@@ -13,16 +13,26 @@ the GoHighLevel MCP Server (834 tools) deployed on Railway.
 - Reachable via the GHL connectors wired into the session (official GHL + Frontline busybee).
 - Read AND write both confirmed.
 
-### Command & Construct — ⚠️ DEPLOYED, NOT ALWAYS CONNECTED
+### Command & Construct — ✅ CONNECTOR ADDED & REACHABLE (live read pending in fresh session)
 - Location ID: `xZj500PjsfllQq2j9i9D` (confirm spelling against GHL)
 - Busybee deployed on Railway (project `fulfilling-growth` / production), service Online.
 - Public domain: `go-high-level-mcp-2026-complete-production-711a.up.railway.app`
 - MCP endpoint: `/mcp` (Streamable HTTP; `/sse` legacy). Default start = `node dist/main.js`.
-- To USE it in a chat: add `https://...-711a.up.railway.app/mcp` as a connector, then
-  START A NEW SESSION (connectors load at session start). It already works in sessions
-  where that connector is added.
-- NOTE: this sandbox blocks direct `railway.app` egress ("Host not in allowlist"),
-  so Command must be reached via a wired MCP connector, not curl.
+- 2026-06-06: custom connector named `command` added in Claude and HANDSHOOK successfully
+  — 444 read-only tools loaded into the connector panel. Transport/connection CONFIRMED.
+- STILL PENDING: a live GHL read against `xZj500PjsfllQq2j9i9D` to confirm the busybee's
+  token is actually scoped for Command (could 401/403 if scopes are missing). Run it in a
+  NEW session where `command` is loaded. Test line: "use the command connector, read
+  location xZj500PjsfllQq2j9i9D and give the contact count."
+- Connectors load at SESSION START only: `command` will NOT appear in a chat where it was
+  added mid-session — open a fresh chat to use it.
+- This sandbox blocks direct `railway.app` egress ("Host not in allowlist"), so Command is
+  reachable only via the wired `command` MCP connector, not curl.
+
+### Connector name map (per Claude session)
+- `command` = Command busybee (Railway, location `xZj500PjsfllQq2j9i9D`)
+- `ghl-full` = Frontline busybee (Railway, location `TXw28sw0Z2rI6tcCDhJY`)
+- `GH;` = official GHL MCP (`services.leadconnectorhq.com/mcp`, Frontline)
 
 ## Important notes
 - Connectors are per-session. A connector added mid-session does not appear until a new chat.
