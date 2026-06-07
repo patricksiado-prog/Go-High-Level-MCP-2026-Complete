@@ -1,0 +1,93 @@
+{
+  "id": "customer-follow-up",
+  "title": "Customer conversation follow-up",
+  "goal": "Work the conversation inbox: find customers waiting on a reply or with no first touch, draft the next message, then schedule the follow-up with a task, tag, and optional workflow enrollment.",
+  "requiredInputs": ["locationId"],
+  "optionalInputs": ["query", "channel", "assignedTo", "workflowId", "dueDate", "followUpTag"],
+  "steps": [
+    {
+      "id": "load-inbox",
+      "description": "Load open and unread conversations that may need a reply.",
+      "tool": "crm_conversation_workspace",
+      "input": {
+        "locationId": "{{locationId}}",
+        "query": "{{query}}"
+      }
+    },
+    {
+      "id": "find-unworked",
+      "description": "Find recent leads and contacts with no first-touch follow-up yet.",
+      "tool": "crm_find_unworked_leads",
+      "input": {
+        "locationId": "{{locationId}}"
+      }
+    },
+    {
+      "id": "read-thread",
+      "description": "Pull the recent messages for a selected conversation before drafting a reply.",
+      "tool": "get_recent_messages",
+      "input": {
+        "contactId": "{{contactId}}"
+      }
+    },
+    {
+      "id": "draft-reply",
+      "description": "Stage an SMS or email reply with thread context for the user to approve.",
+      "tool": "crm_prepare_conversation_reply",
+      "input": {
+        "locationId": "{{locationId}}",
+        "contactId": "{{contactId}}",
+        "channel": "{{channel}}",
+        "message": "{{message}}"
+      }
+    },
+    {
+      "id": "send-reply",
+      "description": "Send the approved message to the customer.",
+      "tool": "send_sms",
+      "input": {
+        "contactId": "{{contactId}}",
+        "message": "{{message}}"
+      }
+    },
+    {
+      "id": "schedule-follow-up-task",
+      "description": "Create the next dated follow-up task for the customer.",
+      "tool": "create_contact_task",
+      "input": {
+        "contactId": "{{contactId}}",
+        "title": "Follow up with customer",
+        "body": "Continue the conversation and move toward the next step.",
+        "dueDate": "{{dueDate}}",
+        "assignedTo": "{{assignedTo}}",
+        "completed": false
+      }
+    },
+    {
+      "id": "tag-follow-up-state",
+      "description": "Tag the customer with the current follow-up state for filtering.",
+      "tool": "add_contact_tags",
+      "input": {
+        "contactId": "{{contactId}}",
+        "tags": ["{{followUpTag}}"]
+      }
+    },
+    {
+      "id": "enroll-nurture",
+      "description": "Optionally enroll the customer in a follow-up or nurture workflow.",
+      "tool": "crm_prepare_automation_enrollment",
+      "input": {
+        "locationId": "{{locationId}}",
+        "contactId": "{{contactId}}",
+        "workflowId": "{{workflowId}}"
+      }
+    }
+  ],
+  "confirmationPoints": [
+    "Before sending any SMS or email",
+    "Before sending to more than one customer",
+    "Before enrolling a customer in a workflow",
+    "Before tagging more than 25 contacts"
+  ],
+  "output": "Return conversations reviewed, replies drafted and sent, tasks created, tags applied, and any workflow enrollments staged."
+}

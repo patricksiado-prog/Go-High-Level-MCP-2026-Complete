@@ -9,6 +9,7 @@ Use placeholders like `{{locationId}}`, `{{contactId}}`, and `{{startDate}}` as 
 - `lead-intake-and-dedupe.json` - Search before creating a lead, then tag and task it.
 - `book-appointment-from-lead.json` - Find a contact, check calendar availability, and book a confirmed appointment.
 - `pipeline-follow-up.json` - Review open opportunities and create follow-up tasks for stale deals.
+- `customer-follow-up.json` - Work the conversation inbox: find customers needing a reply, draft messages, and schedule follow-ups.
 - `lost-opportunity-recovery.json` - Find lost opportunities and enroll selected contacts in a recovery workflow.
 - `weekly-ads-report.json` - Pull ad, attribution, funnel, and conversion data for a weekly summary.
 - `form-submission-triage.json` - Review recent form submissions and surface uncontacted leads.

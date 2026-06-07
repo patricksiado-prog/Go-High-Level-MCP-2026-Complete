@@ -5,6 +5,7 @@ These starter prompts are meant for MCP clients that connect to this GoHighLevel
 ## Templates
 
 - `crm-assistant.md` - Contact lookup, notes, tags, tasks, and conversation context.
+- `customer-follow-up-assistant.md` - Chat-driven inbox control: surface customers waiting on a reply, draft messages, and schedule follow-ups.
 - `appointment-setter.md` - Calendar availability and appointment booking.
 - `pipeline-manager.md` - Opportunity review, follow-up, and status hygiene.
 - `ads-reporting-assistant.md` - Weekly/monthly ad and attribution summaries.
