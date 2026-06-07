@@ -64,6 +64,9 @@
 - Converse → confirm address → check eligibility → offer 2 windows → book → move opp to booked
   → tag `command-booked`. YES routes live to 832-247-4060; STOP scrubs via workflow.
 - TCPA: texting DNC/non-consented = $500–$1,500 per message. Throttle and log.
+- **No number randomization / sender rotation to evade carrier filters (snowshoeing).** It is a
+  10DLC + carrier-policy violation and detection evasion, and risks the AT&T dealership. Drips
+  send from a single A2P-registered number to consented contacts only. Owning a list ≠ consent.
 
 ## 6. Code / deploy
 - Curated lead-finder bug fixed on branch `claude/integration-command-control-opts-ULUBC`:
@@ -76,3 +79,16 @@
 ## 7. Security
 - Rotate the exposed `pit-` token in GHL (was shown in screenshots/docs). Keep it in Railway
   env only. The public busybee URL has NO auth — URL = full account access. Keep it private.
+
+## 8. Operator context & account custody (added 2026-06-07)
+- The GHL account is Patrick's. During a business slowdown a manager who works for him operated
+  it; Patrick is now resuming direct control and will run both **Command & Construct** and
+  **Frontline** himself.
+- Contacts predating the manager period (roughly a few months back) are Patrick's own prior
+  data. Recent bulk/CSV/AI-test writes (Wichita auto shops, jeweler/realtor B2B scrape,
+  call-tracking junk) are not consented opt-ins regardless of who loaded them.
+- **La Porte upload `5181c4eb-6.6.xlsx` (319 rows): SKIP-TRACED, not opt-in.** 184/319 carry a
+  DO NOT CALL flag; 135 are clean wireless / non-DNC; every row has at least one wireless line.
+  Route = DOOR-KNOCK + manual CALL on the clean non-DNC subset. **Never an SMS drip.**
+- Textable audiences remain: form opt-ins ("Onboarding Info" submitters) and customers with a
+  real opt-in / prior relationship — from one registered number, throttled, opt-out intact.
