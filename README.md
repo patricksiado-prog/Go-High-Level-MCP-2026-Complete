@@ -172,6 +172,57 @@ Example stdio config:
 }
 ```
 
+## Multiple Sub-Accounts (One Connector Per Location)
+
+One deployed server can serve several GoHighLevel sub-accounts (locations). This
+is the supported way to wire up two Claude/ChatGPT connectors — for example a
+`Frontline Direct` connector and a `Connect & Comm` ("command") connector — that
+point at the **same** deployment but talk to **different** sub-accounts.
+
+Connectors only let you enter a URL (no custom headers), so the account is chosen
+from the URL path:
+
+| Connector            | Connector URL                       | Sub-account        |
+| -------------------- | ----------------------------------- | ------------------ |
+| `ghl-full`           | `https://<your-app>/mcp`            | default (Frontline)|
+| `command`            | `https://<your-app>/mcp/command`    | Connect & Comm     |
+
+### 1. Configure the accounts
+
+Keep the default account in the primary env vars, then add the second account
+either as a JSON blob or as flat vars (see `.env.example`):
+
+```bash
+# Default account (Frontline) -> /mcp
+GHL_API_KEY=pit-frontline-key
+GHL_LOCATION_ID=loc_frontline
+GHL_DEFAULT_ACCOUNT=frontline      # optional friendly name -> /mcp/frontline
+
+# Second account (Connect & Comm) -> /mcp/command
+GHL_API_KEY_COMMAND=pit-command-key
+GHL_LOCATION_ID_COMMAND=loc_command
+
+# ...or as one JSON map instead of the flat *_COMMAND vars:
+# GHL_ACCOUNTS={"command":{"apiKey":"pit-command-key","locationId":"loc_command","label":"Connect & Comm"}}
+```
+
+Each sub-account needs its **own** Private Integration API key created **inside
+that sub-account**, plus that sub-account's Location ID. A key from Frontline
+cannot read Connect & Comm — that mismatch is the usual cause of a second
+connector that "connects but shows the wrong data."
+
+### 2. Verify
+
+```bash
+curl https://<your-app>/accounts
+# { "accounts": [ {"key":"frontline","default":true,...}, {"key":"command",...} ], "count": 2 }
+```
+
+Account keys are case-insensitive (`/mcp/Command` == `/mcp/command`). An unknown
+key returns `400` with the list of valid keys. Power users can still override per
+request with the `x-ghl-account` header or the `x-ghl-access-token` +
+`x-ghl-location-id` header pair.
+
 ## Scripts
 
 ```bash

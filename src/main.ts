@@ -16,6 +16,7 @@ import { EnhancedGHLClient } from './enhanced-ghl-client.js';
 import { ToolRegistry } from './tool-registry.js';
 import { GHLConfig } from './types/ghl-types.js';
 import { registerExecuteRoutes } from './execute-route.js';
+import { AccountResolver } from './account-resolver.js';
 
 dotenv.config();
 
@@ -59,11 +60,42 @@ async function main() {
   const toolCount = registry.getToolCount();
   const startTime = Date.now();
 
+  const accounts = new AccountResolver(config);
+
+  // Reuse a client per resolved location so each account keeps its own cache.
+  const clientCache = new Map<string, EnhancedGHLClient>();
+  clientCache.set(`${config.locationId}:${config.accessToken}`, ghlClient);
+  const clientFor = (cfg: GHLConfig): EnhancedGHLClient => {
+    const key = `${cfg.locationId}:${cfg.accessToken}`;
+    let c = clientCache.get(key);
+    if (!c) {
+      c = new EnhancedGHLClient(cfg);
+      clientCache.set(key, c);
+    }
+    return c;
+  };
+
+  // Resolve which account a request targets, in priority order:
+  //   1. full per-request override headers (x-ghl-access-token + x-ghl-location-id)
+  //   2. account key from the URL path (/mcp/:account) or ?account= / x-ghl-account header
+  //   3. the default account from env
+  const resolveClient = (
+    accountKey: string | undefined,
+    headerToken: string | undefined,
+    headerLoc: string | undefined
+  ): EnhancedGHLClient => {
+    if (headerToken && headerLoc) {
+      return clientFor({ ...config, accessToken: headerToken, locationId: headerLoc });
+    }
+    return clientFor(accounts.resolve(accountKey));
+  };
+
   log('info', 'Initializing GHL MCP server', {
     baseUrl: config.baseUrl,
     version: config.version,
     locationId: config.locationId,
     tools: toolCount,
+    accounts: accounts.list().map((a) => a.key),
   });
 
   await ghlClient.testConnection();
@@ -80,7 +112,7 @@ async function main() {
       callback(new Error('CORS not allowed'));
     },
     methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'mcp-session-id', 'x-ghl-access-token', 'x-ghl-location-id'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'mcp-session-id', 'x-ghl-access-token', 'x-ghl-location-id', 'x-ghl-account'],
     credentials: true,
   }));
   app.use(express.json());
@@ -89,13 +121,15 @@ async function main() {
     next();
   });
 
-  app.all('/mcp', async (req, res) => {
+  app.all(['/mcp', '/mcp/:account'], async (req, res) => {
     try {
       const reqAccessToken = req.headers['x-ghl-access-token'] as string | undefined;
       const reqLocationId = req.headers['x-ghl-location-id'] as string | undefined;
-      const client = reqAccessToken && reqLocationId
-        ? new EnhancedGHLClient({ ...config, accessToken: reqAccessToken, locationId: reqLocationId })
-        : ghlClient;
+      const accountKey =
+        (req.params.account as string | undefined) ||
+        (req.query.account as string | undefined) ||
+        (req.headers['x-ghl-account'] as string | undefined);
+      const client = resolveClient(accountKey, reqAccessToken, reqLocationId);
       const requestServer = createMcpServer(client);
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
       await requestServer.connect(transport);
@@ -105,16 +139,30 @@ async function main() {
       });
     } catch (err: any) {
       log('error', 'Streamable HTTP error', { error: err.message });
-      if (!res.headersSent) res.status(500).json({ error: 'Internal server error' });
+      if (!res.headersSent) {
+        const unknownAccount = /Unknown GHL account/.test(err.message || '');
+        res.status(unknownAccount ? 400 : 500).json({
+          error: unknownAccount ? err.message : 'Internal server error',
+        });
+      }
     }
   });
 
   const handleSSE = async (req: express.Request, res: express.Response) => {
     const sessionId = String(req.query.sessionId || 'unknown');
-    log('info', 'SSE connection', { sessionId });
+    const accountKey =
+      (req.params.account as string | undefined) ||
+      (req.query.account as string | undefined) ||
+      (req.headers['x-ghl-account'] as string | undefined);
+    log('info', 'SSE connection', { sessionId, account: accountKey });
 
     try {
-      const sseServer = createMcpServer(ghlClient);
+      const client = resolveClient(
+        accountKey,
+        req.headers['x-ghl-access-token'] as string | undefined,
+        req.headers['x-ghl-location-id'] as string | undefined
+      );
+      const sseServer = createMcpServer(client);
       const transport = new SSEServerTransport('/sse', res);
       await sseServer.connect(transport);
       req.on('close', () => {
@@ -123,13 +171,21 @@ async function main() {
       });
     } catch (err: any) {
       log('error', 'SSE error', { error: err.message, sessionId });
-      if (!res.headersSent) res.status(500).json({ error: 'Failed to establish SSE connection' });
-      else res.end();
+      if (!res.headersSent) {
+        const unknownAccount = /Unknown GHL account/.test(err.message || '');
+        res
+          .status(unknownAccount ? 400 : 500)
+          .json({ error: unknownAccount ? err.message : 'Failed to establish SSE connection' });
+      } else res.end();
     }
   };
 
-  app.get('/sse', handleSSE);
-  app.post('/sse', handleSSE);
+  app.get(['/sse', '/sse/:account'], handleSSE);
+  app.post(['/sse', '/sse/:account'], handleSSE);
+
+  app.get('/accounts', (_req, res) => {
+    res.json({ accounts: accounts.list(), count: accounts.size });
+  });
 
   app.get('/', (_req, res) => {
     res.json({
@@ -143,8 +199,11 @@ async function main() {
         tools: '/tools',
         execute: '/execute',
         mcp: '/mcp',
+        'mcp (per account)': '/mcp/:account',
         sse: '/sse',
+        accounts: '/accounts',
       },
+      accounts: accounts.list(),
       tools: registry.getToolCounts(),
       cache: ghlClient.getCacheStats(),
     });
@@ -176,7 +235,7 @@ async function main() {
     });
   });
 
-  registerExecuteRoutes(app, registry, config);
+  registerExecuteRoutes(app, registry, config, accounts);
 
   app.get('/tool-inventory', (_req, res) => {
     res.json({
@@ -193,8 +252,21 @@ async function main() {
       return;
     }
 
+    const accountKey =
+      (req.query.account as string | undefined) ||
+      (req.headers['x-ghl-account'] as string | undefined);
+    let callRegistry: ToolRegistry = registry;
+    if (accountKey) {
+      try {
+        callRegistry = new ToolRegistry(clientFor(accounts.resolve(accountKey)));
+      } catch (err: any) {
+        res.status(400).json({ error: err.message });
+        return;
+      }
+    }
+
     try {
-      const result = await registry.callTool(name, args || {});
+      const result = await callRegistry.callTool(name, args || {});
       if (result === undefined) {
         res.status(404).json({ error: `Unknown tool: ${name}` });
         return;

@@ -8,6 +8,7 @@ import type { Application } from 'express';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { GHLConfig } from './types/ghl-types.js';
+import type { AccountResolver } from './account-resolver.js';
 import { EnhancedGHLClient } from './enhanced-ghl-client.js';
 import { ToolRegistry as ToolRegistryClass } from './tool-registry.js';
 
@@ -29,8 +30,21 @@ function toAnthropicTool(tool: Tool) {
 export function registerExecuteRoutes(
   app: Application,
   defaultRegistry: ToolRegistry,
-  baseConfig?: GHLConfig
+  baseConfig?: GHLConfig,
+  accounts?: AccountResolver
 ): void {
+  // Cache one registry per resolved location so each account keeps its cache.
+  const registryCache = new Map<string, ToolRegistry>();
+  const registryForConfig = (cfg: GHLConfig): ToolRegistry => {
+    const key = `${cfg.locationId}:${cfg.accessToken}`;
+    let r = registryCache.get(key);
+    if (!r) {
+      r = new ToolRegistryClass(new EnhancedGHLClient(cfg)) as unknown as ToolRegistry;
+      registryCache.set(key, r);
+    }
+    return r;
+  };
+
   app.get('/tools', (_req, res) => {
     try {
       const anthropicTools = defaultRegistry.getAllToolDefinitions().map(toAnthropicTool);
@@ -53,15 +67,24 @@ export function registerExecuteRoutes(
 
     const perReqToken = req.headers['x-ghl-access-token'] as string | undefined;
     const perReqLoc = req.headers['x-ghl-location-id'] as string | undefined;
+    const accountKey =
+      (req.query.account as string | undefined) ||
+      (req.headers['x-ghl-account'] as string | undefined);
 
     let registry = defaultRegistry;
-    if (perReqToken && perReqLoc && baseConfig) {
-      const perReqClient = new EnhancedGHLClient({
-        ...baseConfig,
-        accessToken: perReqToken,
-        locationId: perReqLoc,
-      });
-      registry = new ToolRegistryClass(perReqClient) as unknown as ToolRegistry;
+    try {
+      if (perReqToken && perReqLoc && baseConfig) {
+        registry = registryForConfig({
+          ...baseConfig,
+          accessToken: perReqToken,
+          locationId: perReqLoc,
+        });
+      } else if (accountKey && accounts) {
+        registry = registryForConfig(accounts.resolve(accountKey));
+      }
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+      return;
     }
 
     try {
