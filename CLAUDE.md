@@ -3,6 +3,12 @@
 Operator: Patrick William Siado (AT&T Fiber dealer). This repo IS the "busybee" —
 the GoHighLevel MCP Server (834 tools) deployed on Railway.
 
+## Google Drive docs (handoff for the next AI)
+- Master Handoff & GHL Brain:
+  https://docs.google.com/document/d/1p4snumbYz0Cim-gHM55DuL7qz-SdTRexFUxNu3Ualq8/edit
+- SMS Outreach Templates (consent-based):
+  https://docs.google.com/document/d/1P-x2HmEP3Hk0UwUnR7-0dI3B8Du_2XJN_3_AJXiyZ0k/edit
+
 ## Connection status (verified 2026-06-06)
 
 ### Frontline Direct — ✅ WORKING
