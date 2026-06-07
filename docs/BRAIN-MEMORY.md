@@ -14,6 +14,34 @@ notes or in chat — they are not wanted and are explicitly off. Don't redact or
 
 ---
 
+## 🚀 NEW-CHAT HANDOFF — Claude + GHL busybee (Railway) + connectors (read first)
+> Connector IDs are **per-session opaque UUIDs** — never trust the prefix; identify any
+> connector by calling its `get_location` first.
+
+**Connector map (verified 2026-06-07):**
+- **Official GHL MCP** (direct `services.leadconnectorhq.com`, read-heavy subset) → **Frontline Direct** (`TXw28sw0Z2rI6tcCDhJY`). **WORKING (read).** This session's prefix: `5e0a9e2e`.
+- **Two full-toolset Railway busybees** (carry `send_sms`, `create_appointment`, `update_opportunity`, …) = **the write/send path** → **both 401** this session. Prefixes `40b566b8` + `6cf38bf0`.
+- **Make.com** (not GHL) prefix `aca126b7` — org `7574693` / team `2262502` / `us2.make.com`.
+- Also wired: Google Drive (read/create only), Gmail, Google Calendar, GitHub MCP (repo `patricksiado-prog/Go-High-Level-MCP-2026-Complete` only).
+
+**What the busybee is / how it works:**
+- "busybee" = the GoHighLevel MCP Server (this repo) on Railway. **One Railway service per GHL sub-account**, pinned by env: `GHL_API_KEY=pit-…` (Private Integration token, all scopes), `GHL_LOCATION_ID`, `GHL_BASE_URL=https://services.leadconnectorhq.com`, `GHL_API_VERSION=2021-07-28`, `MCP_SERVER_PORT=8000` (public port 8080), `NODE_ENV=production`.
+- Connector URL in Claude = Railway domain + `/mcp`. Frontline domain: `go-high-level-mcp-2026-complete-production-711a.up.railway.app`.
+- Connectors load at **session start only**. The Claude sandbox **blocks direct railway.app egress** — reach the busybee via the wired connector, never curl.
+
+**The working recipe (run first every chat):**
+1. `get_location` on each connector → which account + 401 or not.
+2. On the working one: `get-pipelines` (AT&T Commercial; AT&T Leads `ve4ERf2YoKvuUVQEZb85`; Recruiting) · `get-contacts` limit 3 (45,579 total) · `search-conversation` inbound limit 2 (657). All 200.
+3. Both busybees → 401 ⇒ send/write down for both accounts.
+
+**401 / Command root-cause suspect:** both busybees 401 = token expired/rotated, Railway down, or wrong `GHL_LOCATION_ID`. The Command location ID is written two ways — Form A `xZj500PjsfllQq2j9i9D` (master brain + playbook) vs Form B `xZj500PjsflIQg2j9f9D` (creds doc + Untitled docs). Get the real one from the GHL URL (`…/v2/location/<THIS>/…`). Fix order: confirm Railway Online → set correct `GHL_LOCATION_ID` + fresh token → redeploy → re-run `get_location` (expect 200 + count).
+
+**Brain locations:** rolling BRAIN (append via Make) = Google Doc `16imUztr9lL1JyEHD9au9kdXkiwsGzs8gL9driInyQg8`; master handoff (2026-06-06) = `1p4snumbYz0Cim-gHM55DuL7qz-SdTRexFUxNu3Ualq8`; repo mirror = this file. Editing Drive = use Make (see the Make section below).
+
+**Next:** pin real Command location ID → fix Railway env/token for both busybees → re-run health check → only then build/send consented outreach (opt-ins + inbound + open opps, scrubbed of dnd/invalid/no-phone/recruiting).
+
+---
+
 ## Session: 2026-06-07 — Frontline connector verified working
 
 ### TL;DR
