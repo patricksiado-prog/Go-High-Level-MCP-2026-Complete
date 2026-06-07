@@ -154,6 +154,7 @@ async function main() {
       uptime: Math.floor((Date.now() - startTime) / 1000),
       endpoints: {
         health: '/health',
+        readyz: '/readyz',
         capabilities: '/capabilities',
         tools: '/tools',
         execute: '/execute',
@@ -181,6 +182,29 @@ async function main() {
       },
       cache: ghlClient.getCacheStats(),
     });
+  });
+
+  // Live readiness probe: actually calls GHL (GET /locations/{id}) so each deployed service
+  // self-reports whether its token + location validate. 200 = creds good for this account;
+  // 503 = the real GHL error (e.g. 401 token/location/scope mismatch). Use this to tell which
+  // busybee (Command vs Frontline) is actually wired correctly.
+  app.get('/readyz', async (_req, res) => {
+    try {
+      const result = await ghlClient.testConnection();
+      res.json({
+        ready: true,
+        locationId: config.locationId,
+        baseUrl: config.baseUrl,
+        ...(result?.data ?? {}),
+      });
+    } catch (err: any) {
+      res.status(503).json({
+        ready: false,
+        locationId: config.locationId,
+        baseUrl: config.baseUrl,
+        error: err?.message ?? String(err),
+      });
+    }
   });
 
   app.get('/capabilities', (_req, res) => {
