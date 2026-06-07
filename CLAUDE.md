@@ -81,17 +81,19 @@
   env only. The public busybee URL has NO auth — URL = full account access. Keep it private.
 
 ## 8. Operator context & account custody (added 2026-06-07)
-- The GHL account is Patrick's. During a business slowdown a manager who works for him operated
-  it; Patrick is now resuming direct control and will run both **Command & Construct** and
-  **Frontline** himself.
-- Contacts predating the manager period (roughly a few months back) are Patrick's own prior
-  data. Recent bulk/CSV/AI-test writes (Wichita auto shops, jeweler/realtor B2B scrape,
-  call-tracking junk) are not consented opt-ins regardless of who loaded them.
+- **Command & Construct is Patrick's** account to run. **Frontline is a separate team's.**
+  Patrick will NOT take Frontline work done in the last few months — the recent Frontline leads,
+  form opt-ins, and CSV imports belong to that team. **Do not migrate, pull, or text Frontline's
+  recent work into or out of Command.** Treat the Frontline 45,579 / recent opt-ins as off-limits.
+- Patrick's legitimate audience = his **own** contacts (his prior data) plus anyone who opts in to
+  **his** outreach going forward. Recent bulk/CSV/AI-test writes (Wichita auto shops, jeweler/
+  realtor B2B scrape, call-tracking junk) are not consented opt-ins regardless of who loaded them.
 - **La Porte upload `5181c4eb-6.6.xlsx` (319 rows): SKIP-TRACED, not opt-in.** 184/319 carry a
   DO NOT CALL flag; 135 are clean wireless / non-DNC; every row has at least one wireless line.
   Route = DOOR-KNOCK + manual CALL on the clean non-DNC subset. **Never an SMS drip.**
-- Textable audiences remain: form opt-ins ("Onboarding Info" submitters) and customers with a
-  real opt-in / prior relationship — from one registered number, throttled, opt-out intact.
+- Textable audience = **Patrick's own** opt-ins/customers (his prior relationship or people who
+  opt in to his own outreach) — from one registered number, throttled, opt-out intact. NOT
+  Frontline's recent form opt-ins (that team's work).
 
 ## 9. AT&T fiber SMS templates (consent-based)
 Source: Patrick's "GHL SMS Outreach Templates" doc
