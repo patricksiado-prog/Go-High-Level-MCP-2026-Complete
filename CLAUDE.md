@@ -88,3 +88,54 @@ the GoHighLevel MCP Server (834 tools) deployed on Railway.
 - Open opportunities in pipeline `ve4ERf2YoKvuUVQEZb85` (Kingsville batch + form leads).
 - Form opt-ins (source "Onboarding Info") = highest intent and consented → contact first.
 - Work these by phone + booking flow, not cold SMS.
+
+## How it works (architecture)
+- The busybee = this repo's code (`node dist/main.js`) serving MCP at `/mcp` (Streamable
+  HTTP) and `/sse` (legacy). Exposes 834 tools (802 raw API + 32 curated workflows).
+- Auth = a single GHL Private Integration token (`pit-...`) sent as `Authorization: Bearer`.
+  The token IS the permission set — no per-call login. 401/403 = token missing scopes.
+- Each busybee is pinned to ONE sub-account via `GHL_LOCATION_ID`. One Railway service =
+  one GHL location. Multi-account = one service per account (current setup), OR an
+  agency/Company token with agency scopes + pass locationId per call.
+- Tool profiles: `full` (834, default) / `curated` (32) / `raw` (802) via `GHL_TOOL_PROFILE`.
+- Two Frontline connectors: `GH;` = GHL official hosted MCP (`services.leadconnectorhq.com/mcp`);
+  `ghl-full` = the Railway busybee. Both point at Frontline.
+- A dead duplicate `ghl-full` connector ("Failed to start MCP authorization") should be
+  deleted — leftover from setup.
+
+## Railway deployment
+- Project `fulfilling-growth` / production. Service "Go-High-Level-MCP-2026-Complete"
+  (service id `1cba30cf-bf3a-4475-83e1-321c8aa42621`).
+- Command public domain: `go-high-level-mcp-2026-complete-production-711a.up.railway.app`
+- Env vars: GHL_API_KEY (pit- token, SECRET), GHL_API_VERSION=2021-07-28,
+  GHL_BASE_URL=https://services.leadconnectorhq.com, GHL_LOCATION_ID, MCP_SERVER_PORT=8000, NODE_ENV.
+- Add a busybee to Claude: Settings → Connectors → Add custom connector → Remote MCP server
+  URL = the `…/mcp` domain, no OAuth. Loads at NEXT session start.
+
+## Verification status (be honest in handoffs)
+- Frontline: VERIFIED live (get-location 200, 45,579 contacts, SMS delivered).
+- Command: connector handshook (tools loaded) = transport OK, but a live GHL read against
+  `xZj500PjsfllQq2j9i9D` is NOT yet confirmed. Run "Using command, get the location" to
+  prove the token is scoped before trusting Command for sends.
+
+## Operator
+- Patrick William Siado, AT&T. Cell / booking number: 832-247-4060.
+
+## Artifacts produced (2026-06-06)
+- DNC-scrubbed La Porte CSV: 190 clean wireless contacts, tag `laporte-fiber`
+  (door/call route — cold, not for SMS).
+- Google Drive handoff doc "AT&T Outreach Bot — Master Handoff & GHL Brain (2026-06-06)"
+  (Google Doc id `1p4snumbYz0Cim-gHM55DuL7qz-SdTRexFUxNu3Ualq8`).
+
+## Command outreach playbook (consent-based)
+0. Confirm account: "Using command, get the location" → expect xZj500…
+1. Pull ONLY consented/warm: form opt-ins (source "Onboarding Info"), open opps in pipeline
+   `ve4ERf2YoKvuUVQEZb85`, inbound repliers. Skip dnd / null / `invalid`.
+2. Open with a personalized (NOT randomized) message: identify as Patrick w/ AT&T, fiber
+   available, 1 Gig in the $40s, 2 months free, free install; ask for a day/time. GHL
+   auto-appends opt-out — do not add or strip STOP.
+3. Converse & book: confirm address → check eligibility → offer 2 windows → create
+   appointment → move opp to booked stage → tag `command-booked` + note.
+4. Replies: YES → book + route live to 832-247-4060; STOP → existing workflow scrubs;
+   no reply after 1 follow-up → hand to call/door route.
+- Guardrails: consented only, no cold/DNC, no filter-evasion variants, throttle, log all.
