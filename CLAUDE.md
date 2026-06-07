@@ -92,3 +92,28 @@
   Route = DOOR-KNOCK + manual CALL on the clean non-DNC subset. **Never an SMS drip.**
 - Textable audiences remain: form opt-ins ("Onboarding Info" submitters) and customers with a
   real opt-in / prior relationship — from one registered number, throttled, opt-out intact.
+
+## 9. AT&T fiber SMS templates (consent-based)
+Source: Patrick's "GHL SMS Outreach Templates" doc
+(`1P-x2HmEP3Hk0UwUnR7-0dI3B8Du_2XJN_3_AJXiyZ0k`). Opted-in / inbound / warm only — never cold or
+DNC. GHL auto-appends opt-out; do NOT add/strip STOP. Offer baked in: 1 Gig in the $40s · 2
+months free · free install · no contract. Booking/live line **832-247-4060**.
+
+- **Opener (form opt-in):** "Hi {{contact.first_name}}, it's Patrick with AT&T — you reached out
+  about fiber. Good news, it's available at your address: 1 Gig starting in the $40s, 2 months
+  free, free install, no contract. Want me to grab you a quick install window? What day works?"
+- **Opener (warm opp):** "Hi {{contact.first_name}}, Patrick with AT&T here — following up on
+  AT&T fiber for your place. It's live in your area: 1 Gig in the $40s, 2 months free + free
+  install, no contract. Want me to lock in an install time? What day's best?"
+- **Confirm address:** "Perfect! Quick check — is {{contact.address1}} the install address? Once
+  I confirm it's fiber-ready I'll grab you the next available window."
+- **Two windows:** "You're all set — fiber's available there. I've got two openings: {{option_1}}
+  or {{option_2}}. Which works better for you?"
+- **Confirm appt:** "Done! You're booked for {{appt_date}} at {{appt_time}}. You'll get a
+  confirmation + reminder. If anything comes up, text me here or call 832-247-4060."
+- **Follow-up (send ONCE, then stop):** "Hi {{contact.first_name}}, Patrick w/ AT&T — just
+  circling back on the fiber install. Still want me to hold a spot for you?"
+
+Reply routing: YES/interested → continue booking, hand live calls to 832-247-4060. STOP → existing
+STOP workflow scrubs, never re-text. No reply after ONE follow-up → move to call/door, stop texting.
+Recipe: `examples/recipes/att-fiber-consented-drip.json`.
