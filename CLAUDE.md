@@ -117,3 +117,21 @@ months free · free install · no contract. Booking/live line **832-247-4060**.
 Reply routing: YES/interested → continue booking, hand live calls to 832-247-4060. STOP → existing
 STOP workflow scrubs, never re-text. No reply after ONE follow-up → move to call/door, stop texting.
 Recipe: `examples/recipes/att-fiber-consented-drip.json`.
+
+## 10. Offers, flyer & contact points
+AT&T offers:
+- Fiber: 1 Gig in the $40s · 2 months free · free install · no contract.
+- $35 All-in-One; ~$20 bundle for existing wireless customers.
+- 5 unlimited lines $50/mo + iPhone 17.
+- Flyer tiers: $150 / $80 / $65 / $55, with a $100 gift card.
+
+Flyer edit spec: swap in Patrick's number + patrickfiber@att.net; Visa → bill credit; −$25/12mo;
+−20% with cell line; keep existing format/colors.
+
+Contact points: booking/live line **832-247-4060**; sending number **832-952-0728** (Frontline
+`+18329520728`, "TX number 3"); Frontline location line **+18328445183**.
+
+Team/ops (structure only — payroll figures, full roster, and WhatsApp threads NOT in this repo):
+Claire's crew works leads (e.g. Mr. Kassow); split into closers + setters; payroll ≈ closer
+commission sheet × setter chat activity; tooling includes Sales Mate. Keep PII/financials in a
+private doc, not this repo.
