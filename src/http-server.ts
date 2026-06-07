@@ -41,7 +41,10 @@ class GHLMCPHttpServer {
         if (!origin) return callback(null, true);
         if (/^https?:\/\/localhost(:\d+)?$/.test(origin) ||
             origin === 'https://chatgpt.com' ||
-            origin === 'https://chat.openai.com') {
+            origin === 'https://chat.openai.com' ||
+            origin === 'https://claude.ai' ||
+            origin === 'https://claude.com' ||
+            /^https:\/\/[a-z0-9-]+\.claude\.(ai|com)$/.test(origin)) {
           return callback(null, true);
         }
         callback(new Error('CORS not allowed'));
@@ -172,7 +175,16 @@ class GHLMCPHttpServer {
   }
 
   async start(): Promise<void> {
-    await this.ghlClient.testConnection();
+    // Non-fatal: a credential/location mismatch should not take the whole server down.
+    // Crashing here returns 502 on the public URL and remote MCP clients only see
+    // "Couldn't connect"; start anyway and surface the real GHL error at tool-call time.
+    try {
+      await this.ghlClient.testConnection();
+      console.log('[GHL MCP] GHL API connection verified');
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.warn(`[GHL MCP] GHL API connection test failed; starting server anyway: ${msg}`);
+    }
     this.app.listen(this.port, '0.0.0.0', () => {
       console.log(`GoHighLevel MCP legacy SSE server listening on ${this.port}`);
     });

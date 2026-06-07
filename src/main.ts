@@ -66,7 +66,19 @@ async function main() {
     tools: toolCount,
   });
 
-  await ghlClient.testConnection();
+  try {
+    await ghlClient.testConnection();
+    log('info', 'GHL API connection verified', { locationId: config.locationId });
+  } catch (err: any) {
+    // Do not crash the HTTP server on a credential/location mismatch. If we exit here,
+    // the public URL returns 502 and remote MCP clients (e.g. Claude connectors) just see
+    // "Couldn't connect" with no clue. Start anyway and let the real GHL error surface at
+    // tool-call time, where it is actionable.
+    log('warn', 'GHL API connection test failed; starting server anyway (tool calls will surface the real error)', {
+      error: err?.message ?? String(err),
+      locationId: config.locationId,
+    });
+  }
 
   const app = express();
   app.use(cors({
@@ -74,7 +86,10 @@ async function main() {
       if (!origin) return callback(null, true);
       if (/^https?:\/\/localhost(:\d+)?$/.test(origin) ||
           origin === 'https://chatgpt.com' ||
-          origin === 'https://chat.openai.com') {
+          origin === 'https://chat.openai.com' ||
+          origin === 'https://claude.ai' ||
+          origin === 'https://claude.com' ||
+          /^https:\/\/[a-z0-9-]+\.claude\.(ai|com)$/.test(origin)) {
         return callback(null, true);
       }
       callback(new Error('CORS not allowed'));
