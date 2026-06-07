@@ -119,11 +119,15 @@ STOP workflow scrubs, never re-text. No reply after ONE follow-up → move to ca
 Recipe: `examples/recipes/att-fiber-consented-drip.json`.
 
 ## 10. Offers, flyer & contact points
-AT&T offers:
-- Fiber: 1 Gig in the $40s · 2 months free · free install · no contract.
-- $35 All-in-One; ~$20 bundle for existing wireless customers.
-- 5 unlimited lines $50/mo + iPhone 17.
-- Flyer tiers: $150 / $80 / $65 / $55, with a $100 gift card.
+AT&T offers (from flyer + promo sheet, verified 2026-06-07):
+- Fiber flyer pricing (no contract, WiFi 6 router incl., unlimited data, no price change 12 mo):
+  5-GIG $250 · 2-GIG $150 · 1-GIG $80 · 500 Mbps $65 · 300 Mbps $55 (per month).
+- $35/mo with All in One; **$20/mo bundle discount for AT&T wireless customers**.
+- **$100–$200 gift card included.**
+- Promo bill credits (AT&T): new Fiber 1/5 GIG → $30/mo × 12; Fiber 300/500 Mbps → $15/mo × 12;
+  Fiber 1 GIG → $200 Visa reward card; Fiber 5 GIG → $200 Visa; Hyperlocal 5 GIG → $55/mo;
+  Hyperlocal 1 GIG → $45/mo (select zips incl. Houston TX, Dallas-Fort Worth, Atlanta GA).
+- SMS hook stays simple: "1 Gig in the $40s" (the hyperlocal 1-GIG $45/mo bill-credit framing).
 
 Flyer edit spec: swap in Patrick's number + patrickfiber@att.net; Visa → bill credit; −$25/12mo;
 −20% with cell line; keep existing format/colors.
