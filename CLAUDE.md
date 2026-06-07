@@ -139,3 +139,37 @@ the GoHighLevel MCP Server (834 tools) deployed on Railway.
 4. Replies: YES → book + route live to 832-247-4060; STOP → existing workflow scrubs;
    no reply after 1 follow-up → hand to call/door route.
 - Guardrails: consented only, no cold/DNC, no filter-evasion variants, throttle, log all.
+
+## Business context, offers & team (from this session + screenshots)
+
+### AT&T offers seen (use in outreach + flyer)
+- Fiber: **1 Gig in the $40s, 2 months free, free install, no contract.**
+- AT&T Fiber **$35/mo with All in One**.
+- Bundle: **~$20/mo discount for AT&T wireless customers**.
+- Wireless: **5 unlimited lines $50/mo + the new iPhone 17**.
+- Flyer pricing tiers: Hyper-Gig **$150**, **$80**, 300 Mbps **$65**, **$55**; **$100 gift card**.
+- Perks: no price changes, WiFi 6 router included, unlimited data for life, no contracts.
+
+### Flyer edit spec (requested in the "at&t payroll" chat)
+- Add phone **832-247-4060** + email **patrickfiber@att.net**.
+- Remove "no price change at 12 months."
+- Change "**$100–$200 Visa**" → "**$100–$200 bill credit**."
+- Add "**−$25 off for 12 months**" at the top; "**−20% w/ cell**."
+- Keep same format/colors. Check current AT&T new-customer fiber promos before finalizing.
+
+### Numbers / emails on file
+- Booking / live hand-off line: **832-247-4060**.
+- A sending number seen in test texts: **832-952-0728**.
+- Frontline phone on the GHL location: **+18328445183**.
+- Emails: **patrickfiber@att.net** / PATRCKFIBER@ATT.NET; account login patricksiado@gmail.com.
+
+### Team & ops (PARTIAL — confirm/expand)
+- **Claire / Claire's crew** work leads (e.g., "Mr. Kassow" on Frontline, added ~June 4).
+- Roles referenced: **closers + setters**. Payroll/commission audit = AT&T commission sheet
+  (closer side) cross-checked against chat activity (setter side).
+- Texting tool used outside Claude: **Sales Mate**.
+- History: carrier spam blocks / STOP replies / Twilio 30006 from prior cold blasting.
+
+### GAPS — NOT in my possession (paste these to capture them)
+- The actual **WhatsApp transcripts**, detailed **payroll/commission numbers**, and the full
+  **team roster** are NOT available to me. Paste them into a chat and they can be added here.
