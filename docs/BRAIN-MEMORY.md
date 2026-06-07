@@ -71,6 +71,28 @@ The database mixes audiences. Verified by spot-check, not assumption:
   3. confirming **authorization/disclosure** for messaging "as AT&T" (authorized-dealer
      disclosures usually must name the dealer entity, not just "AT&T").
 
+### 🔑 Headline cross-ref (found by reading the Drive brain) — likely the Command 401 cause
+The Command location ID is written **two different ways** across the operator's own docs.
+Only one can be right; a wrong `GHL_LOCATION_ID` in Railway is a textbook 401/403 cause.
+- **Form A** (master Drive brain + the outreach playbook): `xZj500PjsfllQq2j9i9D`
+- **Form B** (Command credentials doc + 2 Untitled docs): `xZj500PjsflIQg2j9f9D`
+
+They differ in the middle/end (lowercase-L vs capital-I, q vs g, i vs f) — classic
+screenshot/OCR drift. **Fix:** copy the real ID straight from the GHL URL
+(`app.gohighlevel.com/v2/location/<THIS>/…`), make it the single source of truth, update
+Railway + both brain docs. Until they match, Command reads keep 401'ing.
+
+### Connector-name map (from the Drive brain, prior session — treat as *likely*, IDs are opaque here)
+- `command` = Command Railway busybee (location `xZj500…`)
+- `ghl-full` = Frontline Railway busybee (location `TXw28sw0Z2rI6tcCDhJY`)
+- `GH;` = official GHL MCP (`services.leadconnectorhq.com/mcp`, Frontline) — **this is the one working today** (`5e0a9e2e`)
+- ⚠️ Regression vs the 2026-06-06 doc: it logged the Frontline busybee as "read+write confirmed, SMS delivered." This session **both** busybees are 401 — so the *send* path is down for Frontline too, not just Command. Only the direct official connector still answers.
+
+### Canonical brain location
+The master brain is on Google Drive: **"AT&T Outreach Bot — Master Handoff & GHL Brain (2026-06-06)"**
+plus this session's addendum **"…GHL Brain UPDATE (2026-06-07)"**. This repo file is a
+secrets-free mirror — never put `pit-` tokens or the no-auth busybee URL here.
+
 ### Next-time shortcuts
 - To re-check health fast: `5e0a9e2e…locations_get-location` first — if it's not the
   account you expect, stop.
