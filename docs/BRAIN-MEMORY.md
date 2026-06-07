@@ -98,6 +98,26 @@ Railway + both brain docs. Until they match, Command reads keep 401'ing.
 The master brain is on Google Drive: **"AT&T Outreach Bot — Master Handoff & GHL Brain (2026-06-06)"**
 plus this session's addendum **"…GHL Brain UPDATE (2026-06-07)"**. This repo file mirrors it.
 
+### ✏️ Editing Drive: use Make.com (the native Drive connector can't)
+The native Claude Google Drive connector is **read/create only** — no edit, no delete.
+To **edit/append an existing Doc**, route through the **Make.com** connector. (Proven
+2026-06-07: this very capability note was appended to the rolling BRAIN doc *through Make*.)
+- **Make:** user patrick siado · org `7574693` · team `2262502` · zone `us2.make.com` · plan Core.
+- **Google connections:** Optimus Google Docs `8884795`, Optimus Google Sheets `8834319`
+  (the Sheets-labeled conn also drives the Docs module — same Google OAuth), Gmail `8834331`, GitHub `8834443`.
+- **Rolling BRAIN doc** (the one Optimus appends to): `16imUztr9lL1JyEHD9au9kdXkiwsGzs8gL9driInyQg8`
+  (dated "BRAIN Delta" entries). This is *different* from the 2026-06-06 handoff doc.
+- **Append scenario:** `Optimus — Append to BRAIN` (id `5073448`) = `util:BasicTrigger → google-docs:appendADocument`.
+  v2 = `Optimus BRAIN Append v2` (id `5244371`).
+- **How to append via Make from here:** the trigger text is **hardcoded** (no input mapping),
+  so the flow is: `scenarios_update` module-1 text → `scenarios_activate` → `scenarios_run` →
+  `scenarios_update` back to original → `scenarios_deactivate`. On-demand runs **require activation first**
+  ("Scenario is not activated" otherwise).
+- **Improvement worth making:** add an input variable to the trigger so future appends pass text
+  via `scenarios_run` `data` instead of rewriting the blueprint each time.
+- **Limit:** this is append-only. Trimming/removing existing Doc text needs a different Docs
+  module (batchUpdate/replace) or a Drive delete via Make — not built yet.
+
 ### Next-time shortcuts
 - To re-check health fast: `5e0a9e2e…locations_get-location` first — if it's not the
   account you expect, stop.
