@@ -101,6 +101,12 @@ class GHLMCPHttpServer {
         status: 'healthy',
         server: 'ghl-mcp-server',
         version: '2.0.0',
+        // Deployed commit, so a curl tells you exactly which build is live
+        // (Railway sets RAILWAY_GIT_COMMIT_SHA; fall back to other common vars).
+        commit: process.env.RAILWAY_GIT_COMMIT_SHA
+          || process.env.SOURCE_COMMIT
+          || process.env.GIT_COMMIT
+          || 'unknown',
         transport: 'sse',
         timestamp: new Date().toISOString(),
         tools: this.registry.getToolCount()
