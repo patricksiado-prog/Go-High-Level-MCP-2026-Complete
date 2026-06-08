@@ -213,3 +213,42 @@ Netgear Nighthawk M7 Pro (up to $269.99) hotspot; NY AWB Premium −$40/mo; Inse
 - **ABF + Phone for Business Bundle:** Unlimited North America **$15/mo per line (lines 1–6)**.
 **Trade-in/tiered:** premium trade-in up to ~$1,100–$1,320; Smartphone Reimbursement Switcher
 up to **$800 Visa**; tiered device offers $0–$99.99/mo; Next Up daily upgrade up to $500/$350 off.
+
+## 12. Busybee usage & tool capabilities (verified 2026-06-08)
+**Two busybees — same code, separate Railway deployments, one account each:**
+- **Command** → `https://go-high-level-mcp-2026-complete-production-711a.up.railway.app/mcp`
+  · location `xZj500PjsflIQg2j9f9D` (Patrick). Pipelines: AT&T Commercial, AT&T Leads.
+- **Frontline** → `https://go-high-level-mcp-2026-complete-production-46d1.up.railway.app/mcp`
+  · location `TXw28sw0Z2rI6tcCDhJY` (**Zack runs it**). Pipelines: AT&T Commercial, AT&T Leads, Recruiting.
+- Add either in claude.ai → Connectors → Add custom connector (paste URL, leave auth blank).
+  Connectors load **at session start** → open a fresh chat after adding/swapping. Each connector
+  is pinned to ONE account; pick the right one for the account you mean to touch.
+
+**What works via the busybee (834 tools):**
+- **Reads:** pipelines, contacts (`search_contacts` by name/phone/email), phone numbers
+  (`list_active_numbers_by_location`), conversations (`get_conversation`), opportunities.
+- **Writes:** create/`upsert_contact`, `add_contact_tags`, create/`update_opportunity`
+  (move stage via `pipelineStageId`), `create_contact_note`, `send_sms` (needs `contactId` +
+  `fromNumber`). Sends verified live from Command (+13466840331) and Frontline.
+- Tags array must be a real array; if a tool returns "no fields", the connector is stale
+  (redeploy / reload — see §1 inputSchema fix).
+
+**What does NOT work via the busybee (use the GHL UI, or add creds):**
+- **Workflows** (read/create/clone/toggle): needs `GHL_FIREBASE_API_KEY` +
+  `GHL_FIREBASE_REFRESH_TOKEN` (or `GHL_REFRESH_TOKEN`) in Railway env — currently unset, so
+  these 404 / "workflow builder not initialized." Toggle/build workflows in the GHL UI until
+  those env vars are added + redeployed.
+- **Smart-list create** (`POST /contacts/smart-lists`) → 404. Build smart lists in the UI.
+- **Bulk tag** (`POST /contacts/tags/bulk`) → 404. Tag per-contact with `add_contact_tags`,
+  or bulk in the UI / via CSV re-import.
+- **Bulk contact import:** no endpoint. Use GHL's native **CSV Import** (matches by phone so no
+  dupes; can apply a tag on the import screen).
+- **get_location** → 401 on Command (token missing `locations.readonly`; cosmetic — reads/sends fine).
+
+**Pull a lead batch:** filter Contacts by **Date Added** in the UI (e.g., an import day), or tag
+the batch via a native CSV re-import (apply the tag on import), then filter by tag.
+
+**AT&T promo reference:** consumer flyer pricing → §10; full dealer sheet (NDSc consumer + NDSb
+business — fiber/wireless/converged/bundle, reward & bill credits, switcher) → §11. Ready-made
+one-pagers in repo: `docs/consumer-fiber-promo-sheet.{md,html,pdf}` and
+`docs/business-fiber-promo-sheet.pdf` (rebuild via `scripts/build_promo_pdf*.py`).
