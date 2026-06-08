@@ -10,6 +10,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ToolAnnotations, Tool } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
 
 import { GHLApiClient } from './clients/ghl-api-client.js';
 import { ContactTools } from './tools/contact-tools.js';
@@ -88,6 +89,58 @@ export interface ToolInventoryItem {
 }
 
 type ToolProfile = 'full' | 'curated' | 'raw';
+
+// ─── Input Schema Conversion ────────────────────────────────
+
+/**
+ * Convert a single JSON-schema property into a permissive Zod type.
+ * Kept loose on purpose: the goal is to ADVERTISE the parameter so the
+ * MCP client stops stripping it, not to strictly validate every shape.
+ */
+function jsonPropToZod(raw: any): z.ZodTypeAny {
+  switch (raw?.type) {
+    case 'string':
+      return z.string();
+    case 'number':
+    case 'integer':
+      return z.number();
+    case 'boolean':
+      return z.boolean();
+    case 'array':
+      return z.array(raw.items ? jsonPropToZod(raw.items) : z.any());
+    case 'object':
+      return z.record(z.string(), z.any());
+    default:
+      return z.any();
+  }
+}
+
+/**
+ * Convert a tool's JSON-schema inputSchema into a Zod raw shape.
+ *
+ * Without this, registerTool() advertises tools with NO parameters, so the
+ * client drops every argument before it reaches the server (empty body → 400).
+ * Returns undefined for zero-argument tools.
+ */
+function jsonSchemaToZodShape(inputSchema: any): Record<string, z.ZodTypeAny> | undefined {
+  const props = inputSchema?.properties;
+  if (!props || typeof props !== 'object') return undefined;
+  const required: string[] = Array.isArray(inputSchema.required)
+    ? inputSchema.required.map(String)
+    : [];
+
+  const shape: Record<string, z.ZodTypeAny> = {};
+  for (const [key, raw] of Object.entries<any>(props)) {
+    let field = jsonPropToZod(raw);
+    if (raw && typeof raw.description === 'string' && raw.description) {
+      field = field.describe(raw.description);
+    }
+    if (!required.includes(key)) field = field.optional();
+    shape[key] = field;
+  }
+
+  return Object.keys(shape).length ? shape : undefined;
+}
 
 // ─── Annotation Inference ───────────────────────────────────
 
@@ -334,6 +387,7 @@ export class ToolRegistry {
 
       const meta = (tool as any)._meta;
       const annotations = inferAnnotations(tool.name, meta);
+      const inputSchema = jsonSchemaToZodShape((tool as any).inputSchema);
 
       try {
         server.registerTool(
@@ -341,6 +395,7 @@ export class ToolRegistry {
           {
             title: annotations.title,
             description: tool.description || '',
+            ...(inputSchema ? { inputSchema } : {}),
             annotations,
             _meta: meta,
           },

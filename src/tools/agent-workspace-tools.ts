@@ -20,7 +20,13 @@ type WorkspaceToolSpec = {
   inputProperties?: JsonRecord;
   required?: string[];
   buildActions?: (args: JsonRecord, locationId: string) => WorkflowAction[];
-  readPlan?: Array<{ label: string; tool: string; method: 'GET'; path: (args: JsonRecord, locationId: string) => string | undefined }>;
+  readPlan?: Array<{
+    label: string;
+    tool: string;
+    method: 'GET' | 'POST';
+    path: (args: JsonRecord, locationId: string) => string | undefined;
+    body?: (args: JsonRecord, locationId: string) => Record<string, unknown> | undefined;
+  }>;
 };
 
 const CONTACT_FIELDS = {
@@ -54,7 +60,7 @@ const WORKSPACE_SPECS: WorkspaceToolSpec[] = [
     },
     readPlan: [
       { label: 'Contact profile', tool: 'get_contact', method: 'GET', path: (args) => stringArg(args.contactId) ? `/contacts/${stringArg(args.contactId)}` : undefined },
-      { label: 'Contact search', tool: 'search_contacts', method: 'GET', path: (args, locationId) => stringArg(args.query) ? `/contacts/search?locationId=${enc(locationId)}&query=${enc(stringArg(args.query))}` : undefined },
+      { label: 'Contact search', tool: 'search_contacts', method: 'POST', path: (args) => stringArg(args.query) ? `/contacts/search` : undefined, body: (args, locationId) => ({ locationId, pageLimit: 20, ...(stringArg(args.query) ? { query: stringArg(args.query) } : {}) }) },
       { label: 'Contact tasks', tool: 'get_contact_tasks', method: 'GET', path: (args) => stringArg(args.contactId) ? `/contacts/${stringArg(args.contactId)}/tasks` : undefined },
       { label: 'Contact notes', tool: 'get_contact_notes', method: 'GET', path: (args) => stringArg(args.contactId) ? `/contacts/${stringArg(args.contactId)}/notes` : undefined },
     ],
@@ -136,8 +142,8 @@ const WORKSPACE_SPECS: WorkspaceToolSpec[] = [
     app: 'lead-intake',
     access: 'read',
     readPlan: [
-      { label: 'Recent form submissions', tool: 'get_form_submissions', method: 'GET', path: (_args, locationId) => `/forms/submissions?locationId=${enc(locationId)}` },
-      { label: 'Contact search', tool: 'search_contacts', method: 'GET', path: (_args, locationId) => `/contacts/search?locationId=${enc(locationId)}` },
+      { label: 'Recent form submissions', tool: 'get_form_submissions', method: 'GET', path: (_args, locationId) => `/forms/submissions?locationId=${enc(locationId)}&limit=20` },
+      { label: 'Contact search', tool: 'search_contacts', method: 'POST', path: () => `/contacts/search`, body: (_args, locationId) => ({ locationId, pageLimit: 20 }) },
     ],
   },
   {
@@ -571,7 +577,8 @@ export class AgentWorkspaceTools {
       const path = item.path(args, locationId);
       if (!path) return undefined;
       try {
-        const response = await this.ghlClient.makeRequest(item.method, path);
+        const body = item.body?.(args, locationId);
+        const response = await this.ghlClient.makeRequest(item.method, path, body);
         return {
           label: item.label,
           tool: item.tool,
@@ -599,7 +606,10 @@ function action(label: string, tool: string, args: JsonRecord, risk: WorkflowAct
 }
 
 function actionsFromReadPlan(spec: WorkspaceToolSpec, args: JsonRecord, locationId: string): WorkflowAction[] {
-  return (spec.readPlan || []).map((item) => action(item.label, item.tool, { path: item.path(args, locationId) }, 'read', false));
+  return (spec.readPlan || []).map((item) => {
+    const body = item.body?.(args, locationId);
+    return action(item.label, item.tool, { path: item.path(args, locationId), ...(body ? { body } : {}) }, 'read', false);
+  });
 }
 
 function compactActions(actions: WorkflowAction[]): WorkflowAction[] {

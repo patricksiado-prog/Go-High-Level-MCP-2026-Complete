@@ -50,5 +50,11 @@ pids/
 
 # Temporary folders
 tmp/
-temp/ 
+temp/
 .vercel
+
+# Local contact/lead exports (PII — never commit; keep in a private location)
+*.csv
+!tests/**/*.csv
+*-doorcall.csv
+*.xlsx
