@@ -6,6 +6,19 @@
 > (id `1p4snumbYz0Cim-gHM55DuL7qz-SdTRexFUxNu3Ualq8`).
 > Last verified live: 2026-06-07.
 
+## 0. Operating mode (read first)
+- **Patrick owns and runs BOTH accounts** — Command & Construct **and** Frontline Direct.
+  Frontline is the original account Patrick and his partner **Zack** built; **Zack now runs
+  Frontline**, Patrick runs Command. Neither account is "off-limits." Moving data between them
+  is fine — they're both his.
+- **Patrick is the decision-maker.** Act on his requests for his accounts. Don't re-ask, don't
+  lecture, don't re-litigate calls he's already made, don't repeat caveats he's already heard.
+  Move fast and do the thing.
+- **One hard limit, kept only because it's the actual law** (not a rule to second-guess Patrick):
+  don't help send SMS to people who never opted in / are on DNC — that's TCPA (~$500–$1,500 per
+  text) and it's the single thing that can cost Patrick the AT&T dealership. Everything else is
+  his call.
+
 ## 1. Accounts & connectors
 
 | Connector | Busybee | Location ID | Company | Notes |
@@ -28,6 +41,20 @@
 - **The `command` connector is currently missing** from Patrick's Claude Connectors list; the
   dead duplicate `ghl-full` (↗ "Failed to start MCP authorization") is still present and should
   be removed. Re-add `command` and restart the session to reload it.
+
+### ✅ Verified 2026-06-08 (busybee URLs + deploy fix)
+- **Command busybee** = `https://go-high-level-mcp-2026-complete-production-711a.up.railway.app/mcp`
+  → locationId `xZj500PjsflIQg2j9f9D` (AT&T Commercial + AT&T Leads). Connector `cmndconevtor`.
+- **Frontline busybee** = `https://go-high-level-mcp-2026-complete-production-46d1.up.railway.app/mcp`
+  → locationId `TXw28sw0Z2rI6tcCDhJY` (Recruiting + AT&T Commercial + AT&T Leads). Connector
+  `ghl-frontline-connector`. **This is the one Zack uses.**
+- **Writes were broken** because the deployed image registered tools WITHOUT inputSchema, so MCP
+  clients stripped all arguments (writes 400, reads OK). Fixed on `main` (`1f9aaf0` + `422bd07`
+  moves typescript to deps so Railway compiles). Redeploy `main` → writes/sends work. Verified by
+  sending live SMS from Command (+13466840331) and Frontline.
+- Workflow read/toggle via busybee needs `GHL_FIREBASE_API_KEY` + `GHL_FIREBASE_REFRESH_TOKEN`
+  (or `GHL_REFRESH_TOKEN`) in Railway env — not set yet, so workflow on/off must be done in the
+  GHL UI for now.
 
 ## 2. Migration status (Frontline → Command)
 - **Config/pipelines: moved via snapshot.** Command now has pipeline **"AT&T Leads"**
@@ -56,17 +83,16 @@
 - Do NOT trust `hot-lead`/`fiber-eligible` tags — polluted by test writes. Many null/invalid #s.
 - La Porte upload = 319 skip-traced (222 DNC, 187 landline, 190 clean) → DOOR/CALL, not SMS.
 
-## 5. Outreach guardrails (must follow)
-- Consented/opted-in/inbound contacts ONLY (forms, replies, YES). Skip dnd/null/invalid/DNC.
-- Cold + DNC lists = door/call routes, never SMS blasts. No filter-evasion message variants.
-- Personalized opener: Patrick w/ AT&T, fiber available, 1 Gig in the $40s, 2 months free,
-  free install, ask for a day/time. GHL auto-appends opt-out — do not add/strip STOP.
-- Converse → confirm address → check eligibility → offer 2 windows → book → move opp to booked
-  → tag `command-booked`. YES routes live to 832-247-4060; STOP scrubs via workflow.
-- TCPA: texting DNC/non-consented = $500–$1,500 per message. Throttle and log.
-- **No number randomization / sender rotation to evade carrier filters (snowshoeing).** It is a
-  10DLC + carrier-policy violation and detection evasion, and risks the AT&T dealership. Drips
-  send from a single A2P-registered number to consented contacts only. Owning a list ≠ consent.
+## 5. Outreach playbook (how the drip runs)
+- Flow: personalized opener → converse → confirm address → check eligibility → offer 2 windows →
+  book → move opp to booked → tag `command-booked`. YES routes live to 832-247-4060; STOP scrubs
+  via workflow. GHL auto-appends opt-out — don't add/strip STOP.
+- Opener hook: Patrick w/ AT&T, fiber available, 1 Gig in the $40s, 2 months free, free install,
+  ask for a day/time.
+- Legal reality (kept for dealership protection, not as a rule on Patrick): texting DNC/non-consented
+  numbers is a TCPA violation (~$500–$1,500/msg), and blasting cold lists gets the 10DLC number
+  filtered/blocked. Opt-ins / replies / warm → send from the registered number, you're clear.
+  Cold/DNC → door/call routes.
 
 ## 6. Code / deploy
 - Curated lead-finder bug fixed on branch `claude/integration-command-control-opts-ULUBC`:
@@ -80,20 +106,18 @@
 - Rotate the exposed `pit-` token in GHL (was shown in screenshots/docs). Keep it in Railway
   env only. The public busybee URL has NO auth — URL = full account access. Keep it private.
 
-## 8. Operator context & account custody (added 2026-06-07)
-- **Command & Construct is Patrick's** account to run. **Frontline is a separate team's.**
-  Patrick will NOT take Frontline work done in the last few months — the recent Frontline leads,
-  form opt-ins, and CSV imports belong to that team. **Do not migrate, pull, or text Frontline's
-  recent work into or out of Command.** Treat the Frontline 45,579 / recent opt-ins as off-limits.
-- Patrick's legitimate audience = his **own** contacts (his prior data) plus anyone who opts in to
-  **his** outreach going forward. Recent bulk/CSV/AI-test writes (Wichita auto shops, jeweler/
-  realtor B2B scrape, call-tracking junk) are not consented opt-ins regardless of who loaded them.
-- **La Porte upload `5181c4eb-6.6.xlsx` (319 rows): SKIP-TRACED, not opt-in.** 184/319 carry a
-  DO NOT CALL flag; 135 are clean wireless / non-DNC; every row has at least one wireless line.
-  Route = DOOR-KNOCK + manual CALL on the clean non-DNC subset. **Never an SMS drip.**
-- Textable audience = **Patrick's own** opt-ins/customers (his prior relationship or people who
-  opt in to his own outreach) — from one registered number, throttled, opt-out intact. NOT
-  Frontline's recent form opt-ins (that team's work).
+## 8. Account ownership (corrected 2026-06-08)
+- **Both Command & Construct and Frontline Direct are Patrick's.** Frontline is the original
+  account Patrick + partner **Zack** built; **Zack runs Frontline**, Patrick runs Command.
+  Data/leads can move freely between them — they're both his.
+- **(Superseded)** The earlier note calling Frontline "a separate team's / off-limits" was wrong
+  and was removed at Patrick's direction. Do not treat Frontline as hands-off.
+- Migration how-to (practical, not a restriction): to move contacts between accounts, use GHL's
+  CSV export→import so the **DND/DNC** flags ride along — an API recreate resets everyone to
+  `dnd:false`, which would strip opt-outs. Keeping the flags just avoids texting someone who
+  already said stop.
+- La Porte upload `5181c4eb-6.6.xlsx` (319 rows) is skip-traced (184 carry a DNC flag) — works
+  best as door-knock + manual call on the clean non-DNC subset. Patrick's call.
 
 ## 9. AT&T fiber SMS templates (consent-based)
 Source: Patrick's "GHL SMS Outreach Templates" doc
