@@ -197,16 +197,19 @@ Hyperlocal (Lumos markets) **extra wireless line free**.
 (non-port) **$180**; Port-In **$360**; BYOD Port-In **$600** (qualifying unlimited + BYOD
 deactivation) — plus a $25 BYOD variant; waived activation.
 **Business Fiber (ABF):** Tiered Reward Card **$500** (1/2/5 GIG) · **$400** (500M) · **$300**
-(300M), new ABF 300Mbps+ — stacks with switcher + All-In-One + waived install. ABF **Switcher
-up to $750 Visa** (switch w/ prior carrier ETF, ABF 300Mbps+, bill within 60 days of install).
-ABF monthly discount + waived installation; Austin DMA regional ABF deals.
-**Internet Air (AIA-B) / Wireless Broadband (AWB):** AIA-B **$360** bill credits / Free 5G gateway /
-Inseego FX4200 switcher; AWB free Franklin A70 or Netgear Nighthawk M7 Pro hotspot, NY AWB Premium
-−$40/mo; Inseego MiFi Pro M4 **$209.99** bill credits.
+(300M), new ABF 300Mbps+ — stacks with switcher + All-In-One + waived activation. ABF **Switcher
+up to $750 Visa** (switch w/ prior-carrier ETF, ABF 300Mbps+, prior bill dated within 60 days of
+install). ABF **Discount monthly price**: 1 GIG **$120/mo** · 500M **$90/mo** · 300M **$60/mo**.
+Waived installation ($99). Austin DMA: 500M $100/mo · 1 GIG $120/mo.
+**Internet Air (AIA-B) / Wireless Broadband (AWB):** AIA-B **$360** bill credits ($10/mo×36) · Free
+5G Gateway ($274.99 credits) · Inseego FX4200 switcher **$863.35**; **AIA-B Switcher up to $750 Visa**
+(ETF reimbursement — cannot also take ABF, 1 reward card/BAN). AWB: free Franklin A70 ($209.99) or
+Netgear Nighthawk M7 Pro (up to $269.99) hotspot; NY AWB Premium −$40/mo; Inseego MiFi Pro M4 **$209.99**.
 **Multi-product (the bundle money-play):**
-- **All-In-One for Business (ABF):** save up to **$50/mo on Fiber** (credit by speed: $30/mo 1/2/5
-  GIG · $40/mo 500M · $50/mo 300M) **OR $30/mo on Wireless** (ABF + new CRU wireless BAN, ≥1 line).
-- **All-In-One for Business (AIA-B/AWB):** save **$20/mo**.
+- **All-In-One for Business (ABF):** save up to **$50/mo on Fiber** — credit by speed **$50/mo
+  (1/2/5 GIG) · $40/mo (500M) · $30/mo (300M)** — **OR $30/mo on Wireless** (ABF + new CRU wireless
+  BAN, ≥1 line on a qualifying plan). Must retain both services.
+- **All-In-One for Business (AIA-B/AWB):** save **$20/mo** on **up to 6** AIA-B/AWB lines.
 - **ABF + Phone for Business Bundle:** Unlimited North America **$15/mo per line (lines 1–6)**.
 **Trade-in/tiered:** premium trade-in up to ~$1,100–$1,320; Smartphone Reimbursement Switcher
 up to **$800 Visa**; tiered device offers $0–$99.99/mo; Next Up daily upgrade up to $500/$350 off.
