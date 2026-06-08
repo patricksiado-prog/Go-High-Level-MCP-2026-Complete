@@ -172,3 +172,41 @@ Team/ops (structure only — payroll figures, full roster, and WhatsApp threads 
 Claire's crew works leads (e.g. Mr. Kassow); split into closers + setters; payroll ≈ closer
 commission sheet × setter chat activity; tooling includes Sales Mate. Keep PII/financials in a
 private doc, not this repo.
+
+## 11. AT&T dealer promo sheet (Knowledge+ NDSc + NDSb, captured 2026-06-08)
+Source = `attknowledgeplus.com` (dealer portal, login-gated). All offers LTO; exact
+eligibility/end dates + regional (DMA) limits live in the portal. This is the talk-track
+reference for Patrick + Zack. NDSc = consumer/residential; NDSb = business.
+
+### NDSc — Consumer
+**Wireless:** Choice Switcher (Port-In) **$250 bill credits OR $250 reward card**; BYOD Port-In
+**$360 or $180** bill credits; waived activation. Premium Trade-In (w/ eligible unlimited + trade):
+iPhone up to **$1,100/$800/$500/$350** off; Galaxy Z Fold7 & S25 Ultra/+ up to **$1,100/$900/$500**;
+Pixel up to **$1,250/$1,050/$500**; moto razr ultra up to **$1,320/$1,000/$500**. Tiered new-line
+device offers $0–$25.99/mo by trade tier.
+**Fiber (resi):** GIG speeds **−$30/mo ×12**; 300Mbps+ **−$15/mo ×12**; 1 GIG **$200** reward card;
+5 GIG **$200** Visa; Hyperlocal 5 GIG **−$55/mo**, 1 GIG **−$45/mo**; Austin DMA 1 GIG −$40/mo &
+5 GIG −$75/mo; Fort Myers 1 GIG+ −$25/mo. Upgrades: Copper→Fiber 1 GIG+ −$10/mo; Copper→Fiber
+5 GIG+ **$100** reward card.
+**Converged (bundle):** Wireless+Fiber/AIA discounts; Chicago DMA AIA −$5/mo ×12; 55+ FAN
+Wireless+Fiber −$5/mo, Wireless+AIA −$31/mo; 55+ Plan Wireless+Fiber/AIA **−$20/mo per line**;
+Hyperlocal (Lumos markets) **extra wireless line free**.
+
+### NDSb — Business
+**Channel-specific wireless (port-in/switcher credits):** Private Port-In **$250**; New Line
+(non-port) **$180**; Port-In **$360**; BYOD Port-In **$600** (qualifying unlimited + BYOD
+deactivation) — plus a $25 BYOD variant; waived activation.
+**Business Fiber (ABF):** Tiered Reward Card **$500** (1/2/5 GIG) · **$400** (500M) · **$300**
+(300M), new ABF 300Mbps+ — stacks with switcher + All-In-One + waived install. ABF **Switcher
+up to $750 Visa** (switch w/ prior carrier ETF, ABF 300Mbps+, bill within 60 days of install).
+ABF monthly discount + waived installation; Austin DMA regional ABF deals.
+**Internet Air (AIA-B) / Wireless Broadband (AWB):** AIA-B **$360** bill credits / Free 5G gateway /
+Inseego FX4200 switcher; AWB free Franklin A70 or Netgear Nighthawk M7 Pro hotspot, NY AWB Premium
+−$40/mo; Inseego MiFi Pro M4 **$209.99** bill credits.
+**Multi-product (the bundle money-play):**
+- **All-In-One for Business (ABF):** save up to **$50/mo on Fiber** (credit by speed: $30/mo 1/2/5
+  GIG · $40/mo 500M · $50/mo 300M) **OR $30/mo on Wireless** (ABF + new CRU wireless BAN, ≥1 line).
+- **All-In-One for Business (AIA-B/AWB):** save **$20/mo**.
+- **ABF + Phone for Business Bundle:** Unlimited North America **$15/mo per line (lines 1–6)**.
+**Trade-in/tiered:** premium trade-in up to ~$1,100–$1,320; Smartphone Reimbursement Switcher
+up to **$800 Visa**; tiered device offers $0–$99.99/mo; Next Up daily upgrade up to $500/$350 off.
