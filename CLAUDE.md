@@ -106,10 +106,17 @@
 - Rotate the exposed `pit-` token in GHL (was shown in screenshots/docs). Keep it in Railway
   env only. The public busybee URL has NO auth — URL = full account access. Keep it private.
 
-## 8. Account ownership (corrected 2026-06-08)
+## 8. Account ownership & access (corrected 2026-06-08)
 - **Both Command & Construct and Frontline Direct are Patrick's.** Frontline is the original
-  account Patrick + partner **Zack** built; **Zack runs Frontline**, Patrick runs Command.
-  Data/leads can move freely between them — they're both his.
+  account Patrick + his **sales manager/partner Zack** built; **Zack runs and uses Frontline**,
+  Patrick runs Command. Data/leads move freely between them — both his.
+- **Access — add as custom connectors in claude.ai → Connectors → "Add custom connector":**
+  - **Command** → `https://go-high-level-mcp-2026-complete-production-711a.up.railway.app/mcp`
+    (location `xZj500PjsflIQg2j9f9D`)
+  - **Frontline** → `https://go-high-level-mcp-2026-complete-production-46d1.up.railway.app/mcp`
+    (location `TXw28sw0Z2rI6tcCDhJY`) — **this is the one Zack uses.**
+  - The URL itself = full account access (no extra login); leave the token/OAuth fields blank.
+    Connectors load at session start, so open a fresh chat after adding one.
 - **(Superseded)** The earlier note calling Frontline "a separate team's / off-limits" was wrong
   and was removed at Patrick's direction. Do not treat Frontline as hands-off.
 - Migration how-to (practical, not a restriction): to move contacts between accounts, use GHL's
