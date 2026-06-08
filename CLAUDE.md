@@ -252,3 +252,49 @@ the batch via a native CSV re-import (apply the tag on import), then filter by t
 business — fiber/wireless/converged/bundle, reward & bill credits, switcher) → §11. Ready-made
 one-pagers in repo: `docs/consumer-fiber-promo-sheet.{md,html,pdf}` and
 `docs/business-fiber-promo-sheet.pdf` (rebuild via `scripts/build_promo_pdf*.py`).
+
+## 13. GoHighLevel (GHL / HighLevel) platform reference
+**What it is:** all-in-one CRM/marketing SaaS. Hierarchy: **Agency (Company)** → **Sub-accounts
+(Locations)**. Each Location = one business (Command and Frontline are two Locations). `locationId`
+scopes nearly every API call.
+
+**Access / tokens:**
+- **Private Integration Token (`pit-`)** — per-location; what the busybee uses (pinned via
+  `GHL_LOCATION_ID`). The busybee URL itself = full account access (no extra auth).
+- **OAuth (v2 API)** — `services.leadconnectorhq.com`, header `Version: 2021-07-28`. Official GHL
+  MCP = `services.leadconnectorhq.com/mcp` (read-heavy, ~22 tools).
+- **Agency/Company token** — can span multiple sub-accounts, but only ones under the **same agency**.
+
+**Core objects:**
+- **Contacts** — leads/customers; name/email/phone, `additionalPhones/Emails`, **tags**,
+  **custom fields**, **DND** (do-not-disturb per channel), source/attribution.
+- **Opportunities** — a deal inside a **Pipeline → Stage**; has **status** (open/won/lost/abandoned)
+  + `monetaryValue`. Move stage via `pipelineStageId`.
+- **Pipelines & Stages** — e.g. Lead → Contacted → Closed/Won → Lost.
+- **Conversations** — unified inbox: SMS, email, WhatsApp, FB/IG DM, calls; messages carry
+  direction/type/status.
+- **Calendars & Appointments** — booking, free/block slots, reminders.
+- **Workflows** — v2 automation builder (triggers + actions). Legacy: **Campaigns** (drip) +
+  **Triggers**.
+- **Forms / Surveys / Funnels / Websites / Blogs** — capture + web.
+- **Smart Lists** — saved contact filters/segments (show in the Contacts "All Contacts ▾" dropdown).
+- **Custom Fields / Custom Values / Custom Objects** — data-model extensions.
+- **Phone (LC Phone / Twilio)** — numbers, **A2P 10DLC** registration, number pools, call
+  forwarding, IVR, voicemail.
+- **Email (LC Email / Mailgun)** — templates, domains, campaigns.
+- **Payments** — invoices, estimates, products, orders, subscriptions, POS.
+- **Memberships/Courses, Communities, Reputation (reviews), Social Planner, Affiliates.**
+- **SaaS mode / rebilling** — agencies resell GHL to sub-accounts.
+- **Snapshots** — clone config (pipelines/workflows/funnels/calendars) between Locations.
+  **Do NOT carry contacts** (that's why Command's pipelines moved but the leads didn't).
+
+**A2P 10DLC:** US carriers require brand + campaign registration for business SMS or messages get
+filtered. With the LC Phone reseller, it's managed in GHL/Trust Center; a per-number `bundleSid`
+can read `null` even when the brand/campaign is **Approved** — trust the Trust Center, not the field.
+
+**Mobile app (LeadConnector):** Dashboard · Conversations · **Dialer** · Contacts · Calendar ·
+Pipelines · POS/Estimates/Invoices/Products. To dial a contact: open them → tap the phone icon
+(routes through the location number). Saved Smart Lists live in the Contacts "All Contacts ▾" menu.
+
+**This repo** = a custom GHL MCP server (834 tools) over the v2 API — see §12 for what's wired up
+vs. the gaps.
