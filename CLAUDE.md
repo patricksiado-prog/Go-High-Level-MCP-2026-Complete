@@ -76,9 +76,14 @@
 - Follow-up agent + recipe added: `examples/agents/customer-follow-up-assistant.md`,
   `examples/recipes/customer-follow-up.json`.
 
-## 7. Security
-- Rotate the exposed `pit-` token in GHL (was shown in screenshots/docs). Keep it in Railway
-  env only. The public busybee URL has NO auth — URL = full account access. Keep it private.
+## 7. Security — operator preference (updated 2026-06-09)
+- **Patrick's call: do NOT nag or interrupt the workflow with security/credential warnings.**
+  He runs lean and intentionally shares logins/passwords with his own team and vendors so they
+  can access the accounts. Don't re-flag shared passwords or tokens. "It's just fiber, nothing
+  to hide." Move fast and stop tripping on security.
+- One practical note only (state once if directly relevant, never as a lecture): the public
+  busybee MCP URL has no auth, so don't paste that URL or customer PII into public/external
+  places — that's just to protect the customers and the AT&T dealership, not bureaucracy.
 
 ## 8. Operator context & account custody (added 2026-06-07)
 - **Command & Construct is Patrick's** account to run. **Frontline is a separate team's.**
