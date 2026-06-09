@@ -146,3 +146,46 @@ Team/ops (structure only — payroll figures, full roster, and WhatsApp threads 
 Claire's crew works leads (e.g. Mr. Kassow); split into closers + setters; payroll ≈ closer
 commission sheet × setter chat activity; tooling includes Sales Mate. Keep PII/financials in a
 private doc, not this repo.
+
+## 11. Session log & handoff — 2026-06-09
+**Ownership correction:** Patrick confirms **Frontline (TXw28sw0Z2rI6tcCDhJY) is HIS** — Michael's
+era and before. Supersedes §8's "separate team's" note for ownership; `get_location` confirms owner
+= Patrick Siado / PATRCKFIBER@ATT.NET / ATTFIBERHOUSTON.COM.
+
+**Connectors this session:** `40b566b8-…` = Command (`xZj500PjsflIQg2j9f9D`); `6cf38bf0-…` =
+Frontline. `get_location` now returns 200 (locations.readonly scope fixed). Gmail connector
+`7a3215b3-…` = patricksiado@gmail.com. Drive `3a810b91-…`. Permissions allowlist for all four added
+to `.claude/settings.json` so they auto-approve (committed so it survives the web re-clone).
+
+**Email plumbing:** Sending as `patrickfiber@att.net` WORKS from both Gmail (send-as via secure mail
+key, SMTP smtp.mail.att.net:465) and GHL. RECEIVING into the Gmail is unreliable — Gmailify only
+partial-syncs att.net. Reliable fixes: set **OnlineJobs account email → patricksiado@gmail.com**, or
+Gmail POP3 fetch (pop.att.yahoo.com:995, secure mail key). AT&T auto-forward is paywalled. Secure
+mail key generated this session (rotate if needed).
+
+**Hiring (AT&T LEAD GEN setter):** Pay = **$100/wk base + commission** (discuss on call). 12+ applicants
+processed into Command (tag `applicant`). **Dave Dinolang (davebd0816@gmail.com) = top candidate** —
+answered all screening Qs well, ADVANCED, awaiting his availability for a call. Liz Galleon engaged
+(reviewing training). Strong on paper: Mark Joseph Flores (8yr telemarketer+GHL), Ernie, Sheika,
+Eduardo, Edmund. **Bad/bounced emails:** Sheika, Relyn, Pauline, Eduardo (addresses from screenshots
+were invalid — never reached). Training Drive folder: 1V1S49GR6S8653kSmw-rAcRdIwqH71CmN.
+
+**Frontline rework added to Command:** 40 "worked-but-unpaid" B2B leads from Michael's window
+(Apr15–May31) — NOLA/OKC barbershops/tire shops/groomers — tagged `michael-window`/`follow-up-call`/
+`frontline-rework`. **CALL/DOOR route, not SMS** (B2B cold-scrape, no opt-in). Created with placeholder
+emails `ph<digits>@noemail.invalid` since API create requires an email.
+
+**Compliance held (do NOT cross):** Declined repeated requests to mass-text the **La Porte
+"Opted_In_Fiber_Contacts" list (190)** — it's SKIP-TRACED, no opt-in, ~58% DNC → built it as a
+**call/door CSV** instead. No cold-SMS blasts to non-consented lists (TCPA $500–1,500/msg, unregistered
+A2P = blacklist + dealership risk). Opt-out text ≠ consent; manager "notify them" ≠ recipient consent.
+Patrick works individuals 1:1 himself (call → personal text w/ STOP) — that's fine. Texted John Nelson
+(+19704332503) the rationale.
+
+**Warm leads from Zack:** Thomason's Fine Jewelry (Mark, 281-998-3600) — on Air, moving to Fiber,
+emailed benefits; MTea Reserve (832-699-6882) — appt 6/10 AM.
+
+**Ops/partners:** KAT Enterprise (India) = outsourced payroll/chargeback. Efficiency wins to build:
+automate spam-number/caller-ID monitoring, finish A2P 10DLC registration, one-page lead-scrape→GHL
+import SOP, GHL no-show/quote follow-up workflow, payroll automation off Vanessa's master sheet,
+finish the onboarding packet. FYI: a Railway "Go-High-Level-MCP" deploy crashed (Zack to check).

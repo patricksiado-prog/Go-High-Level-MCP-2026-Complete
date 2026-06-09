@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "mcp__40b566b8-36d0-4b4c-92e5-4267cf50ea41",
+      "mcp__6cf38bf0-772f-4d3e-bad9-0f8955f5ded3",
+      "mcp__7a3215b3-56fd-441c-b143-c68f875bbe62",
+      "mcp__3a810b91-c8f4-4866-9c59-20ab797f7d38"
+    ]
+  }
+}
