@@ -189,3 +189,32 @@ emailed benefits; MTea Reserve (832-699-6882) — appt 6/10 AM.
 automate spam-number/caller-ID monitoring, finish A2P 10DLC registration, one-page lead-scrape→GHL
 import SOP, GHL no-show/quote follow-up workflow, payroll automation off Vanessa's master sheet,
 finish the onboarding packet. FYI: a Railway "Go-High-Level-MCP" deploy crashed (Zack to check).
+
+## 12. AT&T offers reference — Knowledge+ (DSI), updated 2026-06-04
+Source: **AT&T Knowledge+ powered by DSI** (`knowledgeplus.com`). Two promo summaries — **NDSb**
+(Neighborhood Direct Sales · Business) and **NDSc** (· Consumer). Dated/LTO — verify live before
+quoting. Headline offers Patrick's team pitches:
+
+**Business (NDSb):**
+- **AT&T Business Fiber (ABF):** Switcher up to **$750 Visa Reward Card**; tiered reward card;
+  **ABF Discount** (reduced monthly); **waived install** (Austin DMA + general); ABF + Phone bundle.
+- **Internet Air for Business (AIA-B):** **$360 bill credits**; Switcher up to **$750 Visa**;
+  **free 5G Gateway**; Inseego FX4200 option.
+- **Wireless Broadband (AWB):** free **Franklin A70** or **Netgear Nighthawk M7 Pro** hotspot;
+  NY AWB Premium **save $40/mo**.
+- **Inseego MiFi Pro M4:** **$209.99 bill credits**.
+- **All-In-One for Business (ABF):** save up to **$50/mo on Fiber** OR **$30/mo on Wireless**;
+  **AIA-B/AWB** bundle **save $20/mo**.
+- **Wireless (channel):** Private Port-in **$250** bill credits · Port-in **$360** · New Line **$180** ·
+  BYOD Port-in **$500/$600** · Waived Activation.
+- **Mobility trade-in/upgrade:** device-specific (iPhone/Samsung/Pixel/Moto) **up to $1,100 / $1,000 /
+  $500** trade-in; "Next Up Anytime" premium + tiered upgrade offers.
+
+**Consumer (NDSc):**
+- **Fiber/converged:** Austin DMA **5 GIG save $75/mo ×12**; Converged (Wireless+Fiber or AIA);
+  **55+ FAN** converged **save $25–$31/mo**; **55+ Plan** converged **save $20/mo per line**;
+  Hyperlocal AIA **save $15/mo ×12**; Chicago DMA AIA **save $5/mo ×12**; Hyperlocal Converged (Lumos).
+- **Wireless:** Choice Switcher Port-in **$250 bill credits OR $250 Reward Card**; BYOD Port-in
+  **$360/$180**; Waived Activation; National Premium Trade-In + Tiered (new-line) offers.
+
+Pricing/channels/terms subject to change — these are LTO promo grids, confirm in Knowledge+ at sale.
