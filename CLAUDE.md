@@ -45,7 +45,7 @@
   ("Patrick's number"); also +13466840217, +13613219339.
 - **Frontline** — 21 numbers (TX/AL/AZ/OK/LA/MS) + Voice-AI inbound on several,
   default **+15043996804** ("New Orleans").
-- These are voice/call lines. **Outreach is call + door only — no SMS/texting** (see §5).
+- These are voice/call lines. **Outreach is call + door only** (see §5).
 
 ## 4. Lead intelligence (Frontline)
 - 45,579 contacts. Main pipeline `ve4ERf2YoKvuUVQEZb85` (early stage `378c10e3…`, form opt-in
@@ -56,9 +56,8 @@
 - La Porte upload = 319 skip-traced (222 DNC, 187 landline, 190 clean) → DOOR/CALL only.
 
 ## 5. Outreach guardrails (must follow)
-- **Channels = phone call + door-knock ONLY. No SMS/texting.** A2P 10DLC is unregistered and
-  the consent trail is unproven — texting these lists risks the AT&T dealership under TCPA, so
-  it is off the table. Owning a list ≠ consent.
+- **Channels = phone call + door-knock ONLY.** The consent trail on these lists is unproven, so
+  blasting them risks the AT&T dealership — work only consented/own contacts. Owning a list ≠ consent.
 - Work Patrick's **own** prior relationships/customers and anyone who opts into **his** outreach.
   Skip dnd/null/invalid/DNC. Honor DNC on call lists; cold + DNC = door route.
 - Personalized opener (call/door): Patrick w/ AT&T, fiber available, 1 Gig in the $40s, 2 months
