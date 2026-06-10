@@ -218,3 +218,47 @@ quoting. Headline offers Patrick's team pitches:
   **$360/$180**; Waived Activation; National Premium Trade-In + Tiered (new-line) offers.
 
 Pricing/channels/terms subject to change — these are LTO promo grids, confirm in Knowledge+ at sale.
+
+## 13. Lead ops, outreach & pitch learnings — 2026-06-09 (eve)
+
+**Lead intelligence from the WhatsApp chats (Chrestian + Support threads).** ~88 B2B leads were
+forwarded there (Houston / Sugar Land / Spring / Mobile AL / OKC — auto shops, tire shops, smoke
+shops, barbershops, printers, cleaners, gyms), in a structured block format (Company / Address /
+Contact / Phone / Notes; "GK"=gatekeeper, "DM"=decision-maker). KEY FINDING when cross-checked
+against GHL: these were **worked by CALL and in-person drop-by, not by message** — each contact's
+Frontline conversation shows **dozens of outbound call logs** (some leads dialed 30+ times across
+months) and the "booked" appointments were set **verbally on calls**. Many of the numbers are
+**landlines** (outbound SMS fails with `Error 30006 – cannot receive SMS`). So this is a
+**CALL/DOOR audience**, and conversation threads are intact (not deleted) — the engagement just
+lives in call logs, not text. The 40 "worked-but-unpaid" ones (Michael's window) were loaded into
+Command tagged `michael-window`/`follow-up-call`/`frontline-rework` as a call queue.
+
+**Lead sources / who feeds deals.** **Zack Woodring (+1 832-403-6232)** = primary deal feeder —
+forwards qualified leads via WhatsApp (Thomason's Fine Jewelry, MTea Reserve came from him); text
+him to ask for fresh drops. **Prime Nation / Jay Dunn (jay@primenation.com, 586-306-0911)** = fiber
+lead vendor, has sent "Fiber Leads" batches before. **LVL UP / John & Vanessa Nelson
+(+1 970-433-2503)** = paymaster + leads, but the relationship reads **strained** (payroll/commission
+disputes) — lean on Zack + Prime Nation first. **Jay (Dominican Call Center)** = outsourced dialing
+vendor (Zelle-paid). **KAT Enterprise (India)** = outsourced payroll/chargeback audit.
+
+**Applicant intake / call-agent outreach flow.** OnlineJobs.ph applicants → land at
+`patrickfiber@att.net` → (partially) sync into `patricksiado@gmail.com` → processed into Command
+(contact tagged `applicant`, screening + training emails sent from `patrickfiber@att.net`). Voice-AI
+/ call agents run outbound in GHL ("Hi, this is Ian/Sean/Toni with AT&T Fiber, you qualify for Fiber
++ 5G…"). NOTE: the **"Onboarding Info" form (`MQwcgmzOAhkOBIJbwO5s`, attfibertraininghub.tiiny.site)
+is the field-REP RECRUITING form, NOT customer leads** — its submissions are job applicants
+(Neighborhood Field Sales, shirt size, etc.). Don't pitch fiber to those.
+
+**The winning pitch (pulled verbatim from live GHL threads).** Local **AT&T Fiber** team · fiber
+available **at YOUR address** · **1 Gig in the $40s** · **2 months FREE** · no contract · free
+install · **WiFi 6 router** · **Visa reward card** · **iPhone trade-in** (iPhone 13 or any device
+$180+ → free iPhone 17 Pro) · unlimited **5G in the $20s** · **$20/mo bundle discount** for AT&T
+wireless customers. The close that works: **book a visit** ("can I swing by tomorrow to go over your
+options?"), not "reply YES."
+
+**What converts.** CALLS → in-person visits = where the closes come from (every booked/closed lead
+has dozens of call logs + a drop-by). Door-knock + dial is the engine; build cold/scraped lists as
+`call-door` queues for the setters, not other channels.
+
+**Settings.** `.claude/settings.json` has an allow-list for the 4 MCP connectors so they auto-approve,
+but it may need a session reload / "Always allow" tap to take effect (this session still prompted).
