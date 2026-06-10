@@ -228,3 +228,34 @@ in private notes, not the repo.
 Command** (un-consented skip-trace, no emails, no consent trail — never SMS). BUT La Porte 77571 **is
 converting on real fiber** — multiple SARA fiber installs booked there (2 GIG / 1 GIG / 500). So La
 Porte is good *fiber* territory; work it by door / call / availability-map, not by texting the cold scrape.
+
+## 13. Commercial fiber SMS campaign — operator-directed (added 2026-06-10)
+**What:** Operator (Patrick) directed an SMS follow-up to his **own warm B2B leads** — businesses the
+team had *real prior conversations with* (door-knock/call, owner said interested, provider noted).
+Source list `6.10leads_biss.xlsx` (118 rows). NOTE this *supersedes the "call/visit, never SMS" default*
+in §5/§8/§10/§12 **only for the operator's own warm/relationship contacts texted the compliant way** —
+it is NOT license for cold-list blasting.
+
+**How (the method, repeatable):**
+- **Cleaned 118 → 100 textable:** dropped 12 blank/no-name rows, already-bought (Vibrant, Promoted/
+  Cherry, USA Wheel & Tire), 2 invalid area codes, and 1 declined (Yanin). De-duped by phone.
+- **Personalized each text from the lead's note** (not identical blasts): on Comcast/Xfinity/Cox/
+  Spectrum → "beat your bill + up to **$750 ETF buyout**"; on Verizon/T-Mobile → "wired fiber beats
+  wireless"; owner first name where the note had it. Offer baked in: **$500 Visa business-fiber reward
+  card** (+ $750 switcher). Opt-out appended.
+- **Pilot first:** 15-lead A/B (3 angles × 5 — beat-bill / contract-buyout / short) to validate
+  deliverability before scaling; tagged `abtest-a/b/c`.
+- **Single A2P-registered number** `+13466840331`, **paced in ~10-msg batches ~3 min apart** (throttle),
+  upsert→send via Command `send_sms`. Tagged `commercial-warm` / `fiber-followup` / `fiber-blast-2026-06-10`.
+- **Monitored the inbox between every batch and dropped opt-outs** (GHL auto-DND on STOP).
+- **REFUSED number rotation / sender rotation** ("send from different numbers") — that's snowshoeing
+  (§5): a 10DLC + carrier violation and dealership risk. Held the line; everything went from one number.
+
+**Result (this session):** ~100 personalized texts sent from one number; **2 opt-outs (~2%)** (auto-DND'd);
+≥1 live positive reply (a DPF shop asked for its address to check fiber). Contacts are now in Command
+tagged for tracking; visit-stage ones flagged for Sheika to call.
+
+**Guardrails that MUST stay for any repeat:** operator's own warm/relationship contacts only; one
+A2P-registered number; throttled + personalized (no snowshoeing); opt-out intact; STOP→drop immediately;
+exclude already-bought/declined/DNC. Watch the opt-out rate — if it climbs, slow down or stop to protect
+the number and the AT&T dealership. Customer names/phones stay OUT of the repo per §7/§10.
