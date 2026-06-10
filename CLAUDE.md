@@ -262,3 +262,54 @@ has dozens of call logs + a drop-by). Door-knock + dial is the engine; build col
 
 **Settings.** `.claude/settings.json` has an allow-list for the 4 MCP connectors so they auto-approve,
 but it may need a session reload / "Always allow" tap to take effect (this session still prompted).
+## 14. Session log & handoff — 2026-06-10
+**Connector permissions — the real gotcha:** Setting a connector to **"Always allow"** in the Claude
+mobile app does NOT take effect mid-session. **Connectors load their permission state at SESSION
+START only.** Command (`cmndconevtor` / `40b566b8`) was flipped to Always-allow this session but every
+call still returned `MCP tool call requires approval` because the chat began under the old state.
+**Fix = start a NEW chat** so Command loads fresh. Frontline (`6cf38bf0`) was already Always-allow
+and worked all session (`get_location` on `TXw28sw0Z2rI6tcCDhJY` → 200, owner Patrick Siado /
+PATRCKFIBER@ATT.NET). So: when something Command-side throws "requires approval", it's a session-load
+issue, not a bad toggle — restart, don't re-toggle.
+
+**Gmail = drafts only.** The Gmail connector (`7a3215b3` = patricksiado@gmail.com) has `create_draft`
+but **no send tool**. Workflow: I build the draft, Patrick opens Gmail → Drafts → Send. Drafts default
+to send-from **patricksiado@gmail.com**; to send as **patrickfiber@att.net** he switches the "From"
+line in compose (send-as already configured). Tool can't attach the flyer PDF — Patrick drags it in
+on his phone (he has the file; emailed `AT&T Fiber Flyer-3.pdf` to torresjosue12@gmail.com on 6/9).
+
+**Recruiting email — canonical template** (the one to reuse for every applicant). Sent verbatim to
+Edmund (bellygo20@gmail.com), subject *"AT&T Fiber Setter Role — next steps"*:
+> Hi {name}, Thanks for applying to my AT&T LEAD GEN post on OnlineJobs.ph. Your cold-calling and
+> appointment-setting background fits what I need. I'm an AT&T Fiber dealer looking for a setter to
+> work my call lists, qualify homeowners, and book install appointments. We run everything in
+> GoHighLevel, so your GHL experience is a plus. Pay is $100/week base plus commission — we'll go over
+> details on a quick call.
+> Reply with: 1) how you scrub/respect DNC flags before dialing; 2) comfort in GHL (contacts, opps,
+> call outcomes); 3) what dialer you've used; 4) hours (US Central pref) + rate; 5) a short call
+> recording or two references. Plus a couple time windows this week.
+> Best, Patrick — AT&T Fiber, 832-247-4060
+
+**Applicant direct emails confirmed (valid):** Edmund `bellygo20@gmail.com` (emailed 6/9) · Dave
+Dinolang `davebd0816@gmail.com` (TOP candidate) · Sheika Lomejor `slomejor232@gmail.com` (corrected —
+her earlier address bounced) · Hazel Mae Fampo `hazelmaefampo08@gmail.com` · Josue Torres
+`torresjosue12@gmail.com` (got flyer). **Behind OnlineJobs.ph relay (no direct email yet):** Mark
+Joseph Flores (8yr BPO/GHL, strong), Ley (10yr AT&T support), Jemar, plus "best candidate ever"
+applicant — reach via OnlineJobs reply or pull their saved emails from Command (`applicant` tag).
+
+**Drafts created this session (sitting in Gmail Drafts, ready to send):** Dave, Sheika, Hazel — all
+the recruiting template above, subject *"AT&T Fiber Setter Role — next steps (your Lead Gen
+application)"*.
+
+**Queue for next chat (once Command loads):**
+1. Pull all `applicant`-tagged contacts in Command; draft the recruiting email to each with a valid
+   direct email not yet contacted (skip Edmund/Dave/Sheika/Hazel — already drafted).
+2. Create Hazel Mae Fampo's contact in Command (hazelmaefampo08@gmail.com, tag `applicant`, source
+   OnlineJobs) — screening email already drafted.
+3. La Porte cleanup in Command: find + delete the La Porte cold list (Opted_In_Fiber_Contacts /
+   TX 77571); report count removed. (Likely near-no-op — list was never fully imported.) Don't touch
+   warm/consented contacts.
+4. Warm/applicant SMS can go from Frontline `+18329520728` now; Command SMS once loaded.
+
+**Compliance unchanged:** consented/warm/applicant only; no cold-SMS blasts to non-consented lists
+(La Porte, raw cell dumps, B2B scrape = door/call routes). Owning a list ≠ consent.
