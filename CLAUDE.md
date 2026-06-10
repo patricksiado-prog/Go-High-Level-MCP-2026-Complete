@@ -174,3 +174,54 @@ doc only.** Recording the audit *structure* and dispute logic here as operationa
   (the matured reversal), category B (active-day counts per account), and category C (the unposted
   VIR/OOF/Plan/AutoPay incentives — the May 2026 workpaper already has the per-line evidence). Keep
   the named line-items in the private doc / workpaper, not here.
+
+## 12. Session log — hiring, team, products, ops (added 2026-06-10)
+
+**Command connector now fully live.** `get_location` on `xZj500PjsflIQg2j9f9D` returns **200** — the
+`locations.readonly` / View Locations scope gap from §1 is **resolved**. Session loaded *two* GHL MCP
+servers: one is Command (200), a second token returns **403** on this location — use the Command one.
+Tech notes: **GHL `send_email` requires the `html` field** (plain `message` → 422 "no message"); the
+**Gmail connector can only create drafts, not send** — outbound email to contacts goes via GHL
+`send_email`, which logs into the contact's conversation.
+
+**Setter hiring pipeline (OnlineJobs.ph).** Applicants arrive via OnlineJobs → forwarded to
+`patrickfiber@att.net` → loaded into Command tagged `applicant`. Screening email = the "AT&T Fiber
+Setter Role — next steps" template (role + **$100/wk base + commission** + 5 screening Qs: DNC
+scrubbing, GHL comfort, dialer used, hours/rate, call recording or references; line 832-247-4060).
+2026-06-10: screening drafts created for 9 applicants (Edmund already *sent*); **Hazel Mae Fampo**
+added (`hazelmaefampo08@gmail.com`). **Sheika Lomejor HIRED** — contact `WzcdsgGwoLtXRXSfaiEJ`, email
+corrected to **`slomejor232@gmail.com`**, tagged `hired`; onboarded with day-to-day + training folder
++ the warm follow-up list + an AT&T resi/commercial product cheat sheet (all sent via GHL email).
+
+**Team / roster (from the WhatsApp "Support" group — structure only).** Patrick (owner) + field/setters:
+**Chrestian Estrera** (main rep — **LEFT 2026-03-06**; his warm B2B pipeline is now orphaned → handed
+to Sheika), JL Pedrano, Rea, Zack Woodring (US manager). PH trainer **Romeo**; tech/data **Janar**;
+partner **Jay** (Detroit / new offices). Sheika reports directly to Patrick. Per-lead/closed pay refs
+kept private per §10.
+
+**Commercial follow-up pipeline.** ~35 warm Houston / Sugar Land B2B leads the team door-knocked or
+called (company, contact, phone, current provider, notes) — owners interested, mostly on
+Comcast/Cox/Xfinity/Verizon. Route = **call/visit follow-up, never cold SMS.** Already-closed (e.g.
+Vibrant Cleaners / "Angela") and dead (Yanin, Brammer Athletic, Gab Auto) excluded. Named detail lives
+in private notes, not the repo.
+
+**AT&T product knowledge (Knowledge+ NDSc/NDSb sheets, verified 2026-06-10):**
+- **Residential fiber (NDSc):** GIG speeds save $30/mo ×12; 300 Mbps+ save $15/mo ×12; **$200 reward
+  card** on 1/5 GIG; copper→fiber upgrade $10/mo or $100 card; hyperlocal 1-GIG ~$45/mo (Houston) =
+  the "1 Gig in the $40s" hook; Converged (add AT&T wireless) +$5/mo off; 55+ FAN deals.
+- **Commercial fiber (NDSb / ABF = AT&T Business Fiber):** Tiered Reward Card **$500** (1/2/5 GIG) /
+  $400 (500 Mbps) / $300 (300 Mbps); **⭐ Switcher = up to $750 Visa to cover the customer's ETF
+  (contract buyout — strongest play vs cable-locked businesses; needs their current bill within 60
+  days)**; ABF discount pricing $60 / $90 / $120 (300 / 500 / 1 GIG); All-In-One for Business up to
+  $50/mo off fiber (or $30 wireless) +$20/mo on AIA-B/AWB; ABF + Phone for Business bundle; waived
+  install ($99) in some DMAs (e.g. Austin).
+- **No-fiber backups (so a deal is never lost):** **AIA-B** (Internet Air for Business — $360 bill
+  credits at $10/mo ×36, free 5G gateway, same switcher Visa) and **AWB** (Wireless Broadband — free
+  hotspot: Franklin A70 / Netgear M7 Pro / Inseego).
+- **Tools:** check serviceability at **youachieve.att.com** (green dot = fiber serviceable); orders are
+  submitted through **SARA Plus**.
+
+**La Porte nuance (updates §4/§8).** The 36 "La Porte 6.8 Skip Trace" cold contacts were **deleted from
+Command** (un-consented skip-trace, no emails, no consent trail — never SMS). BUT La Porte 77571 **is
+converting on real fiber** — multiple SARA fiber installs booked there (2 GIG / 1 GIG / 500). So La
+Porte is good *fiber* territory; work it by door / call / availability-map, not by texting the cold scrape.
