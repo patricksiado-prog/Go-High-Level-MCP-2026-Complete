@@ -1,14 +1,15 @@
 # Project Brain — Data Assets
 
-## Leads list — Chris + Support (commercial, WhatsApp-sourced)
-- **117 commercial leads** extracted from WhatsApp chats with **Chrestian Estrera ("Chris")**
-  and the **Support** group. Senders: Chrestian Estrera, JL Pedrano, Rea.
-- Delivered file: `Leads.xlsx`. Columns: **Date, Name, Phone, Address, Notes**.
-- These are businesses where the team **spoke to the owner** — the Notes field holds the
-  contact person, current carrier to beat, pain point, and best time to visit.
-- Already removed: 4 GHL Closed/Won deals + 1 payroll match (Aliana Tires & Automotive).
-- Source chats live in WhatsApp exports (not tagged in GHL), which is why they never showed
-  up under a "chris"/"support" tag.
+## Master leads list (678 leads — paid/payroll removed)
+- File: `Leads.xlsx`. Columns: **Name, Phone, Address, Type, Notes**.
+- **217 COMMERCIAL** — from WhatsApp chats with the lead-gen team: Chrestian Estrera
+  ("Chris"), the Support group, Rea, and Michael Angelo Pangilinan. Notes hold the owner
+  spoken to, current carrier to beat, pain point, and best time to visit.
+- **461 RESIDENTIAL** — La Porte "Opted-In Leads Final" (Name, Address, Phone, carrier).
+- Built by merging all sources, deduping by phone (744 raw -> 678), and removing the
+  4 GHL Closed/Won + payroll matches.
+- WhatsApp leads are NOT tagged in GHL — that's why they don't appear under a rep tag.
+- Drive index: https://docs.google.com/document/d/1u5UtS8kaQ9X7KVIJqKT9kpkggNXPckESPuGkeYpevSo/edit
 
 ## Payroll / commission sheet (already-paid customers)
 - Google Sheet: https://docs.google.com/spreadsheets/d/1UoqH7I4Gt8MCNa2yYR4ZsksriOOQeLMcaZY6XHrdeqY/edit
