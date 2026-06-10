@@ -83,11 +83,19 @@
 - Rotate the exposed `pit-` token in GHL (was shown in screenshots/docs). Keep it in Railway
   env only. The public busybee URL has NO auth — URL = full account access. Keep it private.
 
-## 8. Operator context & account custody (added 2026-06-07)
-- **Command & Construct is Patrick's** account to run. **Frontline is a separate team's.**
-  Patrick will NOT take Frontline work done in the last few months — the recent Frontline leads,
-  form opt-ins, and CSV imports belong to that team. **Do not migrate, pull, or text Frontline's
-  recent work into or out of Command.** Treat the Frontline 45,579 / recent opt-ins as off-limits.
+## 8. Operator context & account custody (added 2026-06-07; CORRECTED 2026-06-10)
+- **⚠️ CUSTODY CORRECTION (owner-clarified 2026-06-10) — supersedes the "separate team / off-limits"
+  framing.** **Both Command AND Frontline are Patrick's.** Frontline Direct is **Patrick's own company**
+  (his "CO"); **Zack has been running it ~1 month** with his reps. Patrick works day-to-day out of
+  **Command** mainly to keep separation from Zack's reps and avoid confusion — but that's an
+  **operational preference, NOT an absolute custody wall.** Patrick **can use both accounts and move
+  leads / insights / data between them whenever he wants.** Frontline is **NOT** off-limits. Standard §5
+  guardrails (consented/warm, opt-out, single A2P-registered number, throttle, no snowshoeing) still
+  apply on **either** account.
+- *(Original 2026-06-07 note, DOWNGRADED to operational guidance, not a hard boundary:)* "Command is the
+  day-to-day account; the Frontline 45,579 / recent opt-ins were kept off-limits to avoid stepping on
+  Zack's reps." → Keep logically separate by default for clean ops, but they ARE Patrick's to use, pull
+  from, and bring into Command when he wants.
 - Patrick's legitimate audience = his **own** contacts (his prior data) plus anyone who opts in to
   **his** outreach going forward. Recent bulk/CSV/AI-test writes (Wichita auto shops, jeweler/
   realtor B2B scrape, call-tracking junk) are not consented opt-ins regardless of who loaded them.
