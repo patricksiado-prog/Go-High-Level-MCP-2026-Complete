@@ -155,13 +155,20 @@ doc only.** Recording the audit *structure* and dispute logic here as operationa
 - **Dispute category B — near-complete clawbacks.** ~12 chargebacks where the line stayed active
   **75–99% of the 90-day window** yet the full commission was reversed (worst: a `89/90`). Demand
   the carrier's actual disconnect dates; several look like timing/reporting errors. ≈ $6K subtotal.
-- **Total clearly disputable ≈ $6.4K** (A + B), before the VIR item below.
-- **Unverified — missing VIR.** Prior claim of $75 VIR × 12 phone lines (~$900) **cannot be
-  confirmed from this statement** (it shows VIR being paid, not the earned-but-unpaid set). Need
-  the activation list to match line-by-line.
+- **Chargeback disputes (A + B) ≈ $6.4K.**
+- **Dispute category C — unposted incentives on confirmed activations (now substantiated).**
+  Cross-checked Patrick's own "AT&T Commission Review — Final Verified (May 2026)" workpaper
+  (owner `patricksiado@gmail.com`, ref'd to the same payfile) against the statement. It documents
+  incentives that activated but **never posted**, each row "activation confirmed / other components
+  paid / [X] not posted": **VIR** $75 × 12 lines = **$900** (this is the previously-"unverified"
+  VIR claim — now evidenced line-by-line, with "N other lines same week paid VIR" corroboration);
+  **OOF** $50 × ~15 ≈ $750; **Plan Bonus** $25–35 × ~24 ≈ $720; **AutoPay** $10 × ~34 ≈ $340.
+  Incentive subtotal ≈ **$2.7K**.
+- **Combined claim against Level Up ≈ $9.1K** (chargebacks ~$6.4K + unposted incentives ~$2.7K).
 - **Recurring drag:** a ~$5 "SARA Plus" fee hits ~every funded line (300+ lines).
 - **Data-quality caveat:** the sheet has *irregular columns* (some rows drop the Dealer Code
   field), so aggregate totals wobble; the named dispute items are solid.
 - **Next action:** draft an itemized dispute note to Level Up (Jay / Vanessa) covering category A
-  (the matured reversal) + category B (active-day counts per account). Keep the named line-items in
-  the private doc, not here.
+  (the matured reversal), category B (active-day counts per account), and category C (the unposted
+  VIR/OOF/Plan/AutoPay incentives — the May 2026 workpaper already has the per-line evidence). Keep
+  the named line-items in the private doc / workpaper, not here.
