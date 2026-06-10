@@ -267,3 +267,29 @@ tagged for tracking; visit-stage ones flagged for Sheika to call.
 A2P-registered number; throttled + personalized (no snowshoeing); opt-out intact; STOP→drop immediately;
 exclude already-bought/declined/DNC. Watch the opt-out rate — if it climbs, slow down or stop to protect
 the number and the AT&T dealership. Customer names/phones stay OUT of the repo per §7/§10.
+
+## 14. Frontline SMS history audit + what actually converts (added 2026-06-10)
+Audited Frontline's conversation history (633 inbound-SMS threads) to find aged "yeses" to revive and to
+learn texts-per-interested-customer. **Finding: the aged Frontline SMS pipeline is SPENT — there is no
+reservoir of unworked fiber "yeses" to revive.**
+- **The aged inbound (1 month back and older) is ~all opt-outs:** "STOP" / "Not interested" / "QUIT" /
+  business auto-reply bots. Searching inbound for "interested" returns only **"Not interested."** Almost
+  every replier is tagged `dnd` — re-texting them is illegal *and* pointless.
+- These came from **cold mass-blast lists**, not a warm pipeline: tags `att-fiber-blast`,
+  `scrape-2026-04-27`, `dealmachine`/`cluteresi`, `maphunter leads`, `wavv-not-interested`, the dated
+  monthly "biz/resi maria/angela" scrapes, and a Wavv power-dialer. Targets were random B2B (movers,
+  pest control, tire shops, jewelers, realtors, mortgage brokers) + residential cell scrapes.
+- **Texts per interested customer on the cold SMS blast ≈ terrible** — huge send volume → overwhelmingly
+  STOP, a sea of `dnd`. This channel/list is **not** how fiber sold.
+- The "Yes" replies on the New Orleans line (+15043996804) are partly a **recruiting funnel** (job
+  applicants: "interested in the position… daily-use vehicle… available 10–6"), not fiber buyers —
+  separate those out before treating a "yes" as a sale.
+- **What ACTUALLY sold:** the rep books (e.g. Zack Gonzalez = 63 customers: residential 1-Gig $405 /
+  500 Mbps / 300 Mbps + Internet Air $486 + one whale mobility account) came from **residential fiber
+  lists worked by phone/door**, not the cold SMS blasts.
+- **PLAYBOOK (how to "continue to get us customers"):** do NOT pour effort into reviving the aged
+  Frontline opt-out list. Win via (1) the **warm-B2B Command campaign** (already producing live ones —
+  Precision DPF replied + booked a call-back), (2) **residential fiber lists by phone/door + the
+  youachieve availability map**, (3) the **killer biz promos** — $500 ABF reward card · ⭐ $750 switcher
+  ETF buyout · "1 Gig in the $40s." Quality warm + personalized + paced beats cold-blast volume every
+  time; the blast just manufactures DND and risks the dealership.
