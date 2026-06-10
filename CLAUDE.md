@@ -157,14 +157,16 @@ doc only.** Recording the audit *structure* and dispute logic here as operationa
   the carrier's actual disconnect dates; several look like timing/reporting errors. ≈ $6K subtotal.
 - **Chargeback disputes (A + B) ≈ $6.4K.**
 - **Dispute category C — unposted incentives on confirmed activations (now substantiated).**
-  Cross-checked Patrick's own "AT&T Commission Review — Final Verified (May 2026)" workpaper
-  (owner `patricksiado@gmail.com`, ref'd to the same payfile) against the statement. It documents
-  incentives that activated but **never posted**, each row "activation confirmed / other components
-  paid / [X] not posted": **VIR** $75 × 12 lines = **$900** (this is the previously-"unverified"
-  VIR claim — now evidenced line-by-line, with "N other lines same week paid VIR" corroboration);
-  **OOF** $50 × ~15 ≈ $750; **Plan Bonus** $25–35 × ~24 ≈ $720; **AutoPay** $10 × ~34 ≈ $340.
-  Incentive subtotal ≈ **$2.7K**.
-- **Combined claim against Level Up ≈ $9.1K** (chargebacks ~$6.4K + unposted incentives ~$2.7K).
+  Two of Patrick's own line-by-line workpapers (owner `patricksiado@gmail.com`, both ref'd to the
+  payfile) prove incentives that activated but **never posted**, charged-back accounts already
+  removed. Authoritative tally from "AT&T Dispute — Full Payroll Check by Line" (Section 7):
+  **VIR 18 lines = $1,350; OOF 20 = $1,000; Plan Bonus 27 = $675; AutoPay 40 = $400 → $3,425 gross
+  (~$3,083 at the 90% split).** Each row reads "activation confirmed / other components paid /
+  [X] not posted" with corroboration like "23 of 24 lines that week paid VIR, only this one
+  skipped." A stricter "Final Verified Clean" subset trims VIR to the 12 strongest lines ($900) by
+  dropping AWB-eligibility-to-confirm rows — use it if a conservative number is wanted.
+- **Combined claim against Level Up ≈ $9.8K gross** (chargebacks ~$6.4K + unposted incentives
+  ~$3.4K; ≈ $9.5K net at the 90% split on the incentive piece).
 - **Recurring drag:** a ~$5 "SARA Plus" fee hits ~every funded line (300+ lines).
 - **Data-quality caveat:** the sheet has *irregular columns* (some rows drop the Dealer Code
   field), so aggregate totals wobble; the named dispute items are solid.
