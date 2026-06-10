@@ -45,11 +45,17 @@
   ("Patrick's number"); also +13466840217, +13613219339.
 - **Frontline** — 21 SMS-capable numbers (TX/AL/AZ/OK/LA/MS) + Voice-AI inbound on several,
   default **+15043996804** ("New Orleans").
-- **A2P 10DLC registered on BOTH GHL platforms** (Command + Frontline) — confirmed by operator
-  2026-06-10 (supersedes the earlier `bundleSid: null` reading). Outbound from the registered
-  numbers is carrier-cleared, so volume won't be silently filtered. Still applies: throttle,
-  personalize (no identical-blast snowshoeing), append opt-out, and send to consented/warm
-  contacts only per §5.
+- **A2P 10DLC registered on BOTH GHL platforms** (Command + Frontline) and **ALL individual sending
+  numbers are A2P-approved** — confirmed by operator 2026-06-10 (supersedes the earlier `bundleSid:
+  null` reading). Outbound from any of them is carrier-cleared, so volume won't be silently filtered.
+- **⚠️ "All numbers approved" does NOT make number-rotation OK.** Using different approved numbers for
+  *genuinely distinct* purposes is fine — local-presence by region, residential vs commercial, a rep's
+  own line, separate brands/use-cases. But **rotating ONE campaign across many numbers to dilute
+  per-number volume / dodge spam-filtering is SNOWSHOEING** and stays prohibited (§5). Each number
+  being individually approved does **not** cure it — snowshoeing is a CTIA/carrier code-of-conduct
+  violation + detection evasion *regardless of registration*, and it's exactly what gets 10DLC
+  campaigns revoked and **risks the AT&T dealership.** Still applies: throttle, personalize, opt-out,
+  warm/consented contacts only.
 
 ## 4. Lead intelligence (Frontline)
 - 45,579 contacts. Main pipeline `ve4ERf2YoKvuUVQEZb85` (early stage `378c10e3…`, form opt-in
@@ -293,3 +299,12 @@ reservoir of unworked fiber "yeses" to revive.**
   youachieve availability map**, (3) the **killer biz promos** — $500 ABF reward card · ⭐ $750 switcher
   ETF buyout · "1 Gig in the $40s." Quality warm + personalized + paced beats cold-blast volume every
   time; the blast just manufactures DND and risks the dealership.
+
+## 15. Order ops — SARA credit-review follow-ups (added 2026-06-10)
+- **SARA orders that hit "Credit Check / Account Review" do NOT auto-complete** — they must be cleared
+  through the **Sales Credit Interface Tool (SCI)** (CCKM aid **`*741879_JA_SCI_Tool`** — "How to / Job
+  Aids - Sales Credit Interface") before the order funds. Each one shows a Dealer Code + Reference #.
+- **Always log a follow-up task in Command** for any order stuck in review so it doesn't stall unpaid —
+  per-customer detail (name / address / ref #) lives on the **contact in the CRM**, not in this repo
+  (§7/§10). 2026-06-10: one such La Porte fiber order logged + tasked.
+- Reinforces §12: **La Porte 77571 keeps converting on real fiber** — multiple live orders there.
