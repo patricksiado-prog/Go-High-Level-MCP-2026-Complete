@@ -80,20 +80,19 @@
 - Rotate the exposed `pit-` token in GHL (was shown in screenshots/docs). Keep it in Railway
   env only. The public busybee URL has NO auth — URL = full account access. Keep it private.
 
-## 8. Operator context & account custody (added 2026-06-07)
-- **Command & Construct is Patrick's** account to run. **Frontline is a separate team's.**
-  Patrick will NOT take Frontline work done in the last few months — the recent Frontline leads,
-  form opt-ins, and CSV imports belong to that team. **Do not migrate, pull, or text Frontline's
-  recent work into or out of Command.** Treat the Frontline 45,579 / recent opt-ins as off-limits.
-- Patrick's legitimate audience = his **own** contacts (his prior data) plus anyone who opts in to
-  **his** outreach going forward. Recent bulk/CSV/AI-test writes (Wichita auto shops, jeweler/
-  realtor B2B scrape, call-tracking junk) are not consented opt-ins regardless of who loaded them.
+## 8. Operator context & account custody (updated 2026-06-08)
+- **Both accounts are Patrick's** — Command & Construct AND Frontline Direct. A **manager who
+  works for Patrick** operates the Frontline account on his behalf; it is NOT a separate company.
+  Patrick may use the leads/data in either account freely (export, call, door, work them).
+- **Consent still governs OUTREACH regardless of ownership** — owning a list is not permission to
+  text it. This is about TCPA / carrier policy / protecting the AT&T dealership, not about who owns
+  the data. Skip-traced data and bulk/CSV/AI-test writes (Wichita auto shops, jeweler/realtor B2B
+  scrape, call-tracking junk) are not consented opt-ins, whichever account they sit in.
 - **La Porte upload `5181c4eb-6.6.xlsx` (319 rows): SKIP-TRACED, not opt-in.** 184/319 carry a
   DO NOT CALL flag; 135 are clean wireless / non-DNC; every row has at least one wireless line.
   Route = DOOR-KNOCK + manual CALL on the clean non-DNC subset. **Never an SMS drip.**
-- Textable audience = **Patrick's own** opt-ins/customers (his prior relationship or people who
-  opt in to his own outreach) — from one registered number, throttled, opt-out intact. NOT
-  Frontline's recent form opt-ins (that team's work).
+- Textable audience = consented opt-ins/customers (form opt-ins, inbound, replies, YES) — from one
+  registered number, throttled, opt-out intact. Applies across either account he owns.
 
 ## 9. AT&T fiber SMS templates (consent-based)
 Source: Patrick's "GHL SMS Outreach Templates" doc
