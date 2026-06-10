@@ -141,3 +141,27 @@ Team/ops (structure only — payroll figures, full roster, and WhatsApp threads 
 Claire's crew works leads (e.g. Mr. Kassow); split into closers + setters; payroll ≈ closer
 commission sheet × setter chat activity; tooling includes Sales Mate. Keep PII/financials in a
 private doc, not this repo.
+
+## 11. Payroll / chargeback audit — Level Up Direct (added 2026-06-10)
+Audited the Level Up commission/reserve statement ("Pat.S. AT&T" Google Sheet, owner
+`vn.lvlupdirect@gmail.com`, period 2026-02-10 → 06-02). **Per §7/§10, customer names, account
+numbers, and per-line dollar amounts are kept OUT of this repo — itemized list lives in a private
+doc only.** Recording the audit *structure* and dispute logic here as operational memory:
+
+- **Dispute category A — fully-matured reversals (`Active N/N days`).** A line charged back after
+  staying active the *entire* required window cannot legitimately be reversed. One such case found
+  (a `180/180` account, ~$414 across its chargeback + bonus/autopay reversals). This is the same
+  issue raised earlier to Jay and is **still uncorrected** in the statement. Slam-dunk dispute.
+- **Dispute category B — near-complete clawbacks.** ~12 chargebacks where the line stayed active
+  **75–99% of the 90-day window** yet the full commission was reversed (worst: a `89/90`). Demand
+  the carrier's actual disconnect dates; several look like timing/reporting errors. ≈ $6K subtotal.
+- **Total clearly disputable ≈ $6.4K** (A + B), before the VIR item below.
+- **Unverified — missing VIR.** Prior claim of $75 VIR × 12 phone lines (~$900) **cannot be
+  confirmed from this statement** (it shows VIR being paid, not the earned-but-unpaid set). Need
+  the activation list to match line-by-line.
+- **Recurring drag:** a ~$5 "SARA Plus" fee hits ~every funded line (300+ lines).
+- **Data-quality caveat:** the sheet has *irregular columns* (some rows drop the Dealer Code
+  field), so aggregate totals wobble; the named dispute items are solid.
+- **Next action:** draft an itemized dispute note to Level Up (Jay / Vanessa) covering category A
+  (the matured reversal) + category B (active-day counts per account). Keep the named line-items in
+  the private doc, not here.
