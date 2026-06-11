@@ -76,6 +76,34 @@
 - Follow-up agent + recipe added: `examples/agents/customer-follow-up-assistant.md`,
   `examples/recipes/customer-follow-up.json`.
 
+### Busybee write failure — root cause + fix (2026-06-08)
+- **Symptom:** every Command write (`create_contact`, `upsert_contact`, `add_contact_tags`, even
+  `get_contact` by id) returns **400**; only zero-arg calls (`get_pipelines`, health check) work.
+  Cause = the live server advertises every tool with an **empty parameter schema**, so the MCP
+  client strips all arguments before sending and the handler runs on an empty body.
+- **Bug 1 (code):** `src/tool-registry.ts → registerAll()` registered all ~800 tools via
+  `McpServer.registerTool` WITHOUT passing `inputSchema`. Fixed: added a JSON-schema→Zod converter
+  and pass it as `inputSchema` (PR #1, commit `1f9aaf0`; added `zod` dep).
+- **Bug 2 (build):** `scripts/build-server.mjs` imports `typescript`, but `typescript` was a
+  **devDependency** — Railway prunes devDeps on a production install, so `npm run build` couldn't
+  compile and Railway kept serving the OLD image even when the deploy showed "Active." Fixed: moved
+  `typescript` into `dependencies` (PR #2, commit `422bd07`). PR #3 = empty commit to force a build.
+- All three merged to **main** (HEAD `267de5f`). Proven: the same code on the Frontline busybee
+  advertises real params; Command's did not until rebuilt.
+- **Remaining blocker = Railway, not code.** The Command service kept rebuilding an old commit
+  ("feat: add curated CRM agent workflows") instead of main HEAD, even after merges + a GitHub
+  source disconnect/reconnect. To fix, force a clean build of main HEAD:
+  1. **Recreate the service** (deterministic): Railway → New → Deploy from repo → branch `main`;
+     copy all 7 env vars from the old service (Variables → Raw Editor); update the `command`
+     connector URL to the new domain.
+  2. **Hosted busybee** `https://api.busybee.day/mcp` (if trusted) — skips Railway entirely.
+  3. **Official LeadConnector MCP** pointed at Command (Command `pit-` + `locationId` header).
+- **After ANY deploy fix: REMOVE and RE-ADD the `command` connector** — Claude caches the old empty
+  tool schemas; a new chat alone does not refresh them. Verify by loading the `create_contact`
+  schema: empty `{}` = still stale; `firstName/email/phone` listed = fixed.
+- `get_location` **401** is separate: the `pit-` token needs the **View Locations**
+  (`locations.readonly`) scope added in GHL (writes also need Edit Contacts/Opportunities/Conversations).
+
 ## 7. Security
 - Rotate the exposed `pit-` token in GHL (was shown in screenshots/docs). Keep it in Railway
   env only. The public busybee URL has NO auth — URL = full account access. Keep it private.
