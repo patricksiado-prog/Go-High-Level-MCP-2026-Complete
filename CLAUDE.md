@@ -308,3 +308,51 @@ reservoir of unworked fiber "yeses" to revive.**
   per-customer detail (name / address / ref #) lives on the **contact in the CRM**, not in this repo
   (§7/§10). 2026-06-10: one such La Porte fiber order logged + tasked.
 - Reinforces §12: **La Porte 77571 keeps converting on real fiber** — multiple live orders there.
+
+## 16. AT&T Knowledge+ promo master list (added 2026-06-11)
+Pulled from the **AT&T Knowledge+ promotion-summary sheets** (`attknowledgeplus.com`, dealer-login only)
+— **NDSc** (Neighborhood Direct Sales for *Consumer* = residential) and **NDSb** (for *Business* =
+commercial). Verified by operator screenshots 2026-06-11. Supplements/refreshes §10 & §12; feeds the
+AI text responder (§9/§13). All are **LTO** (limited-time) and many are **DMA/market-specific** — always
+confirm eligibility + current bill before quoting. Most "save" amounts are **bill credits ×12 months**.
+
+**Residential fiber — NDSc INTERNET OFFERS:**
+- Fiber **GIG speeds**: save **$30/mo ×12** · Fiber **300/500 Mbps**: save **$15/mo ×12**.
+- **Fiber 1 GIG**: **$200 Visa reward card** · **Fiber 5 GIG**: **$200 Visa reward card**.
+- **Hyperlocal Fiber 1 GIG**: save **$45/mo** (= the "1 Gig in the $40s" hook) · **Hyperlocal 5 GIG**: save **$55/mo**.
+- **Hyperlocal AIA**: save **$15/mo ×12**.
+- **Copper→Fiber**: save **$10/mo** · **Copper→Fiber 1 GIG+**: **$100 Visa reward card**.
+- DMA-specific: **Austin** 1 GIG save $40/×12 · Austin 5 GIG save $75/×12 · **Fort Myers** 1 GIG+ save $25/×12 · **Des Moines** GIG save $25/×12.
+
+**Converged (Wireless + Fiber/AIA) — NDSc:**
+- **Converged (Wireless + Fiber OR AIA)**: save **$5/mo ×12** on internet.
+- **55+ FAN Converged (Wireless+Fiber)**: save **$21/mo** · **55+ Plan Converged (Wireless+AIA)**: save **$11/mo**.
+- **55+ Plan Converged (Wireless + Fiber OR AIA)**: save **$20/mo per line**.
+- **Hyperlocal Converged** (Lumos markets): **additional wireless line free** · **Chicago DMA AIA Converged**: save $5/mo ×12.
+
+**Residential wireless — NDSc:**
+- **Choice Switcher (Port-In)**: **$250 bill credits OR $250 reward card** · **Port-In**: **$360 or $180 bill credits**.
+- **Smartphone Reimbursement Switcher**: up to **$800 reward card** · **Next Up early upgrade**: up to **$300/$350 off**.
+- **Premium trade-in**: up to **$1,000–$1,100 off** select phones (eligible plan + qualifying trade).
+- **Signature discounts** (55+ / AT&T Appreciation / Signature): **20% off per Premium 2.0 line**.
+- **American Airlines Employee Port-In**: **$750 bill credit per line**.
+
+**Commercial fiber — NDSb (ABF = AT&T Business Fiber):**
+- **ABF Tiered Reward Card** (new RGF 300Mbps+): tiered Visa — per §12 **$500** (1/2/5 GIG) / **$400** (500) / **$300** (300). *(Sheet shows a tiered card; confirm current tier amounts.)*
+- ⭐ **ABF Switcher**: up to **$750 Visa reward card** — needs the customer's **current bill within 60 days** + early-cancel of prior provider. **Strongest play vs cable-locked businesses.**
+- **ABF discount pricing**: ~**$60 / $90 / $120** (300 / 500 / 1 GIG) [§12].
+- **ABF Waived Installation** ($99) — general + Austin DMA.
+- **Inseego MiFi Pro M4 hotspot**: save **$209.99 bill credits**.
+
+**No-fiber backups — NDSb (so a deal is never lost):**
+- **AIA-B** (Internet Air for Business): **$360 bill credits** ($10/mo ×36) · **switcher offer** · **free 5G gateway** · save **$85.55 on Inseego FX4200**.
+- **AWB** (Wireless Broadband): **free Franklin A70 hotspot** · **free Netgear Nighthawk M7 Pro** · NY: save **$20/mo on AWB Premium**.
+
+**All-In-One / bundles — NDSb:**
+- **All-In-One for Business (ABF)**: up to **$50/mo off fiber** OR **$30/mo off wireless**.
+- **All-In-One for Business (AIA-B and/or AWB)**: save **$20/mo**.
+- **ABF + Phone for Business** bundle offer.
+
+**SMS-hook framing stays simple** (don't dump the whole list on a lead): resi = "1 Gig in the $40s" +
+$200 card; commercial = "$500 business-fiber reward card + up to $750 to cover your ETF." Full detail
+above is the AI responder's knowledge base / a rep cheat-sheet, not a blast script.
