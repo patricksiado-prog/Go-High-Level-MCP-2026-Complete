@@ -382,6 +382,17 @@ other-line cancel <90 days stops credits, Next Up Anytime adds $10/mo). Two grid
 - **Flagships ~$9–21/mo:** **iPhone Air** ($640–680) · **Motorola razr+ 2026** ($582–690) · Samsung **S25 Edge / Z Flip7** ($464–524).
 - Don't memorize the full grid — **look up the customer's exact phone** in Knowledge+ (search "wireless ndsb" → Tiered Offer). Numbers are the **max bill credit**; the $/mo tier is what they pay after credit.
 
+**Why AT&T fiber wins — the speed/reliability sell (for the AI responder; verified online 2026-06-11):**
+- **Symmetric speed:** true **1000↑/1000↓** vs cable's ~**1000/35** — uploads, video calls, cloud backups
+  never choke; fiber upload up to **~20× cable**. Up to **5 Gbps** on business fiber.
+- **Dedicated, not shared:** business fiber is the customer's **own line** — **no peak-hour slowdowns** like
+  shared cable. **~99.8% real-world uptime**; **100% uptime guarantee** (bill credit if down) on higher tiers.
+- **Ultra-low latency:** **~2–6 ms** vs cable's **12–20 ms** — smoother video meetings, VoIP, cloud apps.
+- **Free 5G internet backup** on **1 GIG+** business fiber (stays online during an outage). More secure;
+  no contract; no price hikes.
+- **Use these as the WHY *before* the close** ($500 Visa / $750 switcher). Sources: business.att.com,
+  ifeeltech ATT Business Fiber review.
+
 **SMS-hook framing stays simple** (don't dump the whole list on a lead): resi = "1 Gig in the $40s" +
 $200 card; commercial = "$500 business-fiber reward card + up to $750 to cover your ETF." Full detail
 above is the AI responder's knowledge base / a rep cheat-sheet, not a blast script.
