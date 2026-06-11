@@ -401,8 +401,10 @@ other-line cancel <90 days stops credits, Next Up Anytime adds $10/mo). Two grid
 **⭐ Operator-provided CURRENT promos (Patrick, 2026-06-11) — USE AS-IS. The operator is the AT&T dealer
 and the authority on live offers; the Knowledge+ screenshots above are only a partial snapshot. Do NOT
 second-guess operator-stated promos against them — record and use them:**
-- **5 lines for $50 — unlimited everything** (AT&T wireless).
-- **$5 flagship phone** (with qualifying plan/trade per AT&T terms).
+- **5 lines for $50 — unlimited everything** (AT&T wireless) — **this is the main wireless promo we work.**
+- **$5/mo flagship phone** — **SEVERAL flagships qualify at $5/mo.** The trade-in requirement is **covered by
+  Patrick** (he buys the customer a trade-in device to hit the minimum trade value and make the $5 pricing
+  work) — that's the closing mechanic, not a customer cost.
 - **$500 Visa reward card for business internet customers** (ABF).
 - Rule going forward: when Patrick states a promo, treat it as current and run with it — no fact-checking
   against the partial sheets.
