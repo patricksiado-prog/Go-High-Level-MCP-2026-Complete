@@ -449,3 +449,24 @@ above is the AI responder's knowledge base / a rep cheat-sheet, not a blast scri
 - **Named list (business + phone) lives in the CRM, NOT this repo (§7/§10)** — tagged **`revive-call`** in
   Frontline for the team (Sheika) to dial. Strongest signals were the high-unread/"engaged-interested"
   threads (auto shops, a vet, an assisted-living office, a barbershop, cleaning services).
+- **2026-06-11 follow-up:** moved the 5 cleanest engaged/non-opt-out ones into **Command** tagged
+  `revive-call` / `frontline-revive` with call-notes (Houston Builders, Northside Kustom, J&T Automotive,
+  Minh Dinh Car Wash, A&L Movers) — queued for Sheika to **call**.
+
+## 20. What texting actually WORKS — data-backed (added 2026-06-11)
+From the lead/call data + the payroll trail. Do MORE of what's in this list:
+- **Warm + personalized to relationship/consented contacts converts.** The §13 commercial-warm run =
+  ~100 personalized texts from ONE number → **~2% opt-out** + live positive replies and a **booked call-back
+  (Precision DPF)**. Personalizing off each lead's note and pacing in small batches is what produced the low
+  opt-out + the engagement. This is the model to repeat.
+- **The inbound AI responder converts when it leads with value.** Replying to people who text in held a full
+  qualify→address→pricing back-and-forth in the 2026-06-11 live test. **Opening with benefits + the offer**
+  ($500 Visa biz · $40 gig + $200 resi · $750 switcher) beats the old passive "pricing depends" responder.
+- **Texting's job = WARM + BOOK; the phone/door CLOSES.** The revenue that actually funds payroll traces to
+  **residential fiber lists worked by phone/door** (one rep = 63 customers) and **SARA fiber orders** (La
+  Porte 77571, §17) — text to start the convo + set the appointment, then close on the call/visit
+  (**832-247-4060**).
+- **The numbers:** warm/personalized ≈ **2% opt-out + live bookings**; cold mass-blast ≈ near-zero booked +
+  heavy DND. So aim the texting at **warm + inbound**, throttled from one A2P number, and let phone/door close.
+- **Conversion recipe that's working:** warm/inbound contact → personalized benefit-led opener ($40 gig /
+  $500 Visa + $750 switcher) → confirm address → check fiber → offer 2 windows → book → hand close to 832-247-4060.
