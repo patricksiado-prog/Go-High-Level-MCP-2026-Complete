@@ -96,8 +96,10 @@
   1. **Recreate the service** (deterministic): Railway → New → Deploy from repo → branch `main`;
      copy all 7 env vars from the old service (Variables → Raw Editor); update the `command`
      connector URL to the new domain.
-  2. **Hosted busybee** `https://api.busybee.day/mcp` (if trusted) — skips Railway entirely.
-  3. **Official LeadConnector MCP** pointed at Command (Command `pit-` + `locationId` header).
+  2. **Official LeadConnector MCP** pointed at Command (Command `pit-` + `locationId` header) —
+     GHL's own hosted MCP, skips Railway entirely.
+  - ⚠️ NOT `busybee.day` — that is an unrelated project-management SaaS (Notion/ClickUp competitor),
+    not a hosted GHL busybee. Name collision only; do not put the GHL token there.
 - **After ANY deploy fix: REMOVE and RE-ADD the `command` connector** — Claude caches the old empty
   tool schemas; a new chat alone does not refresh them. Verify by loading the `create_contact`
   schema: empty `{}` = still stale; `firstName/email/phone` listed = fixed.
