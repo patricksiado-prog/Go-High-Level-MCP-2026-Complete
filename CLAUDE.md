@@ -395,3 +395,26 @@ above is the AI responder's knowledge base / a rep cheat-sheet, not a blast scri
   order for the in-progress one — per §15 watch for credit/SCI review).
 - **Per §7/§10: customer names, addresses, phones, account #s and order #s live in the CRM contact only —
   NOT this repo.** The AI responder (§9) + §16 promo knowledge are the tools feeding this work.
+
+## 18. Access & reporting limits — clarified 2026-06-11 (corrects earlier confusion)
+- **The sub-account (Command) PIT already sees ALL Command data** — contacts, conversations, messages,
+  send_sms, workflows (list), opportunities, AND it **creates Conversation-AI agents**. **No agency token
+  is needed to "see Command."** (Earlier in-session this got overstated — corrected here.)
+- **An agency token is only needed for:** agency-level **user lists** (e.g., **Sheika is an agency user
+  not in the Command/Frontline location user lists**), cross-location reads, and locations the sub-account
+  token 401s on (e.g., `q40ep4vm8pG0yp6ahMA4`).
+- **Why per-rep call/text COUNTS are stuck — two SEPARATE problems, neither fixed by an agency token:**
+  1. **Reporting endpoints are missing from this busybee build** — `get_call_reports`, `get_sms_reports`,
+     `get_dashboard_stats`, `get_agent_reports` all return **404** (`/reporting/*` not wired in). This is a
+     **code gap, not a permission gap.** An agency token will NOT fix it.
+  2. **Attribution** needs the rep's **GHL userId** to filter messages; agency users (Sheika) aren't in the
+     location user list, so their activity can't be cleanly tagged to them by name.
+- **Workaround for exact counts:** the **GHL Reporting UI** (Call/Agent Reporting, filter by user)
+  sidesteps both — use a screenshot until the `/reporting/*` routes are added to the server.
+- **Workflow BUILDER** (`ghl_create_workflow`, full workflow edit) needs **`GHL_FIREBASE_API_KEY` +
+  `GHL_FIREBASE_REFRESH_TOKEN`** (or `GHL_REFRESH_TOKEN`) in Railway env — NOT set, so build/edit fails
+  ("workflow builder not initialized"); **listing** workflows works. **Conversation-AI agents do NOT need
+  Firebase** — built **"AT&T Fiber AI Responder"** (`vRxEwZks42huNZsLF6MX`) on Command via
+  `official_conversation_ai_create_agent`, **mode `off`** (drafts/sends nothing until switched to
+  Suggestive/Autopilot). Agency PIT created this session = **"BUSY BEE AGENCY"** (`pit-…`, keep private,
+  rotate per §7); not yet wired into Railway/the busybee.
