@@ -372,6 +372,16 @@ device (top tier = current premium plans; lower tier / Standard plan = less):
 - **Bundles:** Apple Watch + Smartphone up to **$164.36** credits · iPad + Smartphone up to **$164.36** · **Apple Triple Bundle up to $528.72** (select iPads + Apple watches).
 - **AT&T Visa Reward Card mechanics (closing tool):** always confirm the **exact** card amount + customer's **billing address + valid email**; redeem at **rewardcenter.att.com**; claim email/letter arrives within **30 days** after install+activation; card lands **~3 weeks after 30 days of active service**; usable anywhere Visa, **not redeemable for cash**; **if a line cancels early the card can be clawed back.** Reward Center **1-800-288-9983** / att.com/rewardinfo.
 
+**National Tiered device offers — "Tiered Offer"** (valid 2026-06-05, LTO; same eligibility as trade-in:
+installment + qualifying plan, credits over ~36 mo start within 3 billing cycles, line must stay active,
+other-line cancel <90 days stops credits, Next Up Anytime adds $10/mo). Two grids — **New Lines** and
+**Upgrades** (new-line tiers run a bit better). Sold as an **effective $/month after credits**; anchors:
+- **Free ($0/mo):** Samsung Galaxy **XCover7 Pro** ($600 credit) · Galaxy **A17 5G** ($200, new line).
+- **~$1–3/mo:** iPhone **17e** ($528–564) · Google **Pixel 10a** ($448) · Samsung **S25 FE** ($578) · moto **g stylus 5G** ($187).
+- **~$5–8/mo:** iPhone **16** ($514–622) · Samsung **S25 / S26** ($584–684).
+- **Flagships ~$9–21/mo:** **iPhone Air** ($640–680) · **Motorola razr+ 2026** ($582–690) · Samsung **S25 Edge / Z Flip7** ($464–524).
+- Don't memorize the full grid — **look up the customer's exact phone** in Knowledge+ (search "wireless ndsb" → Tiered Offer). Numbers are the **max bill credit**; the $/mo tier is what they pay after credit.
+
 **SMS-hook framing stays simple** (don't dump the whole list on a lead): resi = "1 Gig in the $40s" +
 $200 card; commercial = "$500 business-fiber reward card + up to $750 to cover your ETF." Full detail
 above is the AI responder's knowledge base / a rep cheat-sheet, not a blast script.
