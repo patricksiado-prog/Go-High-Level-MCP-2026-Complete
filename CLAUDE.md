@@ -324,6 +324,11 @@ confirm eligibility + current bill before quoting. Most "save" amounts are **bil
 - **Copper→Fiber**: save **$10/mo** · **Copper→Fiber 1 GIG+**: **$100 Visa reward card**.
 - DMA-specific: **Austin** 1 GIG save $40/×12 · Austin 5 GIG save $75/×12 · **Fort Myers** 1 GIG+ save $25/×12 · **Des Moines** GIG save $25/×12.
 
+**AT&T All Fi Pro (residential plan build — from SARA, verified 2026-06-11):** ongoing discounts STACK —
+**$45/mo off ongoing** + **$20/mo off ongoing Internet when bundled with AT&T Wireless** = up to **$65/mo
+off**; **$0 equipment fee**; **unlimited data included**; AT&T Professional Install. The **$45-off is what
+lands it "in the $40s"** — this is the build behind the resi hook. (Trey Hall's in-progress order ran this; §17.)
+
 **Converged (Wireless + Fiber/AIA) — NDSc:**
 - **Converged (Wireless + Fiber OR AIA)**: save **$5/mo ×12** on internet.
 - **55+ FAN Converged (Wireless+Fiber)**: save **$21/mo** · **55+ Plan Converged (Wireless+AIA)**: save **$11/mo**.
