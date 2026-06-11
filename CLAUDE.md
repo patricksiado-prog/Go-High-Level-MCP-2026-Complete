@@ -366,6 +366,12 @@ device (top tier = current premium plans; lower tier / Standard plan = less):
 - **Samsung Galaxy S26 Ultra / S26+ / Z Fold7 — up to $1,100** ($95 min) · $500 ($35 min) · Standard $500.
 - **Legacy rate plans:** similar, with a **UYW Standard 2.0** column (Samsung up to **$900**, Pixel XL **$1,050**, iPhone PM/Pro **$830**).
 
+**Tablets / wearables / reward-card mechanics (added 2026-06-11):**
+- **Business tablet data plans** (bill credits bring it to **$15/mo**, new tablet line req): *DataConnect Unlimited Standard for Tablet* $25 − $10 = **$15**; *Business Unlimited Premium for Tablet* $20 − $5 = **$15** (latter requires add-on to an existing eligible smartphone on a UYW plan; *DataConnect Unlimited Premium for Tablet EXCLUDED*).
+- **Tablets/wearables (national):** Apple Watch **save $100** (SE 3 / Series 11 / Ultra 3; $2.78/mo ×36) · Apple iPad **save $100** ($2.78/mo ×36) · **50% off** Samsung Galaxy Tab A9+ 5G ($140 credit, $3.89/mo ×36) · Samsung Watch **BOGO up to $450 off** ($12.50/mo ×36) · Google Pixel Watch 4 **BOGO up to $450 off**. All need installment + new line on an eligible plan.
+- **Bundles:** Apple Watch + Smartphone up to **$164.36** credits · iPad + Smartphone up to **$164.36** · **Apple Triple Bundle up to $528.72** (select iPads + Apple watches).
+- **AT&T Visa Reward Card mechanics (closing tool):** always confirm the **exact** card amount + customer's **billing address + valid email**; redeem at **rewardcenter.att.com**; claim email/letter arrives within **30 days** after install+activation; card lands **~3 weeks after 30 days of active service**; usable anywhere Visa, **not redeemable for cash**; **if a line cancels early the card can be clawed back.** Reward Center **1-800-288-9983** / att.com/rewardinfo.
+
 **SMS-hook framing stays simple** (don't dump the whole list on a lead): resi = "1 Gig in the $40s" +
 $200 card; commercial = "$500 business-fiber reward card + up to $750 to cover your ETF." Full detail
 above is the AI responder's knowledge base / a rep cheat-sheet, not a blast script.
