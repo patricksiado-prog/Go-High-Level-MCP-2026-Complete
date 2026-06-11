@@ -9,6 +9,20 @@ sessions, polite pacing.
 ## The pipeline, mapped exactly
 
 ```
+SIGNALS (competitor outage, AT&T buildout news, manual)
+  -> optimus_targets.py  TargetQueue (shared ZIP work-queue, lease-based)
+  -> fiber_zone_scanner.py  x N instances (headless, parallel)
+       capture all dots for a ZIP via backend JSON (no screenshots/geocode)
+       score the zone: FRESH / WORKING / MATURE + new-fiber diff vs last scan
+       -> "Fiber Zones" tab (scored, prioritized "knock today" list)
+       -> exact green/gold leads straight to Precise / Copper Upgrade (lat/lng)
+  -> precise pipeline / precise hunter  (exact address where API capture is down)
+  -> MapMan enriches phones -> door-knock + DNC-scrubbed call routes
+```
+
+The single-ZIP / signal-driven path still exists too:
+
+```
 SIGNAL (ZIP, e.g. competitor outage)
   -> COMMAND sheet 12PII... tab "COMMAND"  (A1="OUTAGE", B1="zip|note")
   -> fiber_precise_pipeline.py (--watch or --zip)
@@ -37,6 +51,41 @@ for single-ZIP signal scans; use the hunter for broad sweeps or as fallback.
 `C:\Users\patri\Optimus\` with `fiber_hunter.py`, `hunter_dot_extractor.py`,
 `themapman.py`, creds, and RUN_*.bat launchers. v3 embeds the service-account
 key (see Security below).
+
+## Finding NEW fiber first (discovery layer)
+
+The old `fiber_hunter.py` (on Drive/HP, pyautogui) was slow for two reasons:
+it screenshotted every map cell AND reverse-geocoded **every dot** through
+Nominatim at ~1.2s each, and it could only run one instance (one physical
+mouse). `fiber_zone_scanner.py` replaces that hot path:
+
+- **Headless + backend JSON.** One capture gives every dot's exact address +
+  lat/lng + status for a ZIP. No screenshots, no per-dot geocoding.
+- **Many instances in parallel.** `optimus_targets.TargetQueue` is a
+  lease-based ZIP queue: each instance claims a different ZIP, scans it, marks
+  it done (and auto-re-queues a refresh a week later). A dead instance's lease
+  expires and another picks the ZIP back up. Run `--instance 1`, `--instance 2`,
+  … pointed at one shared `--queue` path.
+- **Fed by signals.** `optimus_targets` turns competitor-outage signals (the
+  COMMAND sheet `OUTAGE` hook) and AT&T fiber-expansion **news** into queued
+  ZIPs (`parse_news_items` / `enqueue_news`), priority-ordered
+  (outage > news > manual > routine refresh).
+
+### Zone freshness (operator rule: "more grey + less gold = getting older")
+
+Grey dots are existing fiber customers, i.e. penetration. So the scanner
+scores each ZIP by grey share (`score_zone`):
+
+| Label | Condition | Priority |
+|---|---|---|
+| **FRESH** | grey share ≤ 12% and ≥15 green | 1 — knock today (greenfield) |
+| **WORKING** | in between | 2 — work normally |
+| **MATURE** | grey share ≥ 35% | 3 — already penetrated, deprioritize |
+
+A ZIP whose green set grew since the last scan (`diff_new_addresses`) is
+flagged **NEW FIBER** and forced to priority 1 — a street that *just lit up*
+and nobody has worked yet. The per-ZIP fingerprint that powers the diff lives
+in `~/Optimus/zone_fingerprints/`.
 
 ## Dot legend (from the map's own on-screen key)
 
@@ -102,6 +151,8 @@ phone enrichment and door routes land on the exact rooftop.
 | `optimus_api_capture.py` | Response sniffer (probe + capture) + JSON feature extractor |
 | `fiber_precise_pipeline.py` | v0.4 signal->ZIP scanner; API capture primary, clicks fallback |
 | `precise_fiber_hunter.py` | v0.3 wide-area grid scanner; HiDPI fix, unified detection |
+| `optimus_targets.py` | Shared lease-based ZIP queue + news/outage signal ingestion |
+| `fiber_zone_scanner.py` | Headless multi-instance discovery; zone freshness score + new-fiber diff |
 
 Deps: `pip install playwright gspread google-auth numpy pillow scipy` then
 `python -m playwright install chromium`. (OpenCV no longer needed.)
