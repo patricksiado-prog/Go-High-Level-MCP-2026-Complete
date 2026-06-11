@@ -65,15 +65,17 @@ from datetime import datetime
 
 from optimus_dot_detect import (GREEN_MIN, GREEN_MAX, GOLD_MIN, GOLD_MAX,
                                 ADDRESS_REGEX, BAN_REGEX, POPUP_READY_HINTS,
-                                find_dots_in_png_bytes)
+                                find_dots_in_png_bytes, classify_status,
+                                STATUS_LEAD, STATUS_CUSTOMER, STATUS_COPPER_UPGRADE)
 from optimus_api_capture import ResponseSniffer
 
 # ---- shared config (matches the rest of Optimus) ------------------------
 SHEET_ID = "1FhO2BTMXGefm1tLwKbbMPXvzT1160882Auauzep7ooA"   # production (leads)
 COMMAND_ID = "12PIIplhqUuZWAfEUdJMP3J04nAyrsFsFB07bDDDV2Ag"  # command channel only
-PRECISE_TAB = "Precise"               # precise exact-address leads land here
+PRECISE_TAB = "Precise"               # green: eligible non-customer leads
+COPPER_TAB = "Copper Upgrade"         # gold: eligible existing copper customers
 SIGNAL_LOG_TAB = "Outage Signals"
-CUSTOMERS_TAB = "Customers (has BAN)"
+CUSTOMERS_TAB = "Customers (has BAN)"  # gray: existing fiber customers (skip)
 FIBER_URL = "https://youachieve.att.com/yourefer/fiber"
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
@@ -381,7 +383,7 @@ def probe_session(profile_dir, zipc=None):
 # the precise scan: API capture first, click/popup fallback
 # -------------------------------------------------------------------------
 def precise_scan(zipc, headless, profile_dir, want_gold, on_lead, on_customer,
-                 seen):
+                 on_copper, seen):
     from playwright.sync_api import sync_playwright
 
     sub = POPUP_CONFIG.get("address_api_url_substring")
@@ -419,21 +421,25 @@ def precise_scan(zipc, headless, profile_dir, want_gold, on_lead, on_customer,
         if sniffer and sniffer.features:
             print("  API capture: %d features for this view -- no clicking needed"
                   % len(sniffer.features))
-            leads = custs = 0
+            leads = custs = coppers = 0
             for f in sniffer.features:
                 key = f["address"].upper()
                 if key in seen:
                     continue
                 seen.add(key)
-                if f["ban"]:
+                st = classify_status(text=f.get("status"), ban=f.get("ban"))
+                if st == STATUS_CUSTOMER:
                     custs += 1
                     on_customer(f["address"], f["ban"], f["lat"], f["lng"])
+                elif st == STATUS_COPPER_UPGRADE:
+                    coppers += 1
+                    on_copper(f["address"], f["ban"], f["lat"], f["lng"])
                 else:
                     leads += 1
                     on_lead(f["address"], "API", f["lat"], f["lng"])
             ctx.close()
-            print("  -> %d leads, %d customers (skipped) [exact coords from API]"
-                  % (leads, custs))
+            print("  -> %d leads, %d copper-upgrades, %d fiber customers (skipped)"
+                  " [exact coords from API]" % (leads, coppers, custs))
             return leads, custs
 
         if sniffer:
@@ -444,8 +450,8 @@ def precise_scan(zipc, headless, profile_dir, want_gold, on_lead, on_customer,
         # ---------------- FALLBACK: click each dot, read the popup --------
         raw = page.screenshot(type="png")
         green, dims = find_dots_in_png_bytes(raw, GREEN_MIN, GREEN_MAX)
-        gold, _ = (find_dots_in_png_bytes(raw, GOLD_MIN, GOLD_MAX)
-                   if want_gold else ([], dims))
+        # gold = copper-upgrade customers; a real lead bucket, so always detect.
+        gold, _ = find_dots_in_png_bytes(raw, GOLD_MIN, GOLD_MAX)
         img_w, img_h = dims
         sx = VIEWPORT["width"] / img_w if img_w else 1.0
         sy = VIEWPORT["height"] / img_h if img_h else 1.0
@@ -453,7 +459,8 @@ def precise_scan(zipc, headless, profile_dir, want_gold, on_lead, on_customer,
         print("  detected %d clickable dots (%d green, %d gold)"
               % (len(dots), len(green), len(gold)))
 
-        leads = custs = blanks = 0
+        # gray dots are existing fiber customers -- we never detect/click them.
+        leads = custs = coppers = blanks = 0
         for color, (px, py, sz) in dots:
             cx, cy = int(px * sx), int(py * sy)
             try:
@@ -477,16 +484,20 @@ def precise_scan(zipc, headless, profile_dir, want_gold, on_lead, on_customer,
             if key in seen:
                 continue
             seen.add(key)
-            if ban:               # existing customer -> not a lead
+            st = classify_status(ban=ban, color=color)   # dot color is the legend
+            if st == STATUS_CUSTOMER:
                 custs += 1
                 on_customer(addr, ban, None, None)
-                continue
-            leads += 1
-            on_lead(addr, color, None, None)
+            elif st == STATUS_COPPER_UPGRADE:
+                coppers += 1
+                on_copper(addr, ban, None, None)
+            else:
+                leads += 1
+                on_lead(addr, color, None, None)
 
         ctx.close()
-        print("  -> %d leads, %d customers (skipped), %d blank/closed [click fallback]"
-              % (leads, custs, blanks))
+        print("  -> %d leads, %d copper-upgrades, %d customers, %d blank/closed"
+              " [click fallback]" % (leads, coppers, custs, blanks))
         return leads, custs
 
 
@@ -502,26 +513,34 @@ def make_writers(client, zipc):
                        "Zone", "Instance", "Scan #", "Date", "Phone",
                        "Lat", "Lng", "Business Address", "Phone Source", "Checked At"]
     precise_ws = ensure_tab(ss, PRECISE_TAB, precise_headers)
+    copper_ws = ensure_tab(ss, COPPER_TAB, precise_headers)  # same layout for MapMan
     cust_ws = ensure_tab(ss, CUSTOMERS_TAB,
                          ["Logged At", "Address", "Subscriber BAN", "ZIP", "Lat", "Lng"])
 
+    def _lead_row(addr, lat, lng, source):
+        return [addr, "", "", "", zipc,
+                "Precise_%s" % zipc, "Precise", "1", now_str(), "",
+                lat if lat is not None else "", lng if lng is not None else "",
+                "", "Precise %s" % source.lower(), ""]
+
     def on_lead(addr, source, lat, lng):
-        precise_ws.append_row([
-            addr, "", "", "", zipc,
-            "Precise_%s" % zipc, "Precise", "1", now_str(), "",
-            lat if lat is not None else "", lng if lng is not None else "",
-            "", "Precise %s" % source.lower(), "",
-        ])
+        precise_ws.append_row(_lead_row(addr, lat, lng, source))
         print("  PRECISE LEAD -> %s%s" % (
             addr, " (%.6f, %.6f)" % (lat, lng) if lat is not None and lng is not None else ""))
+
+    def on_copper(addr, ban, lat, lng):
+        # eligible existing copper customer -> fiber UPGRADE pitch, own tab
+        copper_ws.append_row(_lead_row(addr, lat, lng, "copper-upgrade"))
+        print("  COPPER UPGRADE -> %s%s" % (
+            addr, " (BAN %s)" % ban if ban else ""))
 
     def on_customer(addr, ban, lat, lng):
         cust_ws.append_row([now_str(), addr, ban, zipc,
                             lat if lat is not None else "",
                             lng if lng is not None else ""])
-        print("  cust -- %s (BAN %s) skipped" % (addr, ban))
+        print("  fiber customer -- %s skipped" % addr)
 
-    return on_lead, on_customer, precise_ws
+    return on_lead, on_customer, on_copper, precise_ws
 
 
 # -------------------------------------------------------------------------
@@ -545,12 +564,12 @@ def run_signal(zipc, note, headless, profile_dir, want_gold, enrich=False):
     print("=" * 60)
     client = connect_sheets()
     log_signal(client, zipc, note)
-    on_lead, on_customer, precise_ws = make_writers(client, zipc)
+    on_lead, on_customer, on_copper, precise_ws = make_writers(client, zipc)
     seen = already_seen(precise_ws)
     if seen:
         print("  resume: %d addresses already captured -> will skip them" % len(seen))
     leads, custs = precise_scan(zipc, headless, profile_dir, want_gold,
-                                on_lead, on_customer, seen)
+                                on_lead, on_customer, on_copper, seen)
     if leads > 0 and enrich:
         trigger_mapman(client)
     print("\nDONE: %d precise leads written to the '%s' tab, %d customers skipped."

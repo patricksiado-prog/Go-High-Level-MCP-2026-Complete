@@ -30,8 +30,50 @@ import numpy as np
 # ---------------------------------------------------------------------------
 GREEN_MIN = (30, 130, 30)
 GREEN_MAX = (100, 210, 80)
-GOLD_MIN = (220, 160, 0)      # copper-upgrade dots (optional)
+GOLD_MIN = (220, 160, 0)      # copper-upgrade dots (existing copper customer)
 GOLD_MAX = (255, 200, 60)
+GRAY_MIN = (150, 150, 150)    # existing fiber customer dots
+GRAY_MAX = (205, 205, 205)
+
+# ---------------------------------------------------------------------------
+# LEGEND -- confirmed from the map's own on-screen key (west Houston /
+# Ashford neighborhood, 2026-06). The dot COLOR is the customer status and
+# is more reliable than parsing "Subscriber BAN" out of a popup:
+#   GREEN = fiber eligible / non-customer      -> LEAD (door/call)
+#   GRAY  = fiber customer (already on fiber)   -> existing customer, SKIP
+#   GOLD  = fiber eligible / copper customer    -> UPGRADE target (existing
+#           AT&T copper/DSL customer who can move to fiber)
+# ---------------------------------------------------------------------------
+STATUS_LEAD = "lead"
+STATUS_CUSTOMER = "customer"
+STATUS_COPPER_UPGRADE = "copper_upgrade"
+
+COLOR_STATUS = {
+    "GREEN": STATUS_LEAD,
+    "GRAY": STATUS_CUSTOMER,
+    "GOLD": STATUS_COPPER_UPGRADE,
+}
+
+
+def classify_status(text=None, ban=None, color=None):
+    """Decide LEAD / CUSTOMER / COPPER_UPGRADE for one dot.
+
+    Priority: explicit dot color (the legend) > a status string from the
+    backend JSON > BAN presence. Defaults to LEAD only when nothing says
+    otherwise.
+    """
+    if color and color.upper() in COLOR_STATUS:
+        return COLOR_STATUS[color.upper()]
+    low = (text or "").lower()
+    if "copper" in low:
+        return STATUS_COPPER_UPGRADE
+    if "non-customer" in low or "noncustomer" in low or "eligible" in low:
+        return STATUS_LEAD
+    if "customer" in low or "subscriber" in low:
+        return STATUS_CUSTOMER
+    if ban:
+        return STATUS_CUSTOMER
+    return STATUS_LEAD
 
 # ---------------------------------------------------------------------------
 # Shape filters: keep blobs that look like a round map dot, drop terrain

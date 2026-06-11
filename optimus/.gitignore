@@ -1,0 +1,7 @@
+# Never commit service-account keys or the saved AT&T login session
+google_creds.json
+*creds*.json
+*_creds.json
+att_profile/
+__pycache__/
+*.pyc

@@ -34,6 +34,11 @@ LAT_KEYS = ("lat", "latitude")
 LNG_KEYS = ("lng", "lon", "long", "longitude")
 BAN_KEYS = ("ban", "subscriberban", "billingaccountnumber", "billingaccount",
             "accountnumber")
+# status/color fields that encode the legend (non-customer / fiber customer /
+# copper customer). Captured so callers can classify without parsing a popup.
+STATUS_KEYS = ("status", "dotcolor", "color", "serviceablestatus",
+               "customertype", "customerstatus", "fiberstatus", "servicestatus",
+               "eligibility", "markercolor")
 # URLs that are never the dot layer; skipped to keep probe output readable
 BORING_URL_BITS = (".js", ".css", ".png", ".jpg", ".svg", ".woff", "google-analytics",
                    "googletagmanager", "doubleclick", "hotjar", "telemetry")
@@ -79,12 +84,14 @@ def extract_features(obj, out=None):
     lat = _as_float(_get_first(obj, LAT_KEYS))
     lng = _as_float(_get_first(obj, LNG_KEYS))
     ban = _get_first(obj, BAN_KEYS)
+    status = _get_first(obj, STATUS_KEYS)
 
     # GeoJSON: coordinates are [lng, lat]; attributes live in "properties"
     props = obj.get("properties")
     if isinstance(props, dict):
         addr = addr or _get_first(props, ADDRESS_KEYS)
         ban = ban or _get_first(props, BAN_KEYS)
+        status = status or _get_first(props, STATUS_KEYS)
         if lat is None or lng is None:
             plat = _as_float(_get_first(props, LAT_KEYS))
             plng = _as_float(_get_first(props, LNG_KEYS))
@@ -107,6 +114,7 @@ def extract_features(obj, out=None):
             "address": re.sub(r"\s+", " ", addr).strip(),
             "lat": lat, "lng": lng,
             "ban": str(ban).strip() if ban not in (None, "") else None,
+            "status": str(status).strip() if status not in (None, "") else None,
         })
     else:
         # keep walking nested containers for the real feature objects

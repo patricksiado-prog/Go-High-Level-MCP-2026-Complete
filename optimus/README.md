@@ -15,10 +15,11 @@ SIGNAL (ZIP, e.g. competitor outage)
        PRIMARY:  capture the map's backend JSON (--api-substring)
                  -> exact Address + Lat/Lng + Subscriber BAN per dot
        FALLBACK: screenshot -> detect green dots -> click -> read popup
-  -> sheet 1FhO2... ("ATT FIBER LEADS")
-       BAN present  -> "Customers (has BAN)" tab   (existing customer, skip)
-       no BAN       -> "Precise" tab               (lead; Lat/Lng filled)
-       every signal -> "Outage Signals" tab
+  -> sheet 1FhO2... ("ATT FIBER LEADS"), routed by the map's legend color:
+       GREEN (eligible / non-customer) -> "Precise" tab        (lead; Lat/Lng)
+       GOLD  (eligible / copper cust.)  -> "Copper Upgrade" tab (upgrade pitch)
+       GRAY  (existing fiber customer)  -> "Customers (has BAN)" tab (skip)
+       every signal                     -> "Outage Signals" tab
   -> themapman.py (MapMan v11.2.5, Pydroid)  [Drive 16bAkV_BFbwaakGOeXBZ8Ll-8ySXmv9gV]
        reads IN_TAB ("Hunter Green Commercial" by default — point it at
        "Precise" to consume this pipeline). Reads Address/Lat/Lng/State by
@@ -36,6 +37,21 @@ for single-ZIP signal scans; use the hunter for broad sweeps or as fallback.
 `C:\Users\patri\Optimus\` with `fiber_hunter.py`, `hunter_dot_extractor.py`,
 `themapman.py`, creds, and RUN_*.bat launchers. v3 embeds the service-account
 key (see Security below).
+
+## Dot legend (from the map's own on-screen key)
+
+The dot COLOR is the customer status and is more reliable than parsing
+"Subscriber BAN" out of a popup:
+
+| Color | Meaning | Route |
+|---|---|---|
+| Green | Fiber eligible / non-customer | LEAD -> door/call |
+| Gold/orange | Fiber eligible / copper customer | UPGRADE pitch (existing AT&T copper/DSL customer) |
+| Gray | Fiber customer (already on fiber) | existing customer, SKIP |
+
+`optimus_dot_detect.classify_status()` decides LEAD / COPPER_UPGRADE /
+CUSTOMER from (in priority order) the dot color, a status string in the
+backend JSON, then BAN presence.
 
 ## What was wrong (why sheet addresses were "inaccurate")
 
