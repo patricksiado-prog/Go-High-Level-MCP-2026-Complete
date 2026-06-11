@@ -353,6 +353,19 @@ confirm eligibility + current bill before quoting. Most "save" amounts are **bil
 - **All-In-One for Business (AIA-B and/or AWB)**: save **$20/mo**.
 - **ABF + Phone for Business** bundle offer.
 
+**Cell-phone Premium Trade-In — promo code `TRADEOFFER26`** (valid 2026-06-05, LTO; the "up to
+$1,000–$1,100" line above, itemized). **Requirements:** buy an eligible smartphone on a qualifying
+**installment plan** + an **AT&T Unlimited plan** (current: **UYW Advanced 3.0 / Premium 3.0 / Premium
+2.0 w/Turbo / Standard 3.0**; grandfathered 2.0 plans may add-a-line). Trade **any device w/ min value
+within 30 days** of activation; monthly credits start within **3 billing cycles**; line must stay
+**active + in good standing**; **if other lines cancel within 90 days, credits stop.** Max credit by
+device (top tier = current premium plans; lower tier / Standard plan = less):
+- **Motorola razr ultra — up to $1,320** ($95 min trade) · $1,000 ($35 min) · Standard 3.0 $500.
+- **Google Pixel 10 Pro XL — up to $1,250** ($200 min) · $1,050 ($35 min *or any Pixel, any condition*) · Standard $500. *(Pixel 10 Pro = N/A.)*
+- **iPhone 17 Pro Max / 17 Pro — up to $1,100** ($290 min) · $830 ($130 min) · $350 ($35 min) · Standard 3.0 $500. *(iPhone 17 = N/A.)*
+- **Samsung Galaxy S26 Ultra / S26+ / Z Fold7 — up to $1,100** ($95 min) · $500 ($35 min) · Standard $500.
+- **Legacy rate plans:** similar, with a **UYW Standard 2.0** column (Samsung up to **$900**, Pixel XL **$1,050**, iPhone PM/Pro **$830**).
+
 **SMS-hook framing stays simple** (don't dump the whole list on a lead): resi = "1 Gig in the $40s" +
 $200 card; commercial = "$500 business-fiber reward card + up to $750 to cover your ETF." Full detail
 above is the AI responder's knowledge base / a rep cheat-sheet, not a blast script.
