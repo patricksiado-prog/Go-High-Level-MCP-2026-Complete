@@ -385,3 +385,13 @@ other-line cancel <90 days stops credits, Next Up Anytime adds $10/mo). Two grid
 **SMS-hook framing stays simple** (don't dump the whole list on a lead): resi = "1 Gig in the $40s" +
 $200 card; commercial = "$500 business-fiber reward card + up to $750 to cover your ETF." Full detail
 above is the AI responder's knowledge base / a rep cheat-sheet, not a blast script.
+
+## 17. Sales log — 2026-06-11 (added 2026-06-11)
+- **2 SARA fiber sales worked today** (Command): one **Fiber 1 GIG (Internet 1000) SUBMITTED in La Porte
+  77571**, install booked ~2 days out, paid $20; one **All Fi Pro IN PROGRESS** (Offers stage, $45-off +
+  $20 wireless discount). Both **credit class LOW RISK**.
+- **Reinforces §12/§15: La Porte 77571 keeps converting on real fiber.** Logged both as **Command contact
+  records** with order notes + follow-up **tasks** (install-day confirm for the submitted one; finish-the-
+  order for the in-progress one — per §15 watch for credit/SCI review).
+- **Per §7/§10: customer names, addresses, phones, account #s and order #s live in the CRM contact only —
+  NOT this repo.** The AI responder (§9) + §16 promo knowledge are the tools feeding this work.
