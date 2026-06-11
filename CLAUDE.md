@@ -398,6 +398,15 @@ other-line cancel <90 days stops credits, Next Up Anytime adds $10/mo). Two grid
 - **Use these as the WHY *before* the close** ($500 Visa / $750 switcher). Sources: business.att.com,
   ifeeltech ATT Business Fiber review.
 
+**⭐ Operator-provided CURRENT promos (Patrick, 2026-06-11) — USE AS-IS. The operator is the AT&T dealer
+and the authority on live offers; the Knowledge+ screenshots above are only a partial snapshot. Do NOT
+second-guess operator-stated promos against them — record and use them:**
+- **5 lines for $50 — unlimited everything** (AT&T wireless).
+- **$5 flagship phone** (with qualifying plan/trade per AT&T terms).
+- **$500 Visa reward card for business internet customers** (ABF).
+- Rule going forward: when Patrick states a promo, treat it as current and run with it — no fact-checking
+  against the partial sheets.
+
 **SMS-hook framing stays simple** (don't dump the whole list on a lead): resi = "1 Gig in the $40s" +
 $200 card; commercial = "$500 business-fiber reward card + up to $750 to cover your ETF." Full detail
 above is the AI responder's knowledge base / a rep cheat-sheet, not a blast script.
