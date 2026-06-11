@@ -434,3 +434,18 @@ above is the AI responder's knowledge base / a rep cheat-sheet, not a blast scri
   `official_conversation_ai_create_agent`, **mode `off`** (drafts/sends nothing until switched to
   Suggestive/Autopilot). Agency PIT created this session = **"BUSY BEE AGENCY"** (`pit-…`, keep private,
   rotate per §7); not yet wired into Railway/the busybee.
+
+## 19. Frontline aged-responder revive mine (added 2026-06-11)
+- Re-mined the aged Frontline inbound (the §14 question — any unworked "yeses" to revive). **Confirms §14:**
+  the pool is **mostly opt-outs**, but a **thin layer (~10–11 genuinely interested, non-opt-out, 6+ weeks-old
+  businesses)** is real and worth working — surfaced from the **first 100 of 1,226** conversations (more
+  likely buried in the rest).
+- **Signal used:** interest tags (`wavv-interested`, `b2b-hot`, `green-likely`, `tx-engaged and interested`,
+  `appt booked`) + high unread counts (engaged threads). The outbound-blast body text is NOT a signal —
+  inbound reply text isn't stored for blast threads, so sentiment comes from tags/unread.
+- **Route = CALL, not re-text.** They're 6+ weeks old off cold blasts → re-texting is iffy compliance +
+  low-yield; a call is warm/compliant/higher-converting (per §14 playbook). **Verify any New Orleans-line
+  (`+15043996804`) "yes" isn't a job applicant** — that line doubles as the recruiting funnel.
+- **Named list (business + phone) lives in the CRM, NOT this repo (§7/§10)** — tagged **`revive-call`** in
+  Frontline for the team (Sheika) to dial. Strongest signals were the high-unread/"engaged-interested"
+  threads (auto shops, a vet, an assisted-living office, a barbershop, cleaning services).
