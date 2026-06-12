@@ -34,6 +34,11 @@ from datetime import datetime
 
 LOCATION_ID = "xZj500PjsflIQg2j9f9D"            # Command (Patrick's)
 PIPELINE_ID = "trc5dwodtc1LBYHikmiK"            # AT&T Commercial
+DIALER_WORKFLOW_ID = "41e00387-a766-4975-bbcd-627c684a3ee1"  # "Optimus Fiber Biz — Power
+# Dialer Queue" (published 2026-06-12): one Manual Call action that drops the
+# contact into Conversations > Manual Actions so GHL's power dialer serves it.
+# We enroll via API (below) because GHL's internal API rejected saving a
+# contact-tag trigger; API enrollment is also more deterministic.
 STAGE_LEAD = "Lead"                              # first stage name
 API_BASE = "https://services.leadconnectorhq.com"
 API_VERSION = "2021-07-28"
@@ -158,6 +163,13 @@ class GHLClient:
         o = r.json().get("opportunity", r.json())
         return o.get("id")
 
+    def add_to_workflow(self, contact_id, workflow_id=DIALER_WORKFLOW_ID):
+        r = self._requests.post(
+            "%s/contacts/%s/workflow/%s" % (API_BASE, contact_id, workflow_id),
+            headers=self.h, json={}, timeout=30)
+        r.raise_for_status()
+        return True
+
 
 # -------------------------------------------------------------------------
 # load run
@@ -197,6 +209,8 @@ def load_businesses(ranked_businesses, agents, week_tag, token=None,
                 cid = client.upsert_contact(cbody)
                 obody = opportunity_payload(biz, cid, assigned_to=agent)
                 oid = client.create_opportunity(obody)
+                # drop into the Manual Call queue the power dialer works from
+                client.add_to_workflow(cid)
             except Exception as e:
                 print("  GHL error for %s: %s" % (cbody.get("name"), str(e)[:120]))
                 continue
