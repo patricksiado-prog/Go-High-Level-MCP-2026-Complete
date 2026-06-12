@@ -1,10 +1,27 @@
 #!/usr/bin/env python3
 """
-PRECISE FIBER HUNTER v0.3 (COMMERCIAL green-dot exact-address grabber)
+PRECISE FIBER HUNTER v0.4 (click-every-dot exact-address grabber)
 =============================================================================
 Drives the AT&T fiber map in a real Chromium window (Playwright), clicks each
-GREEN dot, reads the EXACT address from the popup, records it, then pans to
-the next viewport. Snake pattern across a cols x rows grid.
+dot, reads the EXACT address from the popup (confirmed live 2026-06-12:
+"FIBER ELIGIBLE / Address: 8 GREENWAY PLZ UNIT 1111 / CREATE REFERRAL"),
+records it, then pans to the next viewport. Snake pattern across a grid.
+
+CHANGES v0.3 -> v0.4 (the click-each-dot retool, from live screenshots
+2026-06-12, Greenway Plaza / Edloe St session):
+ 1. CLICKS EVERY DOT, not just green. GREEN (lead) and GOLD (copper-upgrade)
+    are both clicked and recorded with their legend status; GRAY (existing
+    fiber customer) is detected but skipped and counted.
+ 2. RETRY CLICKS. The dots are ~6-10 px wide; one centroid click can miss the
+    marker hit-zone and the address is silently lost. Now each dot gets up to
+    5 attempts in a tiny spiral (center, then ±3 px offsets), verifying the
+    popup actually opened after each attempt.
+ 3. POPUP POLLING. Fixed 1.1 s sleeps are gone -- the popup is polled every
+    150 ms (up to 2.5 s) for the READY hints, so hits are fast and misses
+    retry immediately.
+ 4. JSONL HANDOFF. Every capture is also appended to precise_addresses.jsonl
+    {address, dot_status, popup_status, ban, area, ts} so business_score.py /
+    ghl_loader.py can consume the run without Google Sheets in the middle.
 
 CHANGES v0.2 -> v0.3 (accuracy fixes, ported from fiber_precise_pipeline):
  1. HiDPI FIX. v0.2 clicked at SCREENSHOT pixel coordinates. On HiDPI/scaled
@@ -54,9 +71,13 @@ RUN:
 
 import os, sys, time, argparse, re
 
-from optimus_dot_detect import (GREEN_MIN, GREEN_MAX,
+import json
+
+from optimus_dot_detect import (GREEN_MIN, GREEN_MAX, GOLD_MIN, GOLD_MAX,
+                                GRAY_MIN, GRAY_MAX, classify_status,
                                 ADDRESS_REGEX, STATUS_REGEX, BAN_REGEX,
-                                ELIGIBLE_REGEX, find_dots_in_png_bytes)
+                                ELIGIBLE_REGEX, POPUP_READY_HINTS,
+                                find_dots_in_png_bytes)
 
 # ----------------------------------------------------------------------------
 # CONFIG
@@ -79,9 +100,14 @@ MAP_RIGHT_FRAC = 0.98
 
 # --- pacing (seconds) ---
 WAIT_AFTER_PAN = 1.5
-WAIT_AFTER_CLICK = 1.1
 WAIT_AFTER_ZOOM = 1.5
 PAN_PRESSES = 6
+POPUP_POLL_INTERVAL = 0.15    # poll the popup instead of fixed sleeps
+POPUP_POLL_TIMEOUT = 2.5      # per click attempt
+CLICK_OFFSETS = [(0, 0), (3, 0), (-3, 0), (0, 3), (0, -3)]   # retry spiral
+
+JSONL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          "precise_addresses.jsonl")
 
 # --- popup parsing (canonical regexes from optimus_dot_detect) ---
 POPUP_KEYS = {
@@ -138,7 +164,7 @@ def open_sheet():
         ws = sh.add_worksheet(title=OUT_TAB, rows="5000", cols="8")
     if not ws.get_all_values():
         ws.append_row(["Address", "Status", "Subscriber BAN", "Eligible",
-                       "Captured At", "ZIP/Area"])
+                       "Captured At", "ZIP/Area", "Dot Status"])
     return ws
 
 
@@ -156,28 +182,41 @@ def already_seen(ws):
 # ----------------------------------------------------------------------------
 # screenshot + dot detection (canonical detector + HiDPI scaling)
 # ----------------------------------------------------------------------------
-def find_green_dots(page):
-    """Return list of (x, y) CLICK coordinates of green dots inside the map
-    region. Screenshot pixels are scaled to viewport (click) pixels, so this
-    is correct even if device_scale_factor != 1 sneaks back in."""
+DOT_COLOR_WINDOWS = [
+    ("GREEN", GREEN_MIN, GREEN_MAX),   # fiber eligible / non-customer -> click
+    ("GOLD", GOLD_MIN, GOLD_MAX),      # fiber eligible / copper customer -> click
+    ("GRAY", GRAY_MIN, GRAY_MAX),      # existing fiber customer -> skip, count
+]
+
+
+def find_map_dots(page):
+    """ONE screenshot, every dot color. Returns ([(x, y, color)], gray_count)
+    where (x, y) are CLICK coordinates inside the map region and color is
+    GREEN or GOLD (clickable). GRAY dots are only counted -- the legend says
+    they're existing fiber customers, never a knock/call target."""
     raw = page.screenshot(type="png")
-    dots, (img_w, img_h) = find_dots_in_png_bytes(raw, GREEN_MIN, GREEN_MAX)
-    if not img_w or not img_h:
-        return []
     vp = page.viewport_size or VIEWPORT
-    sx = vp["width"] / img_w
-    sy = vp["height"] / img_h
-    # map region bounds in CLICK pixels
-    top = vp["height"] * MAP_TOP_FRAC
-    bottom = vp["height"] * MAP_BOTTOM_FRAC
-    left = vp["width"] * MAP_LEFT_FRAC
-    right = vp["width"] * MAP_RIGHT_FRAC
-    out = []
-    for (px, py, _sz) in dots:
-        cx, cy = px * sx, py * sy
-        if left <= cx <= right and top <= cy <= bottom:
-            out.append((int(cx), int(cy)))
-    return out
+    out, gray = [], 0
+    img_w = img_h = 0
+    for color, cmin, cmax in DOT_COLOR_WINDOWS:
+        dots, (img_w, img_h) = find_dots_in_png_bytes(raw, cmin, cmax)
+        if not img_w or not img_h:
+            continue
+        sx = vp["width"] / img_w
+        sy = vp["height"] / img_h
+        top = vp["height"] * MAP_TOP_FRAC
+        bottom = vp["height"] * MAP_BOTTOM_FRAC
+        left = vp["width"] * MAP_LEFT_FRAC
+        right = vp["width"] * MAP_RIGHT_FRAC
+        for (px, py, _sz) in dots:
+            cx, cy = px * sx, py * sy
+            if left <= cx <= right and top <= cy <= bottom:
+                if color == "GRAY":
+                    gray += 1
+                else:
+                    out.append((int(cx), int(cy), color))
+    out.sort(key=lambda p: (p[1] // 40, p[0]))  # reading order across colors
+    return out, gray
 
 
 # ----------------------------------------------------------------------------
@@ -214,6 +253,41 @@ def read_popup(page):
     if m:
         out["ban"] = m.group(1).strip()
     return out if out["address"] else None
+
+
+def wait_for_popup(page, timeout=POPUP_POLL_TIMEOUT):
+    """Poll until the dot popup is actually open (READY hints visible) and
+    parseable, instead of sleeping a fixed interval. Returns info or None."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        info = read_popup(page)
+        if info:
+            return info
+        time.sleep(POPUP_POLL_INTERVAL)
+    return None
+
+
+def click_dot(page, x, y):
+    """Click a tiny map dot with a retry spiral. The markers are ~6-10 px;
+    a centroid click can land just outside the hit-zone, so on a miss we
+    nudge ±3 px and try again, verifying the popup opened each time."""
+    for (dx, dy) in CLICK_OFFSETS:
+        try:
+            page.mouse.click(x + dx, y + dy)
+        except Exception:
+            continue
+        info = wait_for_popup(page)
+        if info:
+            return info
+    return None
+
+
+def append_jsonl(record):
+    try:
+        with open(JSONL_PATH, "a") as f:
+            f.write(json.dumps(record) + "\n")
+    except Exception as e:
+        print("   jsonl write error: %s" % e)
 
 
 def empty_map_point(page):
@@ -336,40 +410,54 @@ def search_zip(page, zip_code):
 # scan: drain each viewport fully, THEN pan; snake across grid
 # ----------------------------------------------------------------------------
 def drain_viewport(page, ws, seen, area_label, dry):
-    """Click EVERY green dot in the current viewport, capture, return count."""
+    """Click EVERY clickable dot (green + gold) in the current viewport,
+    capture the exact popup address, return count."""
     captured = 0
     clicked_pixels = set()
-    dots = find_green_dots(page)
-    print("  viewport: %d green dots" % len(dots))
-    for (x, y) in dots:
+    dots, gray_count = find_map_dots(page)
+    greens = sum(1 for d in dots if d[2] == "GREEN")
+    golds = len(dots) - greens
+    print("  viewport: %d green + %d gold dots (%d gray customers skipped)"
+          % (greens, golds, gray_count))
+    misses = 0
+    for (x, y, color) in dots:
         keyxy = (x // 12, y // 12)   # coarse de-dupe within this viewport
         if keyxy in clicked_pixels:
             continue
         clicked_pixels.add(keyxy)
-        try:
-            page.mouse.click(x, y)
-        except Exception:
-            continue
-        time.sleep(WAIT_AFTER_CLICK)
-        info = read_popup(page)
+        info = click_dot(page, x, y)
         if info and info.get("address"):
             addr_key = info["address"].strip().upper()
             if addr_key not in seen:
                 seen.add(addr_key)
+                dot_status = classify_status(text=info.get("status"),
+                                             ban=info.get("ban"), color=color)
+                ts = time.strftime("%Y-%m-%d %H:%M:%S")
                 row = [info["address"], info.get("status") or "",
                        info.get("ban") or "", "FIBER ELIGIBLE",
-                       time.strftime("%Y-%m-%d %H:%M:%S"), area_label]
+                       ts, area_label, dot_status]
                 if dry or not ws:
-                    print("   + %s | %s | BAN %s" %
-                          (info["address"], info.get("status") or "-", info.get("ban") or "-"))
+                    print("   + [%s] %s | %s | BAN %s" %
+                          (dot_status, info["address"],
+                           info.get("status") or "-", info.get("ban") or "-"))
                 else:
                     try:
                         ws.append_row(row)
                     except Exception as e:
                         print("   write error: %s" % e)
+                if not dry:
+                    append_jsonl({"address": info["address"],
+                                  "dot_status": dot_status,
+                                  "popup_status": info.get("status"),
+                                  "ban": info.get("ban"),
+                                  "area": area_label, "ts": ts})
                 captured += 1
+        else:
+            misses += 1
         close_popup(page)
-        time.sleep(0.3)
+        time.sleep(0.2)
+    if misses:
+        print("  (%d dots never opened a popup after retries)" % misses)
     return captured
 
 
