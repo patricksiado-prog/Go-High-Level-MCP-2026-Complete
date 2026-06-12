@@ -79,7 +79,16 @@ Rank so callers spend minutes on the businesses most likely to buy:
 `fiber_zone_scanner.score_zone()` already produces the zone half; MapMan
 already classifies type + filters chains. The score module combines them.
 
-## Calling mechanism — the one real decision (stage 6)
+## Calling mechanism — DECIDED: power dialer, human on every call
+
+Operator left the call. Decision: **power/preview dialer with a live agent on
+every call** (built). The loader stages and ranks the work and assigns it;
+GHL's power dialer pulls the AT&T Commercial pipeline in score order and
+connects a human to each business. No predictive/auto-blast and no recordings
+to map/skip-traced (mostly-wireless) numbers — that's the TCPA line we don't
+cross. "Automatic" for the team, defensible for the agent ID.
+
+## Calling mechanism — detail (stage 6)
 
 "Call automatically" has two very different meanings, and they sit on opposite
 sides of the compliance line:
@@ -117,13 +126,17 @@ Built (this branch):
 - `fiber_zone_scanner` — headless multi-instance discovery + freshness score
 - `themapman` (MapMan) — address → business name + phone + type, chain filter
 
+Built (this branch, continued):
+- `business_score` — perfect-business rank (zone + status + type +
+  reachability + new-to-us); hard-drops customers/DNC/no-phone. Tested.
+- `ghl_loader` — scored businesses → Command: upsert contact + AT&T Commercial
+  opportunity at Lead stage, tag/assign round-robin/custom-fields, dedupe
+  across weeks (by phone), and export a score-ordered DIAL QUEUE for the power
+  dialer. Dry-run by default; `--commit` + GHL_PIT_TOKEN to load live. Never
+  dials, never texts. Tested.
+
 New to build (in priority order):
-1. **`ghl_loader.py`** — scored businesses → GHL Command: upsert contact +
-   create opportunity in AT&T Commercial pipeline, tag/assign/custom-fields.
-   The core new piece; everything before it already feeds it.
-2. **`business_score.py`** — combine zone freshness + type + reachability +
-   not-already-in-GHL into the perfect-business rank.
-3. **WIDE signal loaders** — `bdc_diff.py` (footprint-wide backbone, free,
+1. **WIDE signal loaders** — `bdc_diff.py` (footprint-wide backbone, free,
    needs FCC API token), news/Reddit watcher (wire to `optimus_targets`),
    BEAD award loader.
 4. **`weekly_run.py`** — orchestrator/cron: signals → scan → enrich → score →
