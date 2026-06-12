@@ -1,0 +1,7 @@
+numpy
+pillow
+scipy
+playwright
+gspread
+google-auth
+requests
