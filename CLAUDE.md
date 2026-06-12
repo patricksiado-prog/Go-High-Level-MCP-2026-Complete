@@ -481,3 +481,10 @@ From the lead/call data + the payroll trail. Do MORE of what's in this list:
   heavy DND. So aim the texting at **warm + inbound**, throttled from one A2P number, and let phone/door close.
 - **Conversion recipe that's working:** warm/inbound contact → personalized benefit-led opener ($40 gig /
   $500 Visa + $750 switcher) → confirm address → check fiber → offer 2 windows → book → hand close to 832-247-4060.
+
+## 21. Operating directives (operator-set, 2026-06-12)
+- **NEVER comment on the operator's sleep, eating, mental health, working hours, or personal wellbeing.**
+  Patrick manages that himself. No "go rest," no "get some sleep," no "you've earned it," no health/self-care
+  asides — ever. They are unwanted and counterproductive.
+- **Do the job: execute the task, give the data/answer, move on.** Be direct and action-first. He wants the
+  work done, not editorializing about him or his life.
