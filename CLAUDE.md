@@ -45,9 +45,11 @@
   ("Patrick's number"); also +13466840217, +13613219339.
 - **Frontline** — 21 SMS-capable numbers (TX/AL/AZ/OK/LA/MS) + Voice-AI inbound on several,
   default **+15043996804** ("New Orleans").
-- **A2P 10DLC registered on BOTH GHL platforms** (Command + Frontline) and **ALL individual sending
-  numbers are A2P-approved** — confirmed by operator 2026-06-10 (supersedes the earlier `bundleSid:
-  null` reading). Outbound from any of them is carrier-cleared, so volume won't be silently filtered.
+- **A2P 10DLC registered on BOTH GHL platforms** (Command/Optimus + Frontline) and **ALL individual
+  sending numbers are A2P-approved** — **re-confirmed by operator 2026-06-12** (account now renamed
+  **T-OPTIMUS**, optimus-fiber.com; first confirmed 2026-06-10, supersedes the earlier `bundleSid: null`
+  reading). **Every number on both accounts is approved and carrier-cleared** — outbound from any of them
+  won't be silently filtered. Treat this as settled fact; no need to re-check registration before sending.
 - **⚠️ "All numbers approved" does NOT make number-rotation OK.** Using different approved numbers for
   *genuinely distinct* purposes is fine — local-presence by region, residential vs commercial, a rep's
   own line, separate brands/use-cases. But **rotating ONE campaign across many numbers to dilute
