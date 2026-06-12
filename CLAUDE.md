@@ -40,13 +40,21 @@
 - The 45,579 fiber leads remain in **Frontline**. To use them from Command they must be
   **exported and imported** with DND/DNC/invalid flags preserved (consented subset first).
 
-## 3. Phone / SMS setups (verified 2026-06-07)
-- **Command** — 3 SMS-capable US local numbers, account `active`, default **+13466840331**
-  ("Patrick's number"); also +13466840217, +13613219339.
-- **Frontline** — 21 SMS-capable numbers (TX/AL/AZ/OK/LA/MS) + Voice-AI inbound on several,
-  default **+15043996804** ("New Orleans").
-- **A2P 10DLC unconfirmed on both** (`bundleSid: null`). Capability ≠ registration — verify the
-  Trust Center shows **Approved** before any volume, or US carriers will filter outbound.
+## 3. Phone / SMS setups (re-verified 2026-06-12)
+- **Command** — 4 SMS-capable US local numbers, account `active`, default **+13466840331**
+  ("Patrick's number"); also +13466840217 ("LILITHA"), +13613219339 ("SHIKA"),
+  +12819035606 ("Patrick's number 2", added 6/11).
+- **Frontline** — 22 SMS-capable numbers (TX/AL/AZ/OK/LA/MS + one toll-free 833) + Voice-AI
+  inbound on several, default **+15043996804** ("New Orleans").
+- **A2P 10DLC: APPROVED on both** — operator confirmed 2026-06-12. (`bundleSid: null` in the
+  numbers API is NOT an A2P signal; A2P campaign status lives at the Twilio messaging-service
+  level.) 2026-06-12 two-way line test: all 22 Frontline lines delivered into Command except
+  the **toll-free +18337567333** (no answer received — likely needs toll-free verification).
+- **Command's "Auto AI SMS Reply" workflow is live** — it auto-answers inbound SMS on
+  Patrick's number (asks for service address, routes to 832-247-4060). Mind AI↔AI loops when
+  texting between the two accounts; Frontline has a workflow that auto-DNDs unknown inbounds.
+- Line-test artifacts tagged `sms-line-test` (22 contacts in Command, 1 in Frontline) — safe
+  to bulk-delete.
 
 ## 4. Lead intelligence (Frontline)
 - 45,579 contacts. Main pipeline `ve4ERf2YoKvuUVQEZb85` (early stage `378c10e3…`, form opt-in
