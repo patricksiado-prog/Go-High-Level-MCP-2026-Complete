@@ -488,3 +488,57 @@ From the lead/call data + the payroll trail. Do MORE of what's in this list:
   asides — ever. They are unwanted and counterproductive.
 - **Do the job: execute the task, give the data/answer, move on.** Be direct and action-first. He wants the
   work done, not editorializing about him or his life.
+
+## 22. How to use the busybee (GHL MCP) — operator + team Claude guide (added 2026-06-12)
+This is the "paste into another Claude" reference (e.g. Zack's) for driving the same GoHighLevel
+integration. The busybee = this repo's MCP server (834 tools), deployed on Railway, pinned to ONE GHL
+sub-account by the `GHL_LOCATION_ID` in Railway env. **Connectors load at SESSION START only** — add/fix a
+connector, then restart the chat to reload it.
+
+### 22.1 Connect it
+- In Claude → **Connectors → Add custom connector** → paste the busybee's Railway MCP URL
+  (Command: `…711a.up.railway.app/mcp`). No OAuth — **the URL itself is the access** (PIT baked into Railway
+  env), so keep it private (§7). Restart the session; the GHL tools appear as `mcp__…__*`.
+- One connector = one sub-account. Command = `xZj500PjsflIQg2j9f9D`; Frontline = `TXw28sw0Z2rI6tcCDhJY` (§1).
+- The official GHL hosted MCP (`services.leadconnectorhq.com/mcp`, OAuth) is a thinner alternative — fewer
+  tools, no custom fixes. Prefer the busybee.
+
+### 22.2 The tools that WORK (sub-account PIT sees all of this — no agency token needed, §18)
+- **Contacts:** `search_contacts` (POST body `{locationId, pageLimit}`), `get_contact`, `upsert_contact`
+  (create-or-update by phone/email — the workhorse for logging a lead/sale), `add_contact_tags`,
+  `create_contact_task`, `create_contact_note`.
+- **Conversations / messaging:** `search_conversations`, `get_conversation`, `get_recent_messages`,
+  **`send_sms`** (to a contact, from the A2P number), **`send_email`**.
+- **Pipeline:** `get_pipelines`, `search_opportunities`, `upsert_opportunity`, `update_opportunity_status`
+  (move a deal to booked/won).
+- **Numbers / templates / tags:** `get_phone_numbers`, `get_sms_templates`, `get_location_tags`.
+- **Workflows:** `ghl_list_workflows` works (read). **Conversation-AI agents** build fine via
+  `official_conversation_ai_create_agent` (no Firebase needed).
+- **Reporting:** `get_call_reports` / `get_sms_reports` / `get_agent_reports` / `get_dashboard_stats` —
+  **fixed 2026-06-12** to aggregate from conversation data (conversation-level counts + Houston/Oklahoma
+  region split, optional `userId`). They return real numbers, not 404, **once Railway redeploys the branch**.
+
+### 22.3 Gotchas (learned the hard way — save the trial-and-error)
+- **`send_email` REQUIRES the `html` field.** Plain `message` → 422 "no message". Email logs into the
+  contact's conversation. (The Gmail connector can only *draft*, not send — outbound goes via GHL.)
+- **Workflow BUILDER (create/edit) needs Firebase env** (`GHL_FIREBASE_API_KEY` + `GHL_FIREBASE_REFRESH_TOKEN`
+  in Railway) — uses GHL's internal API, not the PIT. Without it: "workflow builder not initialized." *Listing*
+  workflows still works. Add a trigger to a new workflow in the **UI** (the `call_status` API trigger 500s).
+- **Conversation-AI agent params:** require `personality`, `goal`, `instructions`; channels enum is **`SMS`**
+  (uppercase); mode is **`off` / `suggestive` / `auto-pilot`**. Don't pass `locationId`/`status`/`prompt` —
+  they're rejected.
+- **Per-rep COUNTS have two limits** (§18): the old `/reporting/*` routes 404'd (now fixed via the
+  conversation-aggregation rewrite); and **agency users (e.g. Sheika) aren't in the location user list**, so
+  their activity can't be attributed by `assignedTo`/name from the sub-account token. For exact per-message
+  totals or agency-user filtering, the GHL **Reporting UI** (screenshot) is still authoritative.
+- **Agency token is only for:** agency-level user lists, cross-location reads, and locations the sub-account
+  token 401s on. Everything day-to-day in Command works on the sub-account PIT alone.
+- **Big result sets overflow chat** — `search_conversations`/`get_recent_messages` with `limit: 100` can blow
+  the context window. Page in small batches or have a subagent digest the dump.
+
+### 22.4 The ONE rule that overrides convenience — compliance (§5)
+Any Claude driving the busybee MUST hold the §5/§13 guardrails: **consented/warm contacts only**, **one
+A2P-registered number** (NO sender rotation / snowshoeing — it's a 10DLC + carrier violation that risks the
+AT&T dealership), **throttle + personalize**, **opt-out intact** (GHL auto-appends STOP; never add/strip it),
+**STOP → drop immediately**, **exclude already-bought/declined/DNC**. Cold + DNC lists = door/call, never SMS.
+This is non-negotiable regardless of who's running the account.
