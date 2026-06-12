@@ -7,6 +7,20 @@ dot, reads the EXACT address from the popup (confirmed live 2026-06-12:
 "FIBER ELIGIBLE / Address: 8 GREENWAY PLZ UNIT 1111 / CREATE REFERRAL"),
 records it, then pans to the next viewport. Snake pattern across a grid.
 
+CHANGES v0.4 -> v0.5 (Mapbox fast path -- the OSM research conclusion):
+ The dealer map is Mapbox GL JS on OpenStreetMap tiles. The dots are GeoJSON
+ features INSIDE the page's map object, so instead of color-hunting pixels we
+ hook mapboxgl.Map at page-init and ask the map directly:
+   - queryRenderedFeatures() -> every dot's exact lng/lat + properties
+   - if a feature carries the address in its properties -> record it with
+     ZERO clicking;
+   - else map.project(lnglat) -> exact CSS click pixel for that marker (no
+     centroid guessing), then the v0.4 popup read.
+ Pixel detection remains the automatic fallback when the hook finds nothing.
+ (Nominatim reverse-geocoding was researched and REJECTED for this: the
+ public API forbids systematic grid/bulk queries at 1 req/s, and OSM has no
+ unit numbers -- the popup is the only unit-level source.)
+
 CHANGES v0.3 -> v0.4 (the click-each-dot retool, from live screenshots
 2026-06-12, Greenway Plaza / Edloe St session):
  1. CLICKS EVERY DOT, not just green. GREEN (lead) and GOLD (copper-upgrade)
@@ -108,6 +122,100 @@ CLICK_OFFSETS = [(0, 0), (3, 0), (-3, 0), (0, 3), (0, -3)]   # retry spiral
 
 JSONL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           "precise_addresses.jsonl")
+
+# ----------------------------------------------------------------------------
+# Mapbox GL fast path: hook the map object at page init, then query the dots
+# as GeoJSON features instead of hunting pixels.
+# ----------------------------------------------------------------------------
+MAPBOX_HOOK_JS = """
+(() => {
+  window.__optimusMaps = window.__optimusMaps || [];
+  const hook = () => {
+    try {
+      if (window.mapboxgl && window.mapboxgl.Map && !window.mapboxgl.Map.__optimusHooked) {
+        const Orig = window.mapboxgl.Map;
+        const Wrapped = function(...args) {
+          const m = new Orig(...args);
+          window.__optimusMaps.push(m);
+          return m;
+        };
+        Wrapped.prototype = Orig.prototype;
+        Object.setPrototypeOf(Wrapped, Orig);
+        Wrapped.__optimusHooked = true;
+        window.mapboxgl.Map = Wrapped;
+      }
+    } catch (e) {}
+  };
+  hook();
+  const t = setInterval(hook, 200);
+  setTimeout(() => clearInterval(t), 30000);
+})();
+"""
+
+MAPBOX_QUERY_JS = """
+() => {
+  const m = (window.__optimusMaps || [])[0];
+  if (!m || !m.queryRenderedFeatures) return null;
+  let feats;
+  try { feats = m.queryRenderedFeatures(); } catch (e) { return null; }
+  const out = [];
+  const seen = new Set();
+  for (const f of feats) {
+    if (!f.geometry || f.geometry.type !== 'Point') continue;
+    const p = f.properties || {};
+    const blob = JSON.stringify(p).toLowerCase();
+    if (!(blob.includes('address') || blob.includes('fiber') ||
+          blob.includes('eligib') || blob.includes('referral'))) continue;
+    const [lng, lat] = f.geometry.coordinates;
+    const key = lng.toFixed(6) + ',' + lat.toFixed(6);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const px = m.project([lng, lat]);
+    out.push({lng, lat, x: px.x, y: px.y, props: p,
+              layer: (f.layer && f.layer.id) || ''});
+  }
+  return out;
+}
+"""
+
+# property keys that may carry the address / status straight in the feature
+FEATURE_ADDRESS_KEYS = ["address", "addr", "full_address", "serviceaddress",
+                        "service_address", "location"]
+FEATURE_STATUS_KEYS = ["status", "customer_status", "customertype",
+                       "customer_type", "eligibility", "type"]
+
+
+def query_map_features(page):
+    """Ask the hooked Mapbox map for its dot features. Returns a list of
+    dicts {lng, lat, x, y, props} or None when the hook isn't live."""
+    try:
+        feats = page.evaluate(MAPBOX_QUERY_JS)
+    except Exception:
+        return None
+    return feats or None
+
+
+def feature_address(props):
+    """Pull an address straight out of feature properties, if present."""
+    if not props:
+        return None
+    low = {str(k).lower(): v for k, v in props.items()}
+    for k in FEATURE_ADDRESS_KEYS:
+        v = low.get(k)
+        if v and isinstance(v, str) and len(v.strip()) >= 6:
+            return " ".join(v.split())[:160]
+    return None
+
+
+def feature_status_text(props):
+    if not props:
+        return None
+    low = {str(k).lower(): v for k, v in props.items()}
+    for k in FEATURE_STATUS_KEYS:
+        v = low.get(k)
+        if v and isinstance(v, str):
+            return v
+    return None
 
 # --- popup parsing (canonical regexes from optimus_dot_detect) ---
 POPUP_KEYS = {
@@ -409,15 +517,79 @@ def search_zip(page, zip_code):
 # ----------------------------------------------------------------------------
 # scan: drain each viewport fully, THEN pan; snake across grid
 # ----------------------------------------------------------------------------
+def record_capture(ws, seen, area_label, dry, address, popup_status, ban,
+                   dot_status, via):
+    """Common writer for both the Mapbox fast path and the click path.
+    Returns True when a NEW address was recorded."""
+    addr_key = address.strip().upper()
+    if addr_key in seen:
+        return False
+    seen.add(addr_key)
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    row = [address, popup_status or "", ban or "", "FIBER ELIGIBLE",
+           ts, area_label, dot_status]
+    if dry or not ws:
+        print("   + [%s/%s] %s | %s | BAN %s" %
+              (dot_status, via, address, popup_status or "-", ban or "-"))
+    else:
+        try:
+            ws.append_row(row)
+        except Exception as e:
+            print("   write error: %s" % e)
+    if not dry:
+        append_jsonl({"address": address, "dot_status": dot_status,
+                      "popup_status": popup_status, "ban": ban,
+                      "area": area_label, "ts": ts, "via": via})
+    return True
+
+
+def drain_viewport_mapbox(page, ws, seen, area_label, dry):
+    """FAST PATH: read the dots straight out of the Mapbox map object.
+    Features that carry an address in their properties are recorded with no
+    clicking at all; the rest are clicked at their exact projected pixel.
+    Returns captured count, or None when the hook isn't live (caller falls
+    back to pixel detection)."""
+    feats = query_map_features(page)
+    if feats is None:
+        return None
+    print("  viewport (mapbox): %d dot features" % len(feats))
+    captured = 0
+    for f in feats:
+        props = f.get("props") or {}
+        addr = feature_address(props)
+        status_txt = feature_status_text(props)
+        dot_status = classify_status(text=status_txt or str(props))
+        if addr:
+            if record_capture(ws, seen, area_label, dry, addr, status_txt,
+                              None, dot_status, via="mapbox"):
+                captured += 1
+            continue
+        # no address in the feature -> click at the EXACT projected pixel
+        info = click_dot(page, int(f["x"]), int(f["y"]))
+        if info and info.get("address"):
+            dot_status = classify_status(text=info.get("status") or status_txt,
+                                         ban=info.get("ban"))
+            if record_capture(ws, seen, area_label, dry, info["address"],
+                              info.get("status"), info.get("ban"),
+                              dot_status, via="mapbox-click"):
+                captured += 1
+        close_popup(page)
+        time.sleep(0.2)
+    return captured
+
+
 def drain_viewport(page, ws, seen, area_label, dry):
-    """Click EVERY clickable dot (green + gold) in the current viewport,
-    capture the exact popup address, return count."""
+    """Capture every dot in the current viewport. Tries the Mapbox feature
+    fast path first; falls back to pixel detection + retry clicks."""
+    n = drain_viewport_mapbox(page, ws, seen, area_label, dry)
+    if n is not None:
+        return n
     captured = 0
     clicked_pixels = set()
     dots, gray_count = find_map_dots(page)
     greens = sum(1 for d in dots if d[2] == "GREEN")
     golds = len(dots) - greens
-    print("  viewport: %d green + %d gold dots (%d gray customers skipped)"
+    print("  viewport (pixels): %d green + %d gold dots (%d gray customers skipped)"
           % (greens, golds, gray_count))
     misses = 0
     for (x, y, color) in dots:
@@ -427,30 +599,11 @@ def drain_viewport(page, ws, seen, area_label, dry):
         clicked_pixels.add(keyxy)
         info = click_dot(page, x, y)
         if info and info.get("address"):
-            addr_key = info["address"].strip().upper()
-            if addr_key not in seen:
-                seen.add(addr_key)
-                dot_status = classify_status(text=info.get("status"),
-                                             ban=info.get("ban"), color=color)
-                ts = time.strftime("%Y-%m-%d %H:%M:%S")
-                row = [info["address"], info.get("status") or "",
-                       info.get("ban") or "", "FIBER ELIGIBLE",
-                       ts, area_label, dot_status]
-                if dry or not ws:
-                    print("   + [%s] %s | %s | BAN %s" %
-                          (dot_status, info["address"],
-                           info.get("status") or "-", info.get("ban") or "-"))
-                else:
-                    try:
-                        ws.append_row(row)
-                    except Exception as e:
-                        print("   write error: %s" % e)
-                if not dry:
-                    append_jsonl({"address": info["address"],
-                                  "dot_status": dot_status,
-                                  "popup_status": info.get("status"),
-                                  "ban": info.get("ban"),
-                                  "area": area_label, "ts": ts})
+            dot_status = classify_status(text=info.get("status"),
+                                         ban=info.get("ban"), color=color)
+            if record_capture(ws, seen, area_label, dry, info["address"],
+                              info.get("status"), info.get("ban"),
+                              dot_status, via="pixel-click"):
                 captured += 1
         else:
             misses += 1
@@ -499,6 +652,7 @@ def main():
             device_scale_factor=1,   # screenshot px == click px (HiDPI fix)
             args=["--start-maximized"],
         )
+        ctx.add_init_script(MAPBOX_HOOK_JS)   # hook the map before it loads
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         page.goto(MAP_URL, wait_until="domcontentloaded", timeout=60000)
 
