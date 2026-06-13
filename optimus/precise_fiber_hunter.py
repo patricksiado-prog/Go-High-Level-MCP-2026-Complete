@@ -89,6 +89,7 @@ import json
 
 from optimus_dot_detect import (GREEN_MIN, GREEN_MAX, GOLD_MIN, GOLD_MAX,
                                 GRAY_MIN, GRAY_MAX, classify_status,
+                                zone_freshness,
                                 ADDRESS_REGEX, STATUS_REGEX, BAN_REGEX,
                                 ELIGIBLE_REGEX, POPUP_READY_HINTS,
                                 find_dots_in_png_bytes)
@@ -518,19 +519,21 @@ def search_zip(page, zip_code):
 # scan: drain each viewport fully, THEN pan; snake across grid
 # ----------------------------------------------------------------------------
 def record_capture(ws, seen, area_label, dry, address, popup_status, ban,
-                   dot_status, via):
+                   dot_status, via, zone_label="WORKING"):
     """Common writer for both the Mapbox fast path and the click path.
-    Returns True when a NEW address was recorded."""
+    Returns True when a NEW address was recorded. zone_label (FRESH/WORKING/
+    MATURE) rides along so business_score weights just-lit zones first."""
     addr_key = address.strip().upper()
     if addr_key in seen:
         return False
     seen.add(addr_key)
     ts = time.strftime("%Y-%m-%d %H:%M:%S")
     row = [address, popup_status or "", ban or "", "FIBER ELIGIBLE",
-           ts, area_label, dot_status]
+           ts, area_label, dot_status, zone_label]
     if dry or not ws:
-        print("   + [%s/%s] %s | %s | BAN %s" %
-              (dot_status, via, address, popup_status or "-", ban or "-"))
+        print("   + [%s/%s/%s] %s | %s | BAN %s" %
+              (zone_label, dot_status, via, address,
+               popup_status or "-", ban or "-"))
     else:
         try:
             ws.append_row(row)
@@ -538,12 +541,12 @@ def record_capture(ws, seen, area_label, dry, address, popup_status, ban,
             print("   write error: %s" % e)
     if not dry:
         append_jsonl({"address": address, "dot_status": dot_status,
-                      "popup_status": popup_status, "ban": ban,
-                      "area": area_label, "ts": ts, "via": via})
+                      "zone_label": zone_label, "popup_status": popup_status,
+                      "ban": ban, "area": area_label, "ts": ts, "via": via})
     return True
 
 
-def drain_viewport_mapbox(page, ws, seen, area_label, dry):
+def drain_viewport_mapbox(page, ws, seen, area_label, dry, zone_label="WORKING"):
     """FAST PATH: read the dots straight out of the Mapbox map object.
     Features that carry an address in their properties are recorded with no
     clicking at all; the rest are clicked at their exact projected pixel.
@@ -561,7 +564,7 @@ def drain_viewport_mapbox(page, ws, seen, area_label, dry):
         dot_status = classify_status(text=status_txt or str(props))
         if addr:
             if record_capture(ws, seen, area_label, dry, addr, status_txt,
-                              None, dot_status, via="mapbox"):
+                              None, dot_status, via="mapbox", zone_label=zone_label):
                 captured += 1
             continue
         # no address in the feature -> click at the EXACT projected pixel
@@ -571,26 +574,43 @@ def drain_viewport_mapbox(page, ws, seen, area_label, dry):
                                          ban=info.get("ban"))
             if record_capture(ws, seen, area_label, dry, info["address"],
                               info.get("status"), info.get("ban"),
-                              dot_status, via="mapbox-click"):
+                              dot_status, via="mapbox-click", zone_label=zone_label):
                 captured += 1
         close_popup(page)
         time.sleep(0.2)
     return captured
 
 
-def drain_viewport(page, ws, seen, area_label, dry):
-    """Capture every dot in the current viewport. Tries the Mapbox feature
-    fast path first; falls back to pixel detection + retry clicks."""
-    n = drain_viewport_mapbox(page, ws, seen, area_label, dry)
-    if n is not None:
-        return n
-    captured = 0
-    clicked_pixels = set()
-    dots, gray_count = find_map_dots(page)
+def classify_viewport(page):
+    """One screenshot -> (green, gold, gray, label, gray_share, dots). The dots
+    list is reused by the pixel fallback so we never screenshot twice."""
+    dots, gray = find_map_dots(page)
     greens = sum(1 for d in dots if d[2] == "GREEN")
     golds = len(dots) - greens
-    print("  viewport (pixels): %d green + %d gold dots (%d gray customers skipped)"
-          % (greens, golds, gray_count))
+    label, share = zone_freshness(greens, golds, gray)
+    return greens, golds, gray, label, share, dots
+
+
+def drain_viewport(page, ws, seen, area_label, dry, fresh_only=False):
+    """Capture every clickable dot in the current viewport. Classifies the
+    zone first (green+gold vs grey); in --fresh mode a MATURE/EMPTY viewport
+    is skipped fast. Addresses come from the Mapbox geo features when the hook
+    is live, else the pixel-click fallback."""
+    greens, golds, gray, label, share, dots = classify_viewport(page)
+    print("  viewport: %d green + %d gold + %d grey -> %s (grey %d%%)"
+          % (greens, golds, gray, label, round(share * 100)))
+    if fresh_only and label in ("MATURE", "EMPTY"):
+        print("  skip [%s] -- not new fiber, moving on" % label)
+        return 0
+
+    # FAST PATH: addresses straight from the map's geo features (no clicking)
+    n = drain_viewport_mapbox(page, ws, seen, area_label, dry, zone_label=label)
+    if n is not None:
+        return n
+
+    # FALLBACK: click the green/gold dots we already detected
+    captured = 0
+    clicked_pixels = set()
     misses = 0
     for (x, y, color) in dots:
         keyxy = (x // 12, y // 12)   # coarse de-dupe within this viewport
@@ -603,7 +623,7 @@ def drain_viewport(page, ws, seen, area_label, dry):
                                          ban=info.get("ban"), color=color)
             if record_capture(ws, seen, area_label, dry, info["address"],
                               info.get("status"), info.get("ban"),
-                              dot_status, via="pixel-click"):
+                              dot_status, via="pixel-click", zone_label=label):
                 captured += 1
         else:
             misses += 1
@@ -614,14 +634,14 @@ def drain_viewport(page, ws, seen, area_label, dry):
     return captured
 
 
-def scan(page, ws, area_label, cols, rows, dry):
+def scan(page, ws, area_label, cols, rows, dry, fresh_only=False):
     seen = already_seen(ws)
     print("Resume: %d addresses already captured -> will skip them." % len(seen))
     total = 0
     for r in range(rows):
         for c in range(cols):
             print("[cell r%d c%d]" % (r, c))
-            total += drain_viewport(page, ws, seen, area_label, dry)  # ALL dots first
+            total += drain_viewport(page, ws, seen, area_label, dry, fresh_only)
             if c < cols - 1:
                 pan(page, "right" if r % 2 == 0 else "left")          # THEN pan
         if r < rows - 1:
@@ -640,6 +660,12 @@ def main():
     ap.add_argument("--rows", type=int, default=3)
     ap.add_argument("--zoom-in", type=int, default=0, help="press zoom-IN this many times after load")
     ap.add_argument("--zoom-out", type=int, default=0, help="press zoom-OUT this many times after load")
+    ap.add_argument("--fresh", action="store_true",
+                    help="NEW-FIBER MODE: only capture FRESH/WORKING zones "
+                         "(lots of green+gold, little/no grey); skip MATURE fast")
+    ap.add_argument("--survey-out", type=int, default=0,
+                    help="with --fresh: zoom OUT this many times first so each "
+                         "viewport sweeps more ground hunting just-lit clusters")
     ap.add_argument("--dry", action="store_true", help="don't write to the sheet, just print")
     args = ap.parse_args()
 
@@ -679,10 +705,17 @@ def main():
         if args.zoom_out:
             print("Zooming OUT x%d" % args.zoom_out)
             zoom(page, args.zoom_out, "out")
+        if args.fresh and args.survey_out:
+            print("FRESH survey: zooming OUT x%d to sweep for just-lit clusters"
+                  % args.survey_out)
+            zoom(page, args.survey_out, "out")
         search_this_area(page)   # make sure the starting view's dots are loaded
 
-        print("Scanning %d x %d viewports...\n" % (args.cols, args.rows))
-        n = scan(page, ws, args.zip or "manual", args.cols, args.rows, args.dry)
+        mode = "FRESH (new-fiber only)" if args.fresh else "full"
+        print("Scanning %d x %d viewports -- %s mode...\n"
+              % (args.cols, args.rows, mode))
+        n = scan(page, ws, args.zip or "manual", args.cols, args.rows,
+                 args.dry, fresh_only=args.fresh)
         print("\nDONE. Captured %d new fiber-eligible addresses." % n)
         print(("They're in the '%s' tab." % OUT_TAB) if ws else "(dry run, nothing written)")
         input("Press Enter to close the browser... ")

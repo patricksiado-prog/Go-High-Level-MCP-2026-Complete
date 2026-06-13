@@ -54,6 +54,36 @@ COLOR_STATUS = {
     "GOLD": STATUS_COPPER_UPGRADE,
 }
 
+# ---------------------------------------------------------------------------
+# ZONE FRESHNESS (operator rule, confirmed on the map 2026-06):
+# a JUST-LIT zone has NO grey yet (nobody's a fiber customer) -- it reads as
+# lots of GREEN + GOLD and ~zero GREY. As a zone ages, grey (existing fiber
+# customers) climbs. So the grey SHARE is the freshness signal:
+#     low/no grey + plenty of green+gold -> FRESH  (greenfield, hit TODAY)
+#     high grey share                    -> MATURE (worked/penetrated, skip)
+#     in between                         -> WORKING
+# Canonical thresholds live HERE so the hunter and the zone scanner agree.
+# ---------------------------------------------------------------------------
+FRESH_MAX_GRAY_SHARE = 0.12
+MATURE_MIN_GRAY_SHARE = 0.35
+FRESH_MIN_ELIGIBLE = 8        # green+gold in one viewport to call it greenfield
+
+
+def zone_freshness(green, gold, gray):
+    """Classify one viewport/cluster by its dot mix.
+    Returns (label, gray_share) where label is FRESH / WORKING / MATURE / EMPTY.
+    'No grey, lots of green+gold' -> FRESH."""
+    eligible = int(green) + int(gold)
+    total = eligible + int(gray)
+    if total == 0:
+        return "EMPTY", 0.0
+    gray_share = gray / float(total)
+    if gray_share <= FRESH_MAX_GRAY_SHARE and eligible >= FRESH_MIN_ELIGIBLE:
+        return "FRESH", gray_share
+    if gray_share >= MATURE_MIN_GRAY_SHARE:
+        return "MATURE", gray_share
+    return "WORKING", gray_share
+
 
 def classify_status(text=None, ban=None, color=None):
     """Decide LEAD / CUSTOMER / COPPER_UPGRADE for one dot.
