@@ -53,3 +53,4 @@
 ## Journal
 - 2026-06-13: project tracker created; recorded hunter --fresh + skills work.
 - 2026-06-13: Added enrich_phones (Places API phone bridge) + map-control skill documenting the Claude->Playwright->Drive->GHL loop; research confirmed Mapbox viewport-only queries and AT&T-owned dot layer
+- 2026-06-13: Live HP test: map at /yourefer/fiber behind 'Fiber Availability Map' button (open_map_view added); automated Chromium shows dots but not basemap (fine); popup format confirmed. Researched Mapbox improvements - top = page.on(response) backend capture

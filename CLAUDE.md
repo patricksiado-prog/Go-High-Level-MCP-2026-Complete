@@ -83,6 +83,19 @@
   pageLimit}`, form submissions `limit=20`. **Live Railway still runs old code until redeployed.**
 - Follow-up agent + recipe added: `examples/agents/customer-follow-up-assistant.md`,
   `examples/recipes/customer-follow-up.json`.
+- **Optimus map toolkit** (`/optimus`, branch `claude/optimus-map-tools-setup-6dcl6o`):
+  precise_fiber_hunter (clicks every dot / Mapbox geo fast path / `--fresh` new-zone mode),
+  enrich_phones (free OSM first → paid Places only on miss, cached, `--watch`), business_score,
+  ghl_loader (→ AT&T Commercial + power-dialer workflow). Installer + GitHub updater on Drive
+  ("Optimus Installer"). Skills: optimus-fiber, project-tracker, map-control. Status board:
+  `PROJECT_STATUS.md`.
+- **AT&T fiber map — live-confirmed 2026-06-13:** renders in-page at
+  `youachieve.att.com/yourefer/fiber`; fresh load = portal, map is behind a "Fiber Availability
+  Map" button (`open_map_view()` clicks it). The automated Chromium shows the **dots but not the
+  basemap tiles** — normal, the hunter only needs dots. Login saved once via `--login` into
+  `att_profile/`. Popup = `FIBER ELIGIBLE / Address: … / CREATE REFERRAL`. **Top improvement:**
+  capture the dots from AT&T's backend via a Playwright `page.on("response")` listener (every
+  address+lat/lng+status in one shot, no clicking).
 
 ## 7. Security
 - Rotate the exposed `pit-` token in GHL (was shown in screenshots/docs). Keep it in Railway

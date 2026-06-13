@@ -59,3 +59,33 @@ this skill keeps the design honest and repeatable.
   cold-text. Places gives a phone, not consent.
 - A live run needs the HP (real browser + logins); the build container can only
   test pure logic.
+
+### Live-confirmed on the HP (2026-06-13) — don't relearn
+- **URL:** the map renders **in-page at `youachieve.att.com/yourefer/fiber`**
+  (same URL as the portal). A fresh load lands on the PORTAL; the dot map is
+  behind a **"Fiber Availability Map"** button — `open_map_view()` clicks it.
+- **Automated Chromium shows the DOTS but NOT the basemap tiles.** That's
+  normal and fine — the hunter reads dot color + popup, never the street
+  imagery. "Just dots on white" = working, not broken.
+- **Login** is captured once via `--login` into the persistent `att_profile/`
+  profile; after that the scan browser is already signed in.
+- **Popup format confirmed:** `FIBER ELIGIBLE` / `Address: 8 GREENWAY PLZ UNIT
+  1111` / `CREATE REFERRAL` — matches the parser's ADDRESS_REGEX exactly.
+
+## Improvements roadmap (researched 2026-06-13) — best first
+1. **Network capture (biggest win).** The dots come from an AT&T backend
+   request. Attach a Playwright `page.on("response")` listener that watches for
+   that endpoint and dumps its JSON — you get **every** address + lat/lng +
+   status for the loaded area in one shot, no clicking, no popup parsing, and
+   it doesn't care that the basemap didn't paint. This is the robust version of
+   `fiber_precise_pipeline --api-substring`, folded into the hunter as a passive
+   listener. To find the endpoint: run with the listener logging every response
+   URL, pan once, and grep the URLs that fire when dots load.
+2. **`querySourceFeatures` over `queryRenderedFeatures`.** querySourceFeatures
+   returns features even when hidden/overlapped (more complete), at the cost of
+   needing dedup across tiles — pair it with the existing address de-dupe.
+3. **Auto-snake until empty.** Keep panning a FRESH cluster until no NEW
+   addresses appear, instead of a fixed cols×rows grid, so zone edges aren't
+   missed.
+4. **HAR fallback.** If the endpoint is obfuscated, record a HAR of a manual
+   pan and read the dot payloads out of it offline.
