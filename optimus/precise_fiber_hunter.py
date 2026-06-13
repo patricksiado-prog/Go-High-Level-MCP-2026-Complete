@@ -896,6 +896,9 @@ def main():
                     help="with --net: only parse responses whose URL contains "
                          "this (restrict to the real dot endpoint once known)")
     ap.add_argument("--dry", action="store_true", help="don't write to the sheet, just print")
+    ap.add_argument("--auto", action="store_true",
+                    help="UNATTENDED: no 'press Enter' pauses, auto-close at the end. "
+                         "For the self-restarting launcher / scheduled runs.")
     args = ap.parse_args()
 
     os.makedirs(PROFILE_DIR, exist_ok=True)
@@ -932,8 +935,12 @@ def main():
         if args.zip:
             print("Searching area: %s" % args.zip)
             if not search_zip(page, args.zip):
-                print("Couldn't find the search box -- pan/zoom to your area by hand.")
-                input("Press Enter when the map shows your area... ")
+                if args.auto:
+                    print("Couldn't find the search box -- scanning the current view "
+                          "(unattended mode, no manual step).")
+                else:
+                    print("Couldn't find the search box -- pan/zoom to your area by hand.")
+                    input("Press Enter when the map shows your area... ")
             focus_map(page)
 
         if args.zoom_in:
@@ -961,7 +968,8 @@ def main():
                      args.dry, fresh_only=args.fresh)
         print("\nDONE. Captured %d new fiber-eligible addresses." % n)
         print(("They're in the '%s' tab." % OUT_TAB) if ws else "(dry run, nothing written)")
-        input("Press Enter to close the browser... ")
+        if not args.auto:
+            input("Press Enter to close the browser... ")
         ctx.close()
 
 
