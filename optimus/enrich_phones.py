@@ -30,14 +30,21 @@ RUN:
 
 import os, sys, json, time, argparse
 
-IN_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                       "precise_addresses.jsonl")
-OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        "enriched_leads.jsonl")
+HERE = os.path.dirname(os.path.abspath(__file__))
+IN_PATH = os.path.join(HERE, "precise_addresses.jsonl")
+OUT_PATH = os.path.join(HERE, "enriched_leads.jsonl")
+CACHE_PATH = os.path.join(HERE, "enrich_cache.json")   # never pay twice
 API_BASE = "https://maps.googleapis.com/maps/api/place"
 NEARBY_RADIUS_M = 40          # a fiber dot sits on a rooftop; keep it tight
-THROTTLE_SECS = 0.05          # be gentle on the API
+THROTTLE_SECS = 0.05          # be gentle on the paid API
 PLACES_FIELDS = "name,formatted_phone_number,types,business_status,formatted_address"
+
+# FREE source: OpenStreetMap Overpass (no cost, no key). Coverage is partial
+# (US business phones are spotty in OSM) so it's the FIRST pass; paid Places
+# only fills the misses, and only when --paid is set.
+OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+OVERPASS_RADIUS_M = 35
+OVERPASS_THROTTLE_SECS = 1.1  # public Overpass etiquette: ~1 req/s
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +97,52 @@ def dedupe_key(rec):
     if len(ph) >= 10:
         return "ph:" + ph[-10:]
     return "ad:" + (rec.get("address") or "").strip().upper()
+
+
+def cache_key(rec):
+    """Stable key for the lookup cache -- coordinates if we have them (a dot is
+    a rooftop), else the map address. Lets re-runs cost $0."""
+    lat, lng = rec.get("lat"), rec.get("lng")
+    if lat is not None and lng is not None:
+        return "ll:%.5f,%.5f" % (float(lat), float(lng))
+    return "ad:" + (rec.get("address") or "").strip().upper()
+
+
+def parse_overpass(elements):
+    """Pick the best-named element from an Overpass response and pull
+    name + phone + types from its OSM tags (free; no key)."""
+    best = None
+    for el in elements or []:
+        tags = el.get("tags") or {}
+        if tags.get("name"):
+            best = tags
+            if tags.get("phone") or tags.get("contact:phone"):
+                break   # prefer one that actually has a phone
+    if not best:
+        return {}
+    raw_phone = best.get("phone") or best.get("contact:phone")
+    types = []
+    for k in ("amenity", "shop", "office", "craft", "healthcare"):
+        if best.get(k):
+            types.append(best[k])
+    return {"name": best.get("name"), "phone": normalize_phone(raw_phone),
+            "types": types, "business_status": None}
+
+
+def load_cache(path):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_cache(path, cache):
+    try:
+        with open(path, "w") as f:
+            json.dump(cache, f)
+    except Exception as e:
+        print("   cache write error: %s" % e)
 
 
 def load_jsonl(path):
@@ -147,63 +200,163 @@ class PlacesClient:
 
     def enrich(self, rec):
         lat, lng = rec.get("lat"), rec.get("lng")
+        place = {}
         if lat is not None and lng is not None:
             place = self.by_latlng(lat, lng)
             if place.get("phone"):
                 return place
         if rec.get("address"):
             return self.by_text(rec["address"])
-        return place if (lat is not None) else {}
+        return place
+
+
+class OverpassClient:
+    """FREE business lookup via OpenStreetMap Overpass (no key, no cost).
+    Partial coverage, so it's the first pass before paid Places."""
+    def __init__(self):
+        import requests
+        self._r = requests
+
+    def by_latlng(self, lat, lng):
+        if lat is None or lng is None:
+            return {}
+        q = ('[out:json][timeout:20];'
+             '(node(around:%d,%s,%s)[name];'
+             ' way(around:%d,%s,%s)[name];);'
+             'out tags center 8;'
+             % (OVERPASS_RADIUS_M, lat, lng, OVERPASS_RADIUS_M, lat, lng))
+        try:
+            r = self._r.post(OVERPASS_URL, data={"data": q}, timeout=30)
+            r.raise_for_status()
+            return parse_overpass(r.json().get("elements"))
+        except Exception:
+            return {}
+
+    def enrich(self, rec):
+        return self.by_latlng(rec.get("lat"), rec.get("lng"))
+
+
+def enrich_one(rec, cache, overpass, places, allow_paid):
+    """FREE-FIRST chain for one record, with cache so nothing is paid twice.
+    Order: cache -> OSM (free) -> Places (only if --paid and key present).
+    Returns (place_dict, source)."""
+    ck = cache_key(rec)
+    if ck in cache:
+        return cache[ck], "cache"
+    place, source = {}, "none"
+    if overpass is not None:
+        place = overpass.enrich(rec) or {}
+        if place.get("phone"):
+            source = "osm"
+    if not place.get("phone") and allow_paid and places is not None:
+        paid = places.enrich(rec) or {}
+        if paid.get("name") or paid.get("phone"):
+            place, source = paid, "places"
+    elif place.get("name") and source == "none":
+        source = "osm"   # OSM gave a name but no phone
+    cache[ck] = place
+    return place, source
 
 
 # ---------------------------------------------------------------------------
 # run
 # ---------------------------------------------------------------------------
-def run(in_path, out_path, api_key, dry, client=None):
-    rows = load_jsonl(in_path)
-    print("Read %d captured addresses from %s" % (len(rows), in_path))
-    if client is None and not dry:
-        client = PlacesClient(api_key)
-    seen, enriched = set(), []
-    got_phone = 0
+def _process(rows, cache, overpass, places, allow_paid, seen, out_f, dry):
+    """Enrich a batch of rows free-first; append new leads to out_f. Returns
+    (new_count, phone_count, paid_calls)."""
+    new = phones = paid = 0
     for rec in rows:
-        place = client.enrich(rec) if client else {}
+        place, source = enrich_one(rec, cache, overpass, places, allow_paid)
+        if source == "places":
+            paid += 1
         lead = merge_lead(rec, place)
         k = dedupe_key(lead)
         if k in seen:
             continue
         seen.add(k)
-        enriched.append(lead)
+        new += 1
         if lead.get("phone"):
-            got_phone += 1
-        if dry:
-            print("  %-34s | %s | %s | %s"
-                  % ((lead.get("name") or "?")[:34], lead.get("phone") or "(no phone)",
-                     lead.get("zone_label") or "-", lead.get("address") or "-"))
-        if client:
+            phones += 1
+        print("  [%s] %-30s | %s | %s | %s"
+              % (source, (lead.get("name") or "?")[:30],
+                 lead.get("phone") or "(no phone)", lead.get("zone_label") or "-",
+                 lead.get("address") or "-"))
+        if out_f and not dry:
+            out_f.write(json.dumps(lead) + "\n")
+            out_f.flush()
+        if source == "osm":
+            time.sleep(OVERPASS_THROTTLE_SECS)   # public Overpass etiquette
+        elif source == "places":
             time.sleep(THROTTLE_SECS)
-    if not dry:
-        with open(out_path, "w") as f:
-            for lead in enriched:
-                f.write(json.dumps(lead) + "\n")
-    print("\n%s | %d leads | %d with phone | %d without"
-          % ("DRY RUN" if dry else "WROTE " + out_path,
-             len(enriched), got_phone, len(enriched) - got_phone))
-    return enriched
+    return new, phones, paid
+
+
+def run(in_path, out_path, dry, allow_paid=False, api_key=None,
+        overpass=None, places=None, watch=False, watch_interval=10.0):
+    """Free-first enrichment. Default costs $0 (OSM only); paid Places is used
+    only when allow_paid is set AND a key is present. --watch tails the input
+    so it can run in the background while the hunter is still capturing."""
+    cache = load_cache(CACHE_PATH)
+    if overpass is None:
+        overpass = OverpassClient()
+    if places is None and allow_paid and api_key:
+        places = PlacesClient(api_key)
+    seen = set()
+    for lead in load_jsonl(out_path):    # resume: don't re-emit existing leads
+        seen.add(dedupe_key(lead))
+
+    mode = "PAID (OSM free-first -> Places on misses)" if allow_paid else "FREE (OSM only, $0)"
+    print("Enrichment mode: %s%s" % (mode, " | WATCH" if watch else ""))
+
+    out_f = None if dry else open(out_path, "a")
+    total_new = total_phone = total_paid = 0
+    offset = 0
+    try:
+        while True:
+            rows = load_jsonl(in_path)
+            batch = rows[offset:]
+            offset = len(rows)
+            if batch:
+                n, p, paid = _process(batch, cache, overpass, places,
+                                      allow_paid, seen, out_f, dry)
+                total_new += n; total_phone += p; total_paid += paid
+                if not dry:
+                    save_cache(CACHE_PATH, cache)
+            if not watch:
+                break
+            time.sleep(watch_interval)
+    except KeyboardInterrupt:
+        print("\n(stopped)")
+    finally:
+        if out_f:
+            out_f.close()
+
+    print("\n%s | %d new leads | %d with phone | %d paid Places calls (~$%.2f)"
+          % ("DRY RUN" if dry else "appended -> " + out_path,
+             total_new, total_phone, total_paid, total_paid * 0.017))
+    return total_new
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--in", dest="in_path", default=IN_PATH)
     ap.add_argument("--out", dest="out_path", default=OUT_PATH)
+    ap.add_argument("--paid", action="store_true",
+                    help="allow paid Google Places on OSM misses (needs "
+                         "GOOGLE_PLACES_API_KEY). Default is FREE (OSM only, $0).")
+    ap.add_argument("--watch", action="store_true",
+                    help="keep running and enrich new addresses as the hunter "
+                         "appends them (run in a 2nd terminal; never blocks the scan)")
+    ap.add_argument("--watch-interval", type=float, default=10.0)
     ap.add_argument("--dry", action="store_true",
-                    help="don't call the API or write; just show the plan")
+                    help="show the plan; don't write or spend")
     args = ap.parse_args()
     key = os.environ.get("GOOGLE_PLACES_API_KEY")
-    if not args.dry and not key:
-        print("ERROR: set GOOGLE_PLACES_API_KEY (the key from Zack's GCP project).")
-        sys.exit(1)
-    run(args.in_path, args.out_path, key, args.dry)
+    if args.paid and not key:
+        print("NOTE: --paid set but no GOOGLE_PLACES_API_KEY -- staying FREE (OSM only).")
+        args.paid = False
+    run(args.in_path, args.out_path, args.dry, allow_paid=args.paid,
+        api_key=key, watch=args.watch, watch_interval=args.watch_interval)
 
 
 if __name__ == "__main__":
