@@ -372,36 +372,64 @@ from playwright.sync_api import sync_playwright
 # ----------------------------------------------------------------------------
 # sheet
 # ----------------------------------------------------------------------------
+EXPECTED_CREDS_PROJECT = "fiberscanner-493900"   # the only project that works
+
+
+def _creds_candidates():
+    home = os.path.expanduser("~")
+    return [
+        "google_creds.json",                                    # cwd
+        os.path.join(home, "optimus", "google_creds.json"),     # brain canonical
+        os.path.join(home, "Optimus", "google_creds.json"),
+        os.path.join(home, "Desktop", "google_creds.json"),
+        os.path.join(home, "OneDrive", "Desktop", "google_creds.json"),
+        os.path.join(home, "Downloads", "google_creds.json"),
+        "/storage/emulated/0/Download/google_creds.json",       # Pydroid
+    ]
+
+
+def _read_valid_creds(path):
+    """Return parsed creds if the file is a usable service-account key, else None."""
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            info = json.load(f)
+    except Exception:
+        return None
+    if isinstance(info, dict) and info.get("client_email") and info.get("private_key"):
+        return info
+    return None
+
+
+def find_creds():
+    """Pick the RIGHT creds out of all the scattered copies. Patrick has many
+    google_creds.json across devices -- some wrong-project, some corrupt -- so
+    don't take the first one found: scan all candidates, skip invalid ones, and
+    prefer the fiberscanner-493900 key. Returns a path or None."""
+    fallback = None
+    for p in _creds_candidates():
+        if not os.path.exists(p):
+            continue
+        info = _read_valid_creds(p)
+        if not info:
+            print("  (skipping invalid/corrupt creds at %s)" % p)
+            continue
+        if info.get("project_id") == EXPECTED_CREDS_PROJECT:
+            return p                      # exact match wins immediately
+        if fallback is None:
+            fallback = p                  # valid but maybe wrong project
+    return fallback
+
+
 def open_sheet():
     import gspread
     from google.oauth2.service_account import Credentials
-    creds_file = None
-    for p in ["google_creds.json",
-              r"C:\Users\patri\Optimus\google_creds.json",
-              r"C:\Users\patri\optimus\google_creds.json",
-              os.path.join(os.path.expanduser("~"), "Desktop", "google_creds.json")]:
-        if os.path.exists(p):
-            creds_file = p
-            break
+    creds_file = find_creds()
     if not creds_file:
-        print("google_creds.json not found; running WITHOUT the sheet "
-              "(prints captures, writes nothing). Add a valid service-account "
-              "key to enable sheet writes.")
+        print("No valid google_creds.json found among the usual paths; running "
+              "WITHOUT the sheet (captures print only). Fix with the Drive "
+              "download or drop the fiberscanner key at ~/optimus/google_creds.json.")
         return None
-    # validate the creds file BEFORE handing it to google-auth so a bad/empty
-    # file degrades to print-only instead of crashing the whole run.
-    try:
-        with open(creds_file, "r", encoding="utf-8", errors="ignore") as f:
-            info = json.load(f)
-        if not (isinstance(info, dict) and info.get("client_email")
-                and info.get("private_key")):
-            raise ValueError("not a service-account key (no client_email/private_key)")
-    except Exception as e:
-        print("WARNING: %s is not a valid Google service-account key (%s)."
-              % (creds_file, str(e)[:80]))
-        print("         Running WITHOUT the sheet -- captures print only. "
-              "Replace it with the real key to write to the sheet.")
-        return None
+    print("Using creds: %s" % creds_file)
     try:
         client = gspread.authorize(
             Credentials.from_service_account_file(creds_file, scopes=SCOPES))
