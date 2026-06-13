@@ -519,10 +519,11 @@ def search_zip(page, zip_code):
 # scan: drain each viewport fully, THEN pan; snake across grid
 # ----------------------------------------------------------------------------
 def record_capture(ws, seen, area_label, dry, address, popup_status, ban,
-                   dot_status, via, zone_label="WORKING"):
+                   dot_status, via, zone_label="WORKING", lat=None, lng=None):
     """Common writer for both the Mapbox fast path and the click path.
     Returns True when a NEW address was recorded. zone_label (FRESH/WORKING/
-    MATURE) rides along so business_score weights just-lit zones first."""
+    MATURE) rides along so business_score weights just-lit zones first;
+    lat/lng (when the geo path has them) feed the Places phone enricher."""
     addr_key = address.strip().upper()
     if addr_key in seen:
         return False
@@ -542,7 +543,8 @@ def record_capture(ws, seen, area_label, dry, address, popup_status, ban,
     if not dry:
         append_jsonl({"address": address, "dot_status": dot_status,
                       "zone_label": zone_label, "popup_status": popup_status,
-                      "ban": ban, "area": area_label, "ts": ts, "via": via})
+                      "ban": ban, "area": area_label, "ts": ts, "via": via,
+                      "lat": lat, "lng": lng})
     return True
 
 
@@ -562,9 +564,11 @@ def drain_viewport_mapbox(page, ws, seen, area_label, dry, zone_label="WORKING")
         addr = feature_address(props)
         status_txt = feature_status_text(props)
         dot_status = classify_status(text=status_txt or str(props))
+        lat, lng = f.get("lat"), f.get("lng")
         if addr:
             if record_capture(ws, seen, area_label, dry, addr, status_txt,
-                              None, dot_status, via="mapbox", zone_label=zone_label):
+                              None, dot_status, via="mapbox", zone_label=zone_label,
+                              lat=lat, lng=lng):
                 captured += 1
             continue
         # no address in the feature -> click at the EXACT projected pixel
@@ -574,7 +578,8 @@ def drain_viewport_mapbox(page, ws, seen, area_label, dry, zone_label="WORKING")
                                          ban=info.get("ban"))
             if record_capture(ws, seen, area_label, dry, info["address"],
                               info.get("status"), info.get("ban"),
-                              dot_status, via="mapbox-click", zone_label=zone_label):
+                              dot_status, via="mapbox-click", zone_label=zone_label,
+                              lat=lat, lng=lng):
                 captured += 1
         close_popup(page)
         time.sleep(0.2)
