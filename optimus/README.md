@@ -153,9 +153,28 @@ phone enrichment and door routes land on the exact rooftop.
 | `precise_fiber_hunter.py` | v0.3 wide-area grid scanner; HiDPI fix, unified detection |
 | `optimus_targets.py` | Shared lease-based ZIP queue + news/outage signal ingestion |
 | `fiber_zone_scanner.py` | Headless multi-instance discovery; zone freshness score + new-fiber diff |
+| `bdc_diff.py` | FCC BDC snapshot diff → new AT&T-fiber ZIPs → TargetQueue (footprint-wide signal) |
+| `business_score.py` | Rank enriched businesses best-first (zone + status + type + reachability) |
+| `ghl_loader.py` | Scored businesses → GHL Command opps + power-dialer queue (dry by default) |
+| `weekly_run.py` | Resumable orchestrator: signals → scan → enrich → score → load |
 
-Deps: `pip install playwright gspread google-auth numpy pillow scipy` then
-`python -m playwright install chromium`. (OpenCV no longer needed.)
+Deps: `pip install playwright gspread google-auth numpy pillow scipy requests`
+then `python -m playwright install chromium`. (OpenCV no longer needed.)
+`bdc_diff.py` and `weekly_run.py`'s planning use only the standard library.
+
+## Tests
+
+Pure-logic unit tests (no browser, sheet, or GHL credentials needed) live in
+`optimus/tests/`. From the `optimus/` dir:
+
+```
+python -m unittest discover -s tests -v      # stdlib, no extra deps
+python -m pytest tests -q                     # if you prefer pytest
+```
+
+They cover signal queueing, dot/zone classification, backend-JSON extraction,
+business scoring, GHL payload/dedupe, the BDC new-build diff, and the weekly
+orchestrator's stage planning.
 
 ## Compliance — non-negotiable lanes
 

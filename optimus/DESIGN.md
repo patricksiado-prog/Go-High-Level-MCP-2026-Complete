@@ -134,15 +134,27 @@ Built (this branch, continued):
   across weeks (by phone), and export a score-ordered DIAL QUEUE for the power
   dialer. Dry-run by default; `--commit` + GHL_PIT_TOKEN to load live. Never
   dials, never texts. Tested.
+- `bdc_diff` — footprint-wide signal loader (stage 1, top priority). Diffs two
+  FCC BDC fixed-availability snapshots, isolates the AT&T-fiber location_ids
+  that are NEW this period (the national "new fiber" set), rolls them up to
+  ZIPs (via a fabric `location_id→ZIP` file or resolver; falls back to a
+  per-census-block report), and enqueues the new-build ZIPs into the shared
+  TargetQueue at buildout priority. Pure diff/rollup logic, no map scraping.
+  Dry by default; `--enqueue` to load the queue. Tested.
+- `weekly_run` — the orchestrator/cron (stage 7). One resumable command walks
+  signals → scan → enrich → score → load in order, recording finished stages
+  in a small state file so a re-run picks up where it left off. It checkpoints
+  honestly at `enrich` (MapMan runs on Pydroid, a separate device): if MapMan's
+  output isn't ready it stops cleanly and resumes there next run. Load stays
+  DRY unless `--commit` + GHL_PIT_TOKEN. Never dials, never texts. Tested.
 
 New to build (in priority order):
-1. **WIDE signal loaders** — `bdc_diff.py` (footprint-wide backbone, free,
-   needs FCC API token), news/Reddit watcher (wire to `optimus_targets`),
-   BEAD award loader.
-4. **`weekly_run.py`** — orchestrator/cron: signals → scan → enrich → score →
-   load → (dialer picks up). Idempotent, deduped, resumable.
-5. **Dialer config** — GHL power dialer on the AT&T Commercial pipeline,
-   pulling in score order, dispositions wired to opp stages.
+1. **More WIDE signal loaders** — news/Reddit watcher (wire to
+   `optimus_targets.enqueue_news`), BEAD award loader. (`bdc_diff` — the
+   footprint-wide backbone — is built; see above.)
+2. **Dialer config** — GHL power dialer on the AT&T Commercial pipeline,
+   pulling in score order, dispositions wired to opp stages. (Config in GHL,
+   not code; `ghl_loader`/`weekly_run` already stage and order the work.)
 
 ## Compliance summary (non-negotiable)
 Discovery + business calling only. Found businesses route to **DNC-scrubbed,
