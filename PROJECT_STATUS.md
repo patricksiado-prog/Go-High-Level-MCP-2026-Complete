@@ -52,3 +52,4 @@
 
 ## Journal
 - 2026-06-13: project tracker created; recorded hunter --fresh + skills work.
+- 2026-06-13: Added enrich_phones (Places API phone bridge) + map-control skill documenting the Claude->Playwright->Drive->GHL loop; research confirmed Mapbox viewport-only queries and AT&T-owned dot layer
