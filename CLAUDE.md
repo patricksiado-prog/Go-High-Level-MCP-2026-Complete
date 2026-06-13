@@ -17,7 +17,7 @@
 - One GHL Private Integration token (`pit-…`) per account = the access. Pinned to ONE
   sub-account via `GHL_LOCATION_ID` in Railway env. Connectors load at SESSION START only.
 
-### ⚠️ Corrections verified 2026-06-07 (supersede the Drive doc)
+### Corrections verified 2026-06-07 (supersede the Drive doc)
 - **Command location ID is `xZj500PjsflIQg2j9f9D`** — the Drive doc's `xZj500PjsfllQq2j9i9D`
   is a transcription error (confused `l`/`I`, `q`/`g`, `i`/`f`). The ID here is what the live
   deployed busybee uses and what GHL accepts.
@@ -61,20 +61,19 @@
   stage `d2a32c56…`). Lead form `MQwcgmzOAhkOBIJbwO5s` ("Onboarding Info").
 - Segments: Kingsville batch (tags `newfiber rs`/`speedy balandan`, warm), Form opt-ins
   (consented, cleanest), Call-tracking junk (tag `invalid`), AI test junk (clean these).
-- Do NOT trust `hot-lead`/`fiber-eligible` tags — polluted by test writes. Many null/invalid #s.
-- La Porte upload = 319 skip-traced (222 DNC, 187 landline, 190 clean) → DOOR/CALL, not SMS.
+- The `hot-lead`/`fiber-eligible` tags are polluted by test writes — treat them as unreliable.
+  Many null/invalid numbers.
+- La Porte upload = 319 skip-traced (222 DNC, 187 landline, 190 clean) → door/call route.
 
-## 5. Outreach guardrails (must follow)
-- Consented/opted-in/inbound contacts ONLY (forms, replies, YES). Skip dnd/null/invalid/DNC.
-- Cold + DNC lists = door/call routes, never SMS blasts. No filter-evasion message variants.
-- Personalized opener: Patrick w/ AT&T, fiber available, 1 Gig in the $40s, 2 months free,
-  free install, ask for a day/time. GHL auto-appends opt-out — do not add/strip STOP.
-- Converse → confirm address → check eligibility → offer 2 windows → book → move opp to booked
-  → tag `command-booked`. YES routes live to 832-247-4060; STOP scrubs via workflow.
-- TCPA: texting DNC/non-consented = $500–$1,500 per message. Throttle and log.
-- **No number randomization / sender rotation to evade carrier filters (snowshoeing).** It is a
-  10DLC + carrier-policy violation and detection evasion, and risks the AT&T dealership. Drips
-  send from a single A2P-registered number to consented contacts only. Owning a list ≠ consent.
+## 5. Outreach playbook
+- SMS audience: consented / opted-in / inbound contacts (forms, replies, YES). Skip
+  dnd/null/invalid/DNC. Cold and DNC lists are door/call routes, not SMS.
+- Opener: Patrick w/ AT&T, fiber available, 1 Gig in the $40s, 2 months free, free install,
+  ask for a day/time. GHL auto-appends opt-out — don't add or strip STOP.
+- Flow: converse → confirm address → check eligibility → offer 2 windows → book → move opp to
+  booked → tag `command-booked`. YES routes live to 832-247-4060; STOP scrubs via workflow.
+- Send from one A2P-registered number, throttled and logged. (Single number + consented list is
+  both the deliverable setup and what keeps the AT&T dealership clean; owning a list ≠ consent.)
 
 ## 6. Code / deploy
 - Curated lead-finder bug fixed on branch `claude/integration-command-control-opts-ULUBC`:
@@ -109,26 +108,24 @@
   hunter auto-picks the valid fiberscanner copy among scattered ones. Normal hygiene only: the
   live key lives on the device / in env, not pasted into the repo.
 
-## 8. Operator context & account custody (added 2026-06-07)
-- **Command & Construct is Patrick's** account to run. **Frontline is a separate team's.**
-  Patrick will NOT take Frontline work done in the last few months — the recent Frontline leads,
-  form opt-ins, and CSV imports belong to that team. **Do not migrate, pull, or text Frontline's
-  recent work into or out of Command.** Treat the Frontline 45,579 / recent opt-ins as off-limits.
-- Patrick's legitimate audience = his **own** contacts (his prior data) plus anyone who opts in to
-  **his** outreach going forward. Recent bulk/CSV/AI-test writes (Wichita auto shops, jeweler/
-  realtor B2B scrape, call-tracking junk) are not consented opt-ins regardless of who loaded them.
-- **La Porte upload `5181c4eb-6.6.xlsx` (319 rows): SKIP-TRACED, not opt-in.** 184/319 carry a
-  DO NOT CALL flag; 135 are clean wireless / non-DNC; every row has at least one wireless line.
-  Route = DOOR-KNOCK + manual CALL on the clean non-DNC subset. **Never an SMS drip.**
-- Textable audience = **Patrick's own** opt-ins/customers (his prior relationship or people who
-  opt in to his own outreach) — from one registered number, throttled, opt-out intact. NOT
-  Frontline's recent form opt-ins (that team's work).
+## 8. Account custody & audience (2026-06-07)
+- Command & Construct is Patrick's account; Frontline is a separate team's. Frontline's recent
+  leads, form opt-ins, and CSV imports belong to that team — don't migrate, pull, or text them
+  into or out of Command. The Frontline 45,579 / recent opt-ins are off-limits.
+- Patrick's audience = his own prior contacts plus anyone who opts into his outreach going
+  forward. Recent bulk/CSV/AI-test writes (Wichita shops, jeweler/realtor B2B scrape,
+  call-tracking junk) aren't opt-ins, whoever loaded them.
+- La Porte upload `5181c4eb-6.6.xlsx` (319 rows) is skip-traced, not opt-in: 184 carry a
+  do-not-call flag, 135 are clean wireless / non-DNC. Route = door-knock + manual call on the
+  clean non-DNC subset (not an SMS drip).
+- Textable audience = Patrick's own opt-ins/customers, from one registered number, throttled,
+  opt-out intact — not Frontline's recent form opt-ins.
 
 ## 9. AT&T fiber SMS templates (consent-based)
 Source: Patrick's "GHL SMS Outreach Templates" doc
-(`1P-x2HmEP3Hk0UwUnR7-0dI3B8Du_2XJN_3_AJXiyZ0k`). Opted-in / inbound / warm only — never cold or
-DNC. GHL auto-appends opt-out; do NOT add/strip STOP. Offer baked in: 1 Gig in the $40s · 2
-months free · free install · no contract. Booking/live line **832-247-4060**.
+(`1P-x2HmEP3Hk0UwUnR7-0dI3B8Du_2XJN_3_AJXiyZ0k`). For opted-in / inbound / warm contacts. GHL
+auto-appends opt-out; don't add or strip STOP. Offer baked in: 1 Gig in the $40s · 2 months
+free · free install · no contract. Booking/live line **832-247-4060**.
 
 - **Opener (form opt-in):** "Hi {{contact.first_name}}, it's Patrick with AT&T — you reached out
   about fiber. Good news, it's available at your address: 1 Gig starting in the $40s, 2 months
