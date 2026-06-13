@@ -45,8 +45,11 @@
   ("Patrick's number"); also +13466840217, +13613219339.
 - **Frontline** — 21 SMS-capable numbers (TX/AL/AZ/OK/LA/MS) + Voice-AI inbound on several,
   default **+15043996804** ("New Orleans").
-- **A2P 10DLC unconfirmed on both** (`bundleSid: null`). Capability ≠ registration — verify the
-  Trust Center shows **Approved** before any volume, or US carriers will filter outbound.
+- **A2P 10DLC — operator states all numbers ARE registered** (Patrick, 2026-06-13): carrier/Twilio
+  side complete, just **not yet reflected in GHL** (`bundleSid: null` on all 4 Command + 22 Frontline
+  numbers, observed live 2026-06-13). I.e. the null bundleSid is a GHL propagation gap, not a
+  registration gap. Before high volume, confirm Twilio Trust Center shows **Approved** so GHL/carrier
+  state agree, then sends won't be filtered.
 
 ## 4. Lead intelligence (Frontline)
 - 45,579 contacts. Main pipeline `ve4ERf2YoKvuUVQEZb85` (early stage `378c10e3…`, form opt-in
