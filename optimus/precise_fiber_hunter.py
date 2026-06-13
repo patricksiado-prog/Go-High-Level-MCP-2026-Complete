@@ -899,6 +899,9 @@ def main():
     ap.add_argument("--auto", action="store_true",
                     help="UNATTENDED: no 'press Enter' pauses, auto-close at the end. "
                          "For the self-restarting launcher / scheduled runs.")
+    ap.add_argument("--loop", type=int, default=0, metavar="SECS",
+                    help="re-scan every SECS in the SAME browser session (stays on "
+                         "the map, no reload/portal flip). 0 = one pass then done.")
     args = ap.parse_args()
 
     os.makedirs(PROFILE_DIR, exist_ok=True)
@@ -928,46 +931,51 @@ def main():
             return
 
         ws = None if args.dry else open_sheet()
-        if open_map_view(page):       # portal -> reveal the dot map
-            print("Opened the Fiber Availability Map view.")
-        focus_map(page)
+        searched = [False]   # only search the ZIP on the first pass
 
-        if args.zip:
-            print("Searching area: %s" % args.zip)
-            if not search_zip(page, args.zip):
-                if args.auto:
-                    print("Couldn't find the search box -- scanning the current view "
-                          "(unattended mode, no manual step).")
-                else:
-                    print("Couldn't find the search box -- pan/zoom to your area by hand.")
-                    input("Press Enter when the map shows your area... ")
+        def one_pass():
+            # keep us ON the map -- re-open only if the SPA bounced to the portal
+            # (no page reload here, so the view doesn't flip portal<->map).
+            if open_map_view(page):
+                print("Opened the Fiber Availability Map view.")
             focus_map(page)
-
-        if args.zoom_in:
-            print("Zooming IN x%d" % args.zoom_in)
-            zoom(page, args.zoom_in, "in")
-        if args.zoom_out:
-            print("Zooming OUT x%d" % args.zoom_out)
-            zoom(page, args.zoom_out, "out")
-        if args.fresh and args.survey_out:
-            print("FRESH survey: zooming OUT x%d to sweep for just-lit clusters"
-                  % args.survey_out)
-            zoom(page, args.survey_out, "out")
-        search_this_area(page)   # make sure the starting view's dots are loaded
-
-        if capture is not None:
-            print("Scanning %d x %d viewports -- NETWORK mode (no clicking)...\n"
-                  % (args.cols, args.rows))
-            n = scan_net(page, ws, args.zip or "manual", args.cols, args.rows,
-                         args.dry, capture)
-        else:
+            if args.zip and not searched[0]:
+                print("Searching area: %s" % args.zip)
+                if not search_zip(page, args.zip):
+                    if args.auto:
+                        print("Couldn't find the search box -- scanning the current view.")
+                    else:
+                        print("Couldn't find the search box -- pan/zoom to your area by hand.")
+                        input("Press Enter when the map shows your area... ")
+                focus_map(page)
+                if args.zoom_in:
+                    zoom(page, args.zoom_in, "in")
+                if args.zoom_out:
+                    zoom(page, args.zoom_out, "out")
+                if args.fresh and args.survey_out:
+                    zoom(page, args.survey_out, "out")
+                searched[0] = True
+            search_this_area(page)   # load the current view's dots
+            if capture is not None:
+                print("Scanning %d x %d viewports -- NETWORK mode (no clicking)...\n"
+                      % (args.cols, args.rows))
+                return scan_net(page, ws, args.zip or "manual", args.cols, args.rows,
+                                args.dry, capture)
             mode = "FRESH (new-fiber only)" if args.fresh else "full"
             print("Scanning %d x %d viewports -- %s mode...\n"
                   % (args.cols, args.rows, mode))
-            n = scan(page, ws, args.zip or "manual", args.cols, args.rows,
-                     args.dry, fresh_only=args.fresh)
-        print("\nDONE. Captured %d new fiber-eligible addresses." % n)
-        print(("They're in the '%s' tab." % OUT_TAB) if ws else "(dry run, nothing written)")
+            return scan(page, ws, args.zip or "manual", args.cols, args.rows,
+                        args.dry, fresh_only=args.fresh)
+
+        while True:
+            n = one_pass()
+            print("\nDONE. Captured %d new fiber-eligible addresses." % n)
+            print(("They're in the '%s' tab." % OUT_TAB) if ws else "(dry run, nothing written)")
+            if args.loop and args.loop > 0:
+                print("Next pass in %ds -- staying on the map, no reload.\n" % args.loop)
+                time.sleep(args.loop)
+                continue
+            break
         if not args.auto:
             input("Press Enter to close the browser... ")
         ctx.close()

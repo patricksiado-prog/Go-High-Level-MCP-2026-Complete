@@ -11,16 +11,18 @@ setlocal
 set "REPO=%USERPROFILE%\optimus\repo"
 set "BRANCH=claude/optimus-map-tools-setup-6dcl6o"
 set "ZIP=77027"
-set "RESTART_SECS=60"
+set "RESCAN_SECS=600"
+set "RESTART_SECS=120"
 
 cd /d "%REPO%\optimus" || (echo Repo not found at %REPO% - run install_optimus.bat first. & pause & exit /b 1)
 
 :loop
 echo.
-echo ==== %DATE% %TIME%  updating + scanning ZIP %ZIP% ====
+echo ==== %DATE% %TIME%  updating, then scanning ZIP %ZIP% (re-scan every %RESCAN_SECS%s) ====
 git -C "%REPO%" pull origin %BRANCH%
-python precise_fiber_hunter.py --zip %ZIP% --net --auto
+REM ONE browser session that stays on the map and re-scans in place (no portal flip).
+python precise_fiber_hunter.py --zip %ZIP% --net --auto --loop %RESCAN_SECS%
 echo.
-echo ==== run finished/exited. Restarting in %RESTART_SECS%s. Close window to stop. ====
+echo ==== browser exited (crash or you closed it). Relaunching in %RESTART_SECS%s. Close window to stop. ====
 timeout /t %RESTART_SECS% /nobreak >nul
 goto loop
