@@ -54,3 +54,4 @@
 - 2026-06-13: project tracker created; recorded hunter --fresh + skills work.
 - 2026-06-13: Added enrich_phones (Places API phone bridge) + map-control skill documenting the Claude->Playwright->Drive->GHL loop; research confirmed Mapbox viewport-only queries and AT&T-owned dot layer
 - 2026-06-13: Live HP test: map at /yourefer/fiber behind 'Fiber Availability Map' button (open_map_view added); automated Chromium shows dots but not basemap (fine); popup format confirmed. Researched Mapbox improvements - top = page.on(response) backend capture
+- 2026-06-13: DECISION: precise hunter default = capture ALL fiber-eligible (green+gold) exact addresses regardless of zone age, for commercial calling. --fresh is OPTIONAL prioritization only (new zones first), never the default. Live test 77027 confirmed detection+classify+skip work; 77027 is mature (98-99% grey)
