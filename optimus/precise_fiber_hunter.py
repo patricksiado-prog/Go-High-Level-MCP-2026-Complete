@@ -218,6 +218,127 @@ def feature_status_text(props):
             return v
     return None
 
+
+# ============================================================================
+# NETWORK CAPTURE (the fast path) -- read the dots straight from AT&T's backend
+# JSON response instead of clicking. Research-confirmed: Playwright
+# page.on("response") hands us the payload; one response covers the whole
+# loaded area, no clicking, and it doesn't care that the basemap didn't paint.
+# Pure parsing below is unit-tested; the listener wiring runs on the HP.
+# ============================================================================
+def _nkey(k):
+    """Normalize a JSON key for fuzzy matching: lower, drop _ - and spaces."""
+    return str(k).lower().replace("_", "").replace("-", "").replace(" ", "")
+
+
+ADDR_KEYS = {"address", "addr", "fulladdress", "serviceaddress", "streetaddress",
+             "formattedaddress", "addressline", "address1", "fulladdr"}
+LAT_KEYS = {"lat", "latitude", "y"}
+LNG_KEYS = {"lng", "lon", "long", "longitude", "x"}
+NET_STATUS_KEYS = {"status", "eligibility", "eligible", "customerstatus",
+                   "customertype", "fiberstatus", "type", "dotstatus"}
+NET_BAN_KEYS = {"ban", "subscriberban"}
+
+
+def _pick(low, keyset):
+    for k in keyset:
+        v = low.get(k)
+        if v not in (None, ""):
+            return v
+    return None
+
+
+def _num(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def lead_from_dict(d):
+    """Extract one lead {address, lat, lng, status, ban} from a dict that may
+    be a flat record OR a GeoJSON feature (geometry + properties)."""
+    if not isinstance(d, dict):
+        return None
+    geom = d.get("geometry") if isinstance(d.get("geometry"), dict) else None
+    base = d.get("properties") if isinstance(d.get("properties"), dict) else d
+    low = {_nkey(k): v for k, v in base.items()}
+    addr = _pick(low, ADDR_KEYS)
+    if not addr or not isinstance(addr, str):
+        return None
+    lat, lng = _num(_pick(low, LAT_KEYS)), _num(_pick(low, LNG_KEYS))
+    if geom and geom.get("type") == "Point":
+        coords = geom.get("coordinates")
+        if isinstance(coords, (list, tuple)) and len(coords) >= 2:
+            lng = lng if lng is not None else _num(coords[0])
+            lat = lat if lat is not None else _num(coords[1])
+    status = _pick(low, NET_STATUS_KEYS)
+    return {"address": " ".join(addr.split())[:160], "lat": lat, "lng": lng,
+            "status": status if isinstance(status, str) else None,
+            "ban": _pick(low, NET_BAN_KEYS)}
+
+
+def extract_leads_from_json(obj, out=None, depth=0):
+    """Recursively pull every lead out of an arbitrary JSON payload
+    (FeatureCollection, plain list, {data:[...]}, nested, etc.)."""
+    if out is None:
+        out = []
+    if depth > 7:
+        return out
+    if isinstance(obj, dict):
+        ld = lead_from_dict(obj)
+        if ld:
+            out.append(ld)
+        else:
+            for v in obj.values():
+                extract_leads_from_json(v, out, depth + 1)
+    elif isinstance(obj, list):
+        for it in obj:
+            extract_leads_from_json(it, out, depth + 1)
+    return out
+
+
+class NetCapture:
+    """Collects leads seen on the wire. Attach .handle to page.on('response');
+    call .flush() per viewport to write the new ones."""
+    def __init__(self, substr=None):
+        self.substr = substr        # restrict to URLs containing this, if set
+        self.pending = []
+        self.seen = set()
+        self.endpoints = {}          # url(no query) -> lead count, for discovery
+
+    def handle(self, response):
+        try:
+            ct = (response.headers or {}).get("content-type", "")
+            if "json" not in ct.lower():
+                return
+            url = response.url
+            if self.substr and self.substr not in url:
+                return
+            leads = extract_leads_from_json(response.json())
+            if leads:
+                base = url.split("?")[0]
+                self.endpoints[base] = self.endpoints.get(base, 0) + len(leads)
+                self.pending.extend(leads)
+        except Exception:
+            pass
+
+    def flush(self, ws, seen, area_label, dry):
+        n = 0
+        self.seen = seen
+        while self.pending:
+            ld = self.pending.pop()
+            addr = (ld.get("address") or "").strip()
+            if not addr:
+                continue
+            dot_status = classify_status(text=ld.get("status"), ban=ld.get("ban"))
+            if record_capture(ws, seen, area_label, dry, addr,
+                              ld.get("status"), ld.get("ban"), dot_status,
+                              via="network", zone_label="WORKING",
+                              lat=ld.get("lat"), lng=ld.get("lng")):
+                n += 1
+        return n
+
 # --- popup parsing (canonical regexes from optimus_dot_detect) ---
 POPUP_KEYS = {
     "eligible": re.compile(ELIGIBLE_REGEX, re.I),
@@ -674,6 +795,32 @@ def scan(page, ws, area_label, cols, rows, dry, fresh_only=False):
     return total
 
 
+def scan_net(page, ws, area_label, cols, rows, dry, capture):
+    """FAST sweep: don't click dots at all. Pan the grid, click 'Search this
+    area' to make the backend serve each viewport's data, and let the
+    page.on('response') listener capture every address off the wire."""
+    seen = already_seen(ws)
+    print("Resume: %d addresses already captured -> will skip them." % len(seen))
+    total = 0
+    for r in range(rows):
+        for c in range(cols):
+            search_this_area(page)        # trigger the backend data load
+            time.sleep(1.0)
+            n = capture.flush(ws, seen, area_label, dry)
+            print("[cell r%d c%d] network capture: +%d" % (r, c, n))
+            total += n
+            if c < cols - 1:
+                pan(page, "right" if r % 2 == 0 else "left")
+        if r < rows - 1:
+            pan(page, "down")
+    total += capture.flush(ws, seen, area_label, dry)   # final drain
+    if capture.endpoints:
+        print("\nData endpoints seen (URL -> leads):")
+        for u, n in sorted(capture.endpoints.items(), key=lambda kv: -kv[1]):
+            print("  %4d  %s" % (n, u))
+    return total
+
+
 # ----------------------------------------------------------------------------
 # entry
 # ----------------------------------------------------------------------------
@@ -691,6 +838,13 @@ def main():
     ap.add_argument("--survey-out", type=int, default=0,
                     help="with --fresh: zoom OUT this many times first so each "
                          "viewport sweeps more ground hunting just-lit clusters")
+    ap.add_argument("--net", action="store_true",
+                    help="FAST PATH: capture addresses from AT&T's backend JSON "
+                         "response (no dot-clicking). Prints the data endpoint(s) "
+                         "it found so you can pin them with --api-substring.")
+    ap.add_argument("--api-substring", default=None,
+                    help="with --net: only parse responses whose URL contains "
+                         "this (restrict to the real dot endpoint once known)")
     ap.add_argument("--dry", action="store_true", help="don't write to the sheet, just print")
     args = ap.parse_args()
 
@@ -705,6 +859,12 @@ def main():
         )
         ctx.add_init_script(MAPBOX_HOOK_JS)   # hook the map before it loads
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
+
+        capture = None
+        if args.net:
+            capture = NetCapture(substr=args.api_substring)
+            page.on("response", capture.handle)   # grab dot data off the wire
+
         page.goto(MAP_URL, wait_until="domcontentloaded", timeout=60000)
 
         if args.login:
@@ -738,11 +898,17 @@ def main():
             zoom(page, args.survey_out, "out")
         search_this_area(page)   # make sure the starting view's dots are loaded
 
-        mode = "FRESH (new-fiber only)" if args.fresh else "full"
-        print("Scanning %d x %d viewports -- %s mode...\n"
-              % (args.cols, args.rows, mode))
-        n = scan(page, ws, args.zip or "manual", args.cols, args.rows,
-                 args.dry, fresh_only=args.fresh)
+        if capture is not None:
+            print("Scanning %d x %d viewports -- NETWORK mode (no clicking)...\n"
+                  % (args.cols, args.rows))
+            n = scan_net(page, ws, args.zip or "manual", args.cols, args.rows,
+                         args.dry, capture)
+        else:
+            mode = "FRESH (new-fiber only)" if args.fresh else "full"
+            print("Scanning %d x %d viewports -- %s mode...\n"
+                  % (args.cols, args.rows, mode))
+            n = scan(page, ws, args.zip or "manual", args.cols, args.rows,
+                     args.dry, fresh_only=args.fresh)
         print("\nDONE. Captured %d new fiber-eligible addresses." % n)
         print(("They're in the '%s' tab." % OUT_TAB) if ws else "(dry run, nothing written)")
         input("Press Enter to close the browser... ")
