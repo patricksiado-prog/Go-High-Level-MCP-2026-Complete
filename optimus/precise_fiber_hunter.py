@@ -384,18 +384,40 @@ def open_sheet():
             creds_file = p
             break
     if not creds_file:
-        print("google_creds.json not found; will run as dry (no writes).")
+        print("google_creds.json not found; running WITHOUT the sheet "
+              "(prints captures, writes nothing). Add a valid service-account "
+              "key to enable sheet writes.")
         return None
-    client = gspread.authorize(Credentials.from_service_account_file(creds_file, scopes=SCOPES))
-    sh = client.open_by_key(SHEET_ID)
+    # validate the creds file BEFORE handing it to google-auth so a bad/empty
+    # file degrades to print-only instead of crashing the whole run.
     try:
-        ws = sh.worksheet(OUT_TAB)
-    except Exception:
-        ws = sh.add_worksheet(title=OUT_TAB, rows="5000", cols="8")
-    if not ws.get_all_values():
-        ws.append_row(["Address", "Status", "Subscriber BAN", "Eligible",
-                       "Captured At", "ZIP/Area", "Dot Status"])
-    return ws
+        with open(creds_file, "r", encoding="utf-8", errors="ignore") as f:
+            info = json.load(f)
+        if not (isinstance(info, dict) and info.get("client_email")
+                and info.get("private_key")):
+            raise ValueError("not a service-account key (no client_email/private_key)")
+    except Exception as e:
+        print("WARNING: %s is not a valid Google service-account key (%s)."
+              % (creds_file, str(e)[:80]))
+        print("         Running WITHOUT the sheet -- captures print only. "
+              "Replace it with the real key to write to the sheet.")
+        return None
+    try:
+        client = gspread.authorize(
+            Credentials.from_service_account_file(creds_file, scopes=SCOPES))
+        sh = client.open_by_key(SHEET_ID)
+        try:
+            ws = sh.worksheet(OUT_TAB)
+        except Exception:
+            ws = sh.add_worksheet(title=OUT_TAB, rows="5000", cols="8")
+        if not ws.get_all_values():
+            ws.append_row(["Address", "Status", "Subscriber BAN", "Eligible",
+                           "Captured At", "ZIP/Area", "Dot Status"])
+        return ws
+    except Exception as e:
+        print("WARNING: couldn't open the Google Sheet (%s)." % str(e)[:100])
+        print("         Running WITHOUT the sheet -- captures print only.")
+        return None
 
 
 def already_seen(ws):
