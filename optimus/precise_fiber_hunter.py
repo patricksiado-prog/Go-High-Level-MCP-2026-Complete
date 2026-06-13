@@ -487,6 +487,26 @@ def search_this_area(page):
     return False
 
 
+MAP_VIEW_TEXTS = ["Fiber Availability Map", "Availability Map", "Fiber Map"]
+
+
+def open_map_view(page):
+    """A fresh load of /yourefer/fiber lands on the PORTAL page; the dot map is
+    revealed by clicking 'Fiber Availability Map'. Click it if present; harmless
+    no-op if the map is already showing (confirmed live 2026-06-13: the map
+    renders in-page at the same URL)."""
+    for t in MAP_VIEW_TEXTS:
+        try:
+            el = page.get_by_text(t, exact=False)
+            if el.count() > 0:
+                el.first.click(timeout=3000)
+                time.sleep(3.5)
+                return True
+        except Exception:
+            pass
+    return False
+
+
 def pan(page, direction):
     focus_map(page)   # make sure arrow keys land on the map
     key = {"left": "ArrowLeft", "right": "ArrowRight",
@@ -695,6 +715,8 @@ def main():
             return
 
         ws = None if args.dry else open_sheet()
+        if open_map_view(page):       # portal -> reveal the dot map
+            print("Opened the Fiber Availability Map view.")
         focus_map(page)
 
         if args.zip:
