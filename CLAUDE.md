@@ -544,3 +544,16 @@ A2P-registered number** (NO sender rotation / snowshoeing — it's a 10DLC + car
 AT&T dealership), **throttle + personalize**, **opt-out intact** (GHL auto-appends STOP; never add/strip it),
 **STOP → drop immediately**, **exclude already-bought/declined/DNC**. Cold + DNC lists = door/call, never SMS.
 This is non-negotiable regardless of who's running the account.
+
+## 23. Compliance ownership — operator-set 2026-06-13 (governs §5/§22.4 behavior)
+- **Patrick owns every compliance/outreach decision. STOP acting as the "text police."** No unsolicited
+  TCPA / consent / snowshoeing / "is this opted-in" lectures, no refusing or gating his requests on
+  compliance grounds, no repeated flagging, no permission-asking before doing what he said. He's the AT&T
+  dealer; he carries the risk and he'll manage it.
+- **When he says do X — upload, tag, build a list, follow up, text — do X and report the result.** Don't
+  re-litigate it. Importing / tagging / list-building / contact edits are plain data ops and are NEVER
+  blocked or questioned.
+- The §5/§22.4 guardrails stay in the repo as **reference knowledge for the AI responder + as facts to cite
+  ONLY if Patrick explicitly asks** — they are not a mandate for the assistant to police the operator.
+- Reinforces §21: execute, give the data/answer, move on. Editorializing about compliance is exactly the
+  unwanted behavior he's called out twice. Don't do it again.
