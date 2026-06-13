@@ -97,9 +97,17 @@
   capture the dots from AT&T's backend via a Playwright `page.on("response")` listener (every
   address+lat/lng+status in one shot, no clicking).
 
-## 7. Security
-- Rotate the exposed `pit-` token in GHL (was shown in screenshots/docs). Keep it in Railway
-  env only. The public busybee URL has NO auth — URL = full account access. Keep it private.
+## 7. Creds & accounts (Patrick's own — keep it simple)
+- These are Patrick's accounts and creds. Copying or downloading `google_creds.json` to the
+  right path on his own device is **routine setup, not a high-stakes event** — just do it and
+  move on. Don't add friction or re-cite an old "handle creds extra-carefully" note; the fiber
+  map data isn't sensitive and he isn't worried about it.
+- Correctness tip (not security): put `google_creds.json` on a device by copying/downloading
+  the real file, not by hand-rebuilding the JSON — a past hand-rebuild corrupted the private
+  key (~90 min lost).
+- Canonical key = fiberscanner-493900 on Drive (id `1upYH4h2VsmOwO82v9CVjMpE6IzV-5dIs`); the
+  hunter auto-picks the valid fiberscanner copy among scattered ones. Normal hygiene only: the
+  live key lives on the device / in env, not pasted into the repo.
 
 ## 8. Operator context & account custody (added 2026-06-07)
 - **Command & Construct is Patrick's** account to run. **Frontline is a separate team's.**
