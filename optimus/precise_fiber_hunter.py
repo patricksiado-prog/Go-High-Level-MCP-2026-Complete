@@ -690,19 +690,38 @@ def pan(page, direction):
 
 
 def search_zip(page, zip_code):
-    for sel in ["input[type='search']", "input[placeholder*='ddress']",
-                "input[placeholder*='earch']", "input"]:
+    """Type the ZIP into the AT&T map's search box and submit. Tries the
+    Mapbox geocoder input, visible text inputs, then the textbox role."""
+    selectors = [".mapboxgl-ctrl-geocoder--input",
+                 "input[placeholder*='Search' i]",
+                 "input[placeholder*='address' i]",
+                 "input[type='search']",
+                 "input[type='text']",
+                 "input"]
+    for sel in selectors:
         try:
             box = page.query_selector(sel)
-            if box:
+            if box and box.is_visible():
                 box.click()
-                box.fill(str(zip_code))
-                time.sleep(0.4)
+                box.fill("")
+                box.type(str(zip_code), delay=40)
+                time.sleep(0.6)
                 page.keyboard.press("Enter")
-                time.sleep(3.0)
+                time.sleep(3.5)
                 return True
         except Exception:
             continue
+    # last resort: any visible textbox by ARIA role
+    try:
+        tb = page.get_by_role("textbox")
+        if tb.count() > 0:
+            tb.first.click()
+            tb.first.fill(str(zip_code))
+            page.keyboard.press("Enter")
+            time.sleep(3.5)
+            return True
+    except Exception:
+        pass
     return False
 
 
@@ -846,24 +865,29 @@ def scan(page, ws, area_label, cols, rows, dry, fresh_only=False):
 
 
 def scan_net(page, ws, area_label, cols, rows, dry, capture):
-    """FAST sweep: don't click dots at all. Pan the grid, click 'Search this
-    area' to make the backend serve each viewport's data, and let the
-    page.on('response') listener capture every address off the wire."""
+    """Try the FAST network capture per cell; if the backend isn't serving the
+    dots as JSON (it usually isn't -- they're vector tiles), FALL BACK to the
+    click/geo capture (drain_viewport) so we still get the addresses."""
     seen = already_seen(ws)
     print("Resume: %d addresses already captured -> will skip them." % len(seen))
     total = 0
     for r in range(rows):
         for c in range(cols):
-            search_this_area(page)        # trigger the backend data load
+            search_this_area(page)        # trigger the data load
             time.sleep(1.0)
             n = capture.flush(ws, seen, area_label, dry)
-            print("[cell r%d c%d] network capture: +%d" % (r, c, n))
+            if n == 0:
+                # dots aren't JSON on this map -> click/geo the dots instead
+                n = drain_viewport(page, ws, seen, area_label, dry, fresh_only=False)
+                print("[cell r%d c%d] clicked: +%d" % (r, c, n))
+            else:
+                print("[cell r%d c%d] network: +%d" % (r, c, n))
             total += n
             if c < cols - 1:
                 pan(page, "right" if r % 2 == 0 else "left")
         if r < rows - 1:
             pan(page, "down")
-    total += capture.flush(ws, seen, area_label, dry)   # final drain
+    total += capture.flush(ws, seen, area_label, dry)   # final net drain
     if capture.endpoints:
         print("\nData endpoints seen (URL -> leads):")
         for u, n in sorted(capture.endpoints.items(), key=lambda kv: -kv[1]):
