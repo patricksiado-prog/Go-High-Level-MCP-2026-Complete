@@ -300,19 +300,32 @@ def extract_leads_from_json(obj, out=None, depth=0):
 
 class NetCapture:
     """Collects leads seen on the wire. Attach .handle to page.on('response');
-    call .flush() per viewport to write the new ones."""
-    def __init__(self, substr=None):
+    call .flush() per viewport to write the new ones. With debug=True it ALSO
+    logs every response (URL, content-type, size) so we can find which endpoint
+    actually carries the dot data."""
+    def __init__(self, substr=None, debug=False):
         self.substr = substr        # restrict to URLs containing this, if set
+        self.debug = debug
         self.pending = []
         self.seen = set()
         self.endpoints = {}          # url(no query) -> lead count, for discovery
+        self.seen_urls = {}          # base url -> [content_type, hits, max_bytes]
 
     def handle(self, response):
         try:
+            url = response.url
             ct = (response.headers or {}).get("content-type", "")
+            if self.debug:
+                base = url.split("?")[0]
+                try:
+                    sz = int((response.headers or {}).get("content-length") or -1)
+                except Exception:
+                    sz = -1
+                row = self.seen_urls.setdefault(base, [ct, 0, 0])
+                row[1] += 1
+                row[2] = max(row[2], sz)
             if "json" not in ct.lower():
                 return
-            url = response.url
             if self.substr and self.substr not in url:
                 return
             leads = extract_leads_from_json(response.json())
@@ -322,6 +335,27 @@ class NetCapture:
                 self.pending.extend(leads)
         except Exception:
             pass
+
+    def dump_debug(self, path=None):
+        """Print + save every endpoint the map hit, biggest first -- the dot
+        data is usually a large response (a tile or an availability API)."""
+        if not self.seen_urls:
+            print("  (net-debug: no responses captured)")
+            return
+        rows = sorted(self.seen_urls.items(), key=lambda kv: -kv[1][2])
+        print("\n=== net-debug: endpoints the map hit (biggest first) ===")
+        print("  %-9s %-30s %s" % ("bytes", "content-type", "url"))
+        for base, (ct, hits, mx) in rows[:25]:
+            print("  %-9s %-30s %s" % (mx, ct[:30], base[:90]))
+        if path:
+            try:
+                with open(path, "w") as f:
+                    f.write("max_bytes\tcontent_type\thits\turl\n")
+                    for base, (ct, hits, mx) in rows:
+                        f.write("%d\t%s\t%d\t%s\n" % (mx, ct, hits, base))
+                print("  full list -> %s" % path)
+            except Exception as e:
+                print("  (couldn't write %s: %s)" % (path, e))
 
     def flush(self, ws, seen, area_label, dry):
         n = 0
@@ -892,6 +926,9 @@ def scan_net(page, ws, area_label, cols, rows, dry, capture):
         print("\nData endpoints seen (URL -> leads):")
         for u, n in sorted(capture.endpoints.items(), key=lambda kv: -kv[1]):
             print("  %4d  %s" % (n, u))
+    if capture.debug:
+        capture.dump_debug(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                        "net_responses.log"))
     return total
 
 
@@ -919,6 +956,10 @@ def main():
     ap.add_argument("--api-substring", default=None,
                     help="with --net: only parse responses whose URL contains "
                          "this (restrict to the real dot endpoint once known)")
+    ap.add_argument("--net-debug", action="store_true",
+                    help="RESEARCH: log EVERY network response (url, type, size) "
+                         "so we can find which endpoint carries the dot data. "
+                         "Prints the biggest endpoints + writes net_responses.log.")
     ap.add_argument("--dry", action="store_true", help="don't write to the sheet, just print")
     ap.add_argument("--auto", action="store_true",
                     help="UNATTENDED: no 'press Enter' pauses, auto-close at the end. "
@@ -941,8 +982,8 @@ def main():
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
 
         capture = None
-        if args.net:
-            capture = NetCapture(substr=args.api_substring)
+        if args.net or args.net_debug:
+            capture = NetCapture(substr=args.api_substring, debug=args.net_debug)
             page.on("response", capture.handle)   # grab dot data off the wire
 
         page.goto(MAP_URL, wait_until="domcontentloaded", timeout=60000)
