@@ -998,6 +998,30 @@ def main():
         ws = None if args.dry else open_sheet()
         searched = [False]   # only search the ZIP on the first pass
 
+        if args.net_debug:
+            # RESEARCH short-circuit: load the map, trigger a few data loads by
+            # searching/panning, then dump the endpoint log. No scanning/clicking.
+            if open_map_view(page):
+                print("Opened the Fiber Availability Map view.")
+            focus_map(page)
+            if args.zip:
+                print("Searching area: %s" % args.zip)
+                search_zip(page, args.zip)
+                focus_map(page)
+            for _ in range(4):
+                search_this_area(page)
+                time.sleep(1.5)
+                try:
+                    pan(page, "right")
+                except Exception:
+                    pass
+            capture.dump_debug(os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "net_responses.log"))
+            if not args.auto:
+                input("\nPress Enter to close the browser... ")
+            ctx.close()
+            return
+
         def one_pass():
             # keep us ON the map -- re-open only if the SPA bounced to the portal
             # (no page reload here, so the view doesn't flip portal<->map).
