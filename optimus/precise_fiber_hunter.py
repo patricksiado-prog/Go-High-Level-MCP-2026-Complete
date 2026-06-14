@@ -102,8 +102,12 @@ PROFILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "att_prof
 
 SHEET_ID = "1FhO2BTMXGefm1tLwKbbMPXvzT1160882Auauzep7ooA"  # ATT FIBER LEADS (production)
 OUT_TAB = "Precise Fiber"
+STATUS_TAB = "Hunter Status"   # live "what it's doing" log, on Drive in the same sheet
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
           "https://www.googleapis.com/auth/drive"]
+
+# Self-update: which branch to pull on each start (matches the launcher).
+REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
 
 VIEWPORT = {"width": 1366, "height": 768}
 
@@ -933,9 +937,92 @@ def scan_net(page, ws, area_label, cols, rows, dry, capture):
 
 
 # ----------------------------------------------------------------------------
+# self-update (pull latest code from GitHub on each start)
+# ----------------------------------------------------------------------------
+def self_update():
+    """On launch, pull the newest code from GitHub so a restart always runs the
+    latest version. If THIS file actually changed, relaunch once with the new
+    code. Guards: OPTIMUS_NO_UPDATE=1 (set on the relaunch) stops an infinite
+    re-exec loop; GIT_TERMINAL_PROMPT=0 stops a hang on a credential prompt;
+    any failure (offline, no git) is non-fatal -- we just keep running."""
+    import subprocess
+    if os.environ.get("OPTIMUS_NO_UPDATE") == "1" or "--no-update" in sys.argv:
+        return
+    here = os.path.abspath(__file__)
+    repo_root = os.path.dirname(os.path.dirname(here))
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
+    try:
+        before = open(here, "rb").read()
+        subprocess.run(["git", "-C", repo_root, "pull", "origin", REPO_BRANCH],
+                       env=env, timeout=90, capture_output=True, text=True)
+        after = open(here, "rb").read()
+    except Exception as e:
+        print("(auto-update skipped: %s)" % str(e)[:80])
+        return
+    if after != before:
+        print("Pulled newer code from GitHub -- relaunching once with it...\n")
+        child_env = dict(os.environ, OPTIMUS_NO_UPDATE="1")
+        try:
+            r = subprocess.run([sys.executable] + sys.argv, env=child_env)
+            sys.exit(r.returncode)
+        except Exception:
+            pass   # couldn't relaunch -- fall through and run the old code
+
+
+# ----------------------------------------------------------------------------
+# live status -> Drive (a tab in the same Google Sheet) + a local file
+# ----------------------------------------------------------------------------
+_status_ws = [None]   # cached "Hunter Status" worksheet handle
+
+
+def _status_sheet(ws):
+    """Get/create the 'Hunter Status' tab next to the data tab, so Patrick can
+    watch what the hunter is doing live on Drive. Returns None if no sheet."""
+    if ws is None:
+        return None
+    if _status_ws[0] is not None:
+        return _status_ws[0]
+    try:
+        sh = ws.spreadsheet
+        try:
+            sws = sh.worksheet(STATUS_TAB)
+        except Exception:
+            sws = sh.add_worksheet(title=STATUS_TAB, rows="2000", cols="6")
+            sws.append_row(["Time", "Host", "Area", "State", "Found this pass", "Note"])
+        _status_ws[0] = sws
+    except Exception:
+        _status_ws[0] = None
+    return _status_ws[0]
+
+
+def report_status(ws, area, state, found="", note=""):
+    """Write one heartbeat line: always to a local run_status.json, and to the
+    Drive sheet's status tab when we have one. Never crashes the run."""
+    import socket
+    stamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    host = socket.gethostname()
+    rec = {"time": stamp, "host": host, "area": str(area),
+           "state": state, "found": found, "note": note}
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "run_status.json"), "w") as f:
+            json.dump(rec, f)
+    except Exception:
+        pass
+    print("[status] %s  %s  area=%s  %s %s" % (stamp, state, area, found, note))
+    sws = _status_sheet(ws)
+    if sws is not None:
+        try:
+            sws.append_row([stamp, host, str(area), state, str(found), str(note)])
+        except Exception:
+            pass
+
+
+# ----------------------------------------------------------------------------
 # entry
 # ----------------------------------------------------------------------------
 def main():
+    self_update()
     ap = argparse.ArgumentParser()
     ap.add_argument("--login", action="store_true", help="open browser to log in once, then quit")
     ap.add_argument("--zip", default=None, help="ZIP/area to search before scanning")
@@ -967,6 +1054,8 @@ def main():
     ap.add_argument("--loop", type=int, default=0, metavar="SECS",
                     help="re-scan every SECS in the SAME browser session (stays on "
                          "the map, no reload/portal flip). 0 = one pass then done.")
+    ap.add_argument("--no-update", action="store_true",
+                    help="skip the GitHub auto-pull on start (run exactly this code)")
     args = ap.parse_args()
 
     os.makedirs(PROFILE_DIR, exist_ok=True)
@@ -1056,14 +1145,27 @@ def main():
             return scan(page, ws, args.zip or "manual", args.cols, args.rows,
                         args.dry, fresh_only=args.fresh)
 
+        report_status(ws, args.zip or "manual", "started",
+                      note="loop=%ss" % args.loop if args.loop else "single pass")
+        passno = 0
         while True:
-            n = one_pass()
+            passno += 1
+            try:
+                n = one_pass()
+            except Exception as e:
+                report_status(ws, args.zip or "manual", "error",
+                              note=str(e)[:120])
+                raise
             print("\nDONE. Captured %d new fiber-eligible addresses." % n)
             print(("They're in the '%s' tab." % OUT_TAB) if ws else "(dry run, nothing written)")
             if args.loop and args.loop > 0:
+                report_status(ws, args.zip or "manual", "sleeping",
+                              found=n, note="pass %d done; next in %ds" % (passno, args.loop))
                 print("Next pass in %ds -- staying on the map, no reload.\n" % args.loop)
                 time.sleep(args.loop)
                 continue
+            report_status(ws, args.zip or "manual", "done", found=n,
+                          note="pass %d; single run complete" % passno)
             break
         if not args.auto:
             input("Press Enter to close the browser... ")
