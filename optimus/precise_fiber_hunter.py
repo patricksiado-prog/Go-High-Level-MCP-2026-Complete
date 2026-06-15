@@ -1399,11 +1399,16 @@ def drain_viewport(page, ws, seen, area_label, dry, fresh_only=False):
     if n is not None and n > 0:
         return n
 
-    # ---- CLICK path: read each green/gold dot's popup (the proven address
-    # source). Flip-safe now: only GREEN/GOLD dots are clicked (never grey or the
-    # blue portal buttons), popups close with Escape (no empty-spot clicks), and
-    # panning is programmatic (pan_map_js). Only run it when we're actually on the
-    # map, so a portal frame can't be clicked.
+    # NO CLICKING by default (operator preference). Captures come only from the
+    # server/network grab above. If the network decode isn't pinned yet we leave
+    # this pass empty (the endpoint dump above shows where the dots come from so
+    # the decoder can be fixed). The click path is opt-in only via --allow-click.
+    if not ALLOW_CLICK:
+        return 0
+
+    # ---- CLICK path (only with --allow-click): read each green/gold dot's
+    # popup. Flip-safe: only GREEN/GOLD dots clicked, Escape to close, no empty
+    # clicks, programmatic pan, and only when actually on the map.
     if not on_map(page):
         return 0
     greens, golds, gray, label, share, dots = classify_viewport(page)
