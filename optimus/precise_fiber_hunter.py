@@ -220,7 +220,27 @@ MAPBOX_PROBE_JS = """
         if (samples.length < 30) samples.push({layer: lid, props: f.properties || {}});
       }
     }
-    out.maps.push({totalFeatures: feats.length, pointFeatures: points, layers, samples});
+    // sources: id, type, and for geojson, a feature count + a sample's props
+    const sources = {};
+    try {
+      const sdefs = (m.getStyle && m.getStyle().sources) || {};
+      for (const id in sdefs) {
+        const t = (sdefs[id] && sdefs[id].type) || '?';
+        let n = null, sample = null;
+        try {
+          const src = m.getSource(id);
+          const d = src && src._data;
+          if (d && typeof d === 'object') {
+            const fs = d.type === 'FeatureCollection' ? (d.features || [])
+                     : (d.type === 'Feature' ? [d] : []);
+            n = fs.length;
+            for (const f of fs) { if (f.geometry && f.geometry.type === 'Point') { sample = f.properties || {}; break; } }
+          }
+        } catch (e) {}
+        sources[id] = {type: t, dataFeatures: n, sampleProps: sample};
+      }
+    } catch (e) {}
+    out.maps.push({totalFeatures: feats.length, pointFeatures: points, layers, samples, sources});
   }
   return out;
 }
@@ -247,9 +267,8 @@ MAPBOX_DOTS_JS = """
     } catch (e) {}
   }
   if (!m || !m.queryRenderedFeatures) return null;
-  let feats;
-  try { feats = m.queryRenderedFeatures(); } catch (e) { return null; }
-  const SKIP = ['road','bridge','tunnel','motorway','street','path','rail',
+  const SKIP_SRC = ['composite', 'mapbox', 'satellite', 'terrain-', 'hillshade'];
+  const SKIP_LAYER = ['road','bridge','tunnel','motorway','street','path','rail',
     'transit','ferry','label','place','poi','water','waterway','marine','land',
     'building','structure','boundary','admin','country','state','contour',
     'hillshade','terrain','park','wood','grass','sand','pitch','aeroway',
@@ -259,28 +278,65 @@ MAPBOX_DOTS_JS = """
         rect = {left: r.left, top: r.top, width: r.width, height: r.height}; } catch (e) {}
   const out = [];
   const seen = new Set();
-  for (const f of feats) {
-    if (!f.geometry || f.geometry.type !== 'Point') continue;
-    const lid = ((f.layer && f.layer.id) || '').toLowerCase();
-    if (SKIP.some(s => lid.includes(s))) continue;
+  const MAX = 4000;
+  const push = (f, src) => {
+    if (out.length >= MAX) return;
+    if (!f || !f.geometry || f.geometry.type !== 'Point') return;
     const c = f.geometry.coordinates;
-    if (!c || c.length < 2) continue;
+    if (!c || c.length < 2) return;
     const lng = c[0], lat = c[1];
     const key = lng.toFixed(6) + ',' + lat.toFixed(6);
-    if (seen.has(key)) continue;
+    if (seen.has(key)) return;
     seen.add(key);
-    let px; try { px = m.project([lng, lat]); } catch (e) { continue; }
-    out.push({lng, lat, x: px.x, y: px.y, props: f.properties || {}, layer: lid});
-  }
+    let x = -1, y = -1;
+    try { const p = m.project([lng, lat]); x = p.x; y = p.y; } catch (e) {}
+    out.push({lng, lat, x, y, props: f.properties || {}, source: src || ''});
+  };
+  // 1) BEST: read each non-basemap source's data directly -> ALL dots + full
+  //    properties (address/status if present), not just the viewport.
+  try {
+    const sources = (m.getStyle && m.getStyle().sources) || {};
+    for (const id in sources) {
+      if (out.length >= MAX) break;
+      const lid = String(id).toLowerCase();
+      if (SKIP_SRC.some(s => lid.includes(s))) continue;
+      const sdef = sources[id] || {};
+      let src; try { src = m.getSource(id); } catch (e) { continue; }
+      if (!src) continue;
+      const d = src._data;
+      if (sdef.type === 'geojson' && d && typeof d === 'object') {
+        const feats = d.type === 'FeatureCollection' ? (d.features || [])
+                    : (d.type === 'Feature' ? [d] : []);
+        for (const f of feats) push(f, id);
+      } else {
+        try { const qf = m.querySourceFeatures(id); for (const f of qf) push(f, id); }
+        catch (e) {}
+      }
+    }
+  } catch (e) {}
+  // 2) SUPPLEMENT: rendered point features not on a basemap layer
+  try {
+    const feats = m.queryRenderedFeatures();
+    for (const f of feats) {
+      if (out.length >= MAX) break;
+      const lid = ((f.layer && f.layer.id) || '').toLowerCase();
+      if (SKIP_LAYER.some(s => lid.includes(s))) continue;
+      push(f, (f.source || ''));
+    }
+  } catch (e) {}
   return {rect, dots: out};
 }
 """
 
 # property keys that may carry the address / status straight in the feature
-FEATURE_ADDRESS_KEYS = ["address", "addr", "full_address", "serviceaddress",
-                        "service_address", "location"]
+FEATURE_ADDRESS_KEYS = ["address", "addr", "addr1", "address1", "full_address",
+                        "fulladdress", "formatted_address", "street_address",
+                        "streetaddress", "serviceaddress", "service_address",
+                        "street", "location"]
 FEATURE_STATUS_KEYS = ["status", "customer_status", "customertype",
-                       "customer_type", "eligibility", "type"]
+                       "customer_type", "eligibility", "eligible", "fiber_status",
+                       "fiberstatus", "service_status", "servicestatus",
+                       "dot_status", "category", "segment", "color", "type"]
 
 
 def query_map_features(page):
@@ -760,6 +816,23 @@ _COLOR_WINDOWS_BY_NAME = [("GREEN", GREEN_MIN, GREEN_MAX),
                           ("GRAY", GRAY_MIN, GRAY_MAX)]
 
 
+def _color_from_status(txt):
+    """Map a feature's status TEXT to a dot colour ONLY when it explicitly says
+    so -- otherwise return None and let the pixel sample decide (avoids writing
+    an ambiguous-coded dot as a lead)."""
+    if not txt or not isinstance(txt, str):
+        return None
+    low = txt.lower()
+    if "copper" in low:
+        return "GOLD"
+    if ("non-customer" in low or "noncustomer" in low or "eligible" in low
+            or "serviceable" in low or "available" in low):
+        return "GREEN"
+    if "customer" in low or "subscriber" in low or "existing" in low or "fiber-customer" in low:
+        return "GRAY"
+    return None
+
+
 def classify_pixel(arr, x, y, rad=4):
     """Sample a small window around (x, y) in an HxWx3 RGB array and return the
     dot color there: GREEN / GOLD / GRAY / None. Used to color a dot whose EXACT
@@ -822,13 +895,9 @@ def drain_viewport_backend(page, ws, seen, area_label, dry, zone_label="WORKING"
         props = d.get("props") or {}
         # prefer an explicit status property; else colour from the exact pixel
         status_txt = feature_status_text(props)
-        color = None
-        if status_txt:
-            cs = classify_status(text=status_txt)
-            color = {"lead": "GREEN", "copper_upgrade": "GOLD",
-                     "customer": "GRAY"}.get(cs)
+        color = _color_from_status(status_txt)   # trust only explicit status
         if color is None:
-            color = classify_pixel(arr, sxpix, sypix)
+            color = classify_pixel(arr, sxpix, sypix)   # else the dot's own pixel
         if color == "GREEN":
             greens += 1
         elif color == "GOLD":
@@ -1515,6 +1584,15 @@ def main():
                 top = sorted(lyr.items(), key=lambda kv: -kv[1])[:12]
                 for lid, n in top:
                     print("      layer %-28s %d" % (lid[:28], n))
+                srcs = mp.get("sources") or {}
+                if srcs:
+                    print("    data sources:")
+                    for sid, sv in srcs.items():
+                        nf = sv.get("dataFeatures")
+                        sp = sv.get("sampleProps")
+                        keys = ",".join(list(sp.keys())[:8]) if isinstance(sp, dict) else "-"
+                        print("      %-22s type=%-7s features=%s  props[%s]"
+                              % (str(sid)[:22], sv.get("type"), nf, keys))
             print("  full detail -> %s" % out)
             if not args.auto:
                 input("\nPress Enter to close the browser... ")
