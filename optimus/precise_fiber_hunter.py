@@ -811,11 +811,28 @@ def search_this_area(page):
 MAP_VIEW_TEXTS = ["Fiber Availability Map", "Availability Map", "Fiber Map"]
 
 
+def on_map(page):
+    """True if the Mapbox map is actually showing (we're on the map view, not
+    the portal landing). Checks for the map canvas / controls."""
+    for sel in (".mapboxgl-canvas", ".mapboxgl-map", ".mapboxgl-ctrl-geocoder",
+                "canvas"):
+        try:
+            el = page.query_selector(sel)
+            if el and el.is_visible():
+                return True
+        except Exception:
+            pass
+    return False
+
+
 def open_map_view(page):
     """A fresh load of /yourefer/fiber lands on the PORTAL page; the dot map is
-    revealed by clicking 'Fiber Availability Map'. Click it if present; harmless
-    no-op if the map is already showing (confirmed live 2026-06-13: the map
-    renders in-page at the same URL)."""
+    revealed by clicking 'Fiber Availability Map'. ONLY click it when we're on
+    the portal -- if the map is already showing, do nothing (clicking again was
+    flipping the view map<->portal every scan cycle). Confirmed live 2026-06-13:
+    the map renders in-page at the same URL."""
+    if on_map(page):
+        return False   # already on the map -- never re-click (no flip)
     for t in MAP_VIEW_TEXTS:
         try:
             el = page.get_by_text(t, exact=False)
