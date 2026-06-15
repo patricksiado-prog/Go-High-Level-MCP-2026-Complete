@@ -154,8 +154,10 @@ MAPBOX_HOOK_JS = """
     } catch (e) {}
   };
   hook();
+  // keep re-wrapping for a long time: the user logs in + opens the map well
+  // after page load, and the map is created THEN -- a short window misses it.
   const t = setInterval(hook, 200);
-  setTimeout(() => clearInterval(t), 30000);
+  setTimeout(() => clearInterval(t), 1800000);   // 30 minutes
 })();
 """
 
@@ -180,6 +182,31 @@ MAPBOX_QUERY_JS = """
     const px = m.project([lng, lat]);
     out.push({lng, lat, x: px.x, y: px.y, props: p,
               layer: (f.layer && f.layer.id) || ''});
+  }
+  return out;
+}
+"""
+
+MAPBOX_PROBE_JS = """
+() => {
+  const maps = (window.__optimusMaps || []);
+  const out = {hookedMaps: maps.length, maps: []};
+  for (const m of maps) {
+    if (!m || !m.queryRenderedFeatures) { out.maps.push({error: 'no queryRenderedFeatures'}); continue; }
+    let feats = [];
+    try { feats = m.queryRenderedFeatures(); } catch (e) { out.maps.push({error: String(e)}); continue; }
+    const layers = {};
+    let points = 0;
+    const samples = [];
+    for (const f of feats) {
+      const lid = (f.layer && f.layer.id) || '?';
+      layers[lid] = (layers[lid] || 0) + 1;
+      if (f.geometry && f.geometry.type === 'Point') {
+        points++;
+        if (samples.length < 30) samples.push({layer: lid, props: f.properties || {}});
+      }
+    }
+    out.maps.push({totalFeatures: feats.length, pointFeatures: points, layers, samples});
   }
   return out;
 }
@@ -1197,6 +1224,10 @@ def main():
     ap.add_argument("--fast", action="store_true",
                     help="cut the wait times for quicker, smoother scanning "
                          "(use if dots still load fast enough on your connection)")
+    ap.add_argument("--probe", action="store_true",
+                    help="DIAGNOSTIC: after you position the map and press Enter, "
+                         "dump what the Mapbox map exposes (layers + dot feature "
+                         "properties) to probe.json so the backend read can be wired.")
     args = ap.parse_args()
 
     if args.fast:
@@ -1257,6 +1288,41 @@ def main():
                     pass
             capture.dump_debug(os.path.join(
                 os.path.dirname(os.path.abspath(__file__)), "net_responses.log"))
+            if not args.auto:
+                input("\nPress Enter to close the browser... ")
+            ctx.close()
+            return
+
+        if args.probe:
+            print("\n  Get the AT&T Fiber Map showing dots, then come back here.")
+            try:
+                input("  Press Enter to PROBE what the map exposes... ")
+            except EOFError:
+                pass
+            try:
+                data = page.evaluate(MAPBOX_PROBE_JS)
+            except Exception as e:
+                data = {"error": str(e)}
+            out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "probe.json")
+            try:
+                with open(out, "w") as f:
+                    json.dump(data, f, indent=2)
+            except Exception:
+                pass
+            hm = (data or {}).get("hookedMaps")
+            print("\n=== MAP PROBE ===")
+            print("  hooked maps: %s" % hm)
+            for i, mp in enumerate((data or {}).get("maps", [])):
+                if "error" in mp:
+                    print("  map %d: error %s" % (i, mp["error"]))
+                    continue
+                print("  map %d: %s point features of %s total"
+                      % (i, mp.get("pointFeatures"), mp.get("totalFeatures")))
+                lyr = mp.get("layers") or {}
+                top = sorted(lyr.items(), key=lambda kv: -kv[1])[:12]
+                for lid, n in top:
+                    print("      layer %-28s %d" % (lid[:28], n))
+            print("  full detail -> %s" % out)
             if not args.auto:
                 input("\nPress Enter to close the browser... ")
             ctx.close()
