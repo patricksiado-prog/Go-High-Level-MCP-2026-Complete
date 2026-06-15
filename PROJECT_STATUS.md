@@ -4,9 +4,15 @@
 > Engineering detail lives in `optimus/DESIGN.md`; this is the cross-session board.
 
 ## NOW
-- Map capture hardening: precise_fiber_hunter v0.5 + `--fresh` mode ready; needs
-  a live HP run on a known just-lit ZIP to confirm the Mapbox geo fast path
-  fires (look for "viewport (mapbox)") vs. the pixel fallback.
+- FINAL capture build shipped (2026-06-15): backend dot read, no clicking, no
+  portal flip. `drain_viewport_backend` reads dots from the Mapbox map and
+  colours each at its own pixel; writes GREEN+GOLD to the sheet. Launcher sweeps
+  a 3x3 block (position spot → press Enter). NEEDS one live HP `--probe` run to
+  confirm the map hook attaches + the dot layer/props are as expected — send the
+  `=== MAP PROBE ===` output / `probe.json`. Fallbacks documented if it doesn't.
+- One-file on-switch on Drive: **START OPTIMUS.bat** (permanent; calls repo
+  go.bat which auto-updates). Old OPTIMUS.bat copies in the Drive folder should
+  be deleted by hand. New skill: **map-backend-read**.
 
 ## NEXT
 1. Wire the front half: signal loaders (FCC BDC diff, news/Reddit watcher) →

@@ -125,8 +125,25 @@
   run is observable without the terminal. Drive installer folder: **"OPTIMUS SETUP - CLICK HERE"**
   (id `1IOWTZiDakRuzXtGGYgRCxPxXHNNZkaPc`) holds `OPTIMUS.bat` + a "READ ME" doc. (No Drive
   delete tool available — old duplicate uploads must be removed by hand.)
-- **Top improvement still open:** pin the address-bearing vector-tile field (from `--net-debug`)
-  so backend capture returns every address with zero clicking.
+- **FINAL CAPTURE ARCHITECTURE (2026-06-15) — backend read, no clicking.** The
+  clicking path kept flipping the view to the portal (whole-screen pixel detection
+  read the portal's blue buttons as "dots" and clicked them; `focus_map`/popup-close
+  clicks hit nav). Replaced with `drain_viewport_backend`: read every non-basemap
+  POINT feature from the Mapbox map (`MAPBOX_DOTS_JS` → `queryRenderedFeatures`,
+  exact `map.project` pixel + lng/lat + props), colour each dot by sampling ITS OWN
+  pixel (`classify_pixel`, ±4px), write GREEN+GOLD, skip GREY. Map grabbed via the
+  30-min `mapboxgl.Map` hook AND a `window`-globals search (module-loaded maps).
+  Pan is programmatic (`pan_map_js` → `panBy`, no clicks) then "Search this area".
+  Default run = `--cols 3 --rows 3 --fast` (position spot, press Enter, sweep 3x3,
+  no zoom). `--allow-click` = old click path; `--probe` dumps map layers/props to
+  `probe.json`. Skill: **map-backend-read**. Legend: GREEN=lead, GOLD=upgrade,
+  GREY=existing customer (skip); all-grey view = MATURE (go to a newer area).
+- **OPEN RISK / next:** the backend read needs the map hook to attach. If a live
+  `--probe` shows `hookedMaps:0` + empty globals, the map is module-scoped or in an
+  iframe (query the frame). If it shows a map but 0 point features, it may be the
+  "Mapbox Standard" style bug (#13332) → use `querySourceFeatures(srcId)` /
+  `getSource(id)._data`. If dots found but classify None, widen the dot RGB windows
+  in `optimus_dot_detect.py` from a real sampled colour. Needs a live HP `--probe`.
 
 ## 7. Creds & accounts (Patrick's own — keep it simple)
 - These are Patrick's accounts and creds. Copying or downloading `google_creds.json` to the
