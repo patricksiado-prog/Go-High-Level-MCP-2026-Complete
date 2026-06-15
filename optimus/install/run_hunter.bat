@@ -1,16 +1,17 @@
 @echo off
 REM ===========================================================================
-REM  RUN HUNTER - restart-every-cycle, always-latest fiber scan.
+REM  RUN HUNTER - one smooth, fast, non-stop scan.
 REM
-REM  HOW IT WORKS (by design):
-REM    1. Pull the latest code from GitHub.
-REM    2. Run ONE scan pass of the ZIP (opens the map, captures, writes to Drive).
-REM    3. Close, wait a few seconds, and GO BACK TO STEP 1 -- pulling fresh code
-REM       again, so every cycle runs the newest fixes automatically.
+REM  It opens the map ONCE and keeps scanning in place -- it does NOT close and
+REM  reopen the browser, so there's no portal flip / "restarting". It pulls the
+REM  latest code once at the start, then runs continuously and fast.
 REM
-REM  So each loop is a fresh restart on the latest code. As fixes get pushed,
-REM  this picks them up on the very next cycle -- no reinstall, no babysitting.
-REM  Close this window (or Ctrl+C) to stop.
+REM  A second small window ("Optimus Enrich") runs alongside it and adds phone
+REM  numbers FREE (OpenStreetMap, no API cost) as addresses come in.
+REM
+REM  The map panning every few seconds IS the scan moving across the area --
+REM  that's the tool working, not a restart. Close the windows (or Ctrl+C) to stop.
+REM  It only reopens the browser if it genuinely crashed.
 REM
 REM  Edit the ZIP below to change the target area.
 REM ===========================================================================
@@ -18,21 +19,24 @@ setlocal
 set "REPO=%USERPROFILE%\optimus\repo"
 set "BRANCH=claude/optimus-map-tools-setup-6dcl6o"
 set "ZIP=77027"
-set "WAIT_SECS=20"
+set "RESCAN_SECS=5"
 
 cd /d "%REPO%\optimus" || (echo Repo not found at %REPO% - run install_optimus.bat first. & pause & exit /b 1)
 
-:loop
 echo.
-echo ==== %DATE% %TIME%  pulling latest code, then scanning ZIP %ZIP% ====
+echo ==== %DATE% %TIME%  updating once, then scanning ZIP %ZIP% non-stop (fast) ====
 git -C "%REPO%" pull origin %BRANCH%
-REM One fresh pass on the newest code (the hunter also self-updates on start).
-python precise_fiber_hunter.py --zip %ZIP% --net --auto
+
+REM Start the FREE phone enricher alongside (its own window). --watch tails the
+REM hunter's captures and enriches as they land. No --paid = OSM only, $0.
+start "Optimus Enrich (free)" cmd /c python enrich_phones.py --watch
+
+:loop
+REM ONE long-lived browser session: stays on the map, re-scans every few seconds,
+REM no reload. --fast tightens the pacing.
+python precise_fiber_hunter.py --zip %ZIP% --net --auto --fast --loop %RESCAN_SECS%
 echo.
-echo ---- adding phone numbers (FREE OpenStreetMap lookup, no API cost) ----
-REM No --paid flag = OSM only, $0. Never calls the paid Google Places API.
-python enrich_phones.py
-echo.
-echo ==== pass done. Restarting on the latest code in %WAIT_SECS%s. Close window to stop. ====
-timeout /t %WAIT_SECS% /nobreak >nul
+echo ==== the browser actually closed (crash or you closed it). ====
+echo ==== Close this window now to stop, or it reopens in 10s. ====
+timeout /t 10 /nobreak >nul
 goto loop

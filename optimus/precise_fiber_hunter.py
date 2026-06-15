@@ -117,12 +117,14 @@ MAP_BOTTOM_FRAC = 0.96
 MAP_LEFT_FRAC = 0.02
 MAP_RIGHT_FRAC = 0.98
 
-# --- pacing (seconds) ---
-WAIT_AFTER_PAN = 1.5
-WAIT_AFTER_ZOOM = 1.5
+# --- pacing (seconds) -- tightened for smooth continuous scanning; --fast cuts
+#     them further. These are module globals so main() can lower them on --fast.
+WAIT_AFTER_PAN = 0.9
+WAIT_AFTER_ZOOM = 0.9
+SEARCH_SETTLE = 0.8           # wait after "Search this area" for dots to load
 PAN_PRESSES = 6
-POPUP_POLL_INTERVAL = 0.15    # poll the popup instead of fixed sleeps
-POPUP_POLL_TIMEOUT = 2.5      # per click attempt
+POPUP_POLL_INTERVAL = 0.12    # poll the popup instead of fixed sleeps
+POPUP_POLL_TIMEOUT = 2.0      # per click attempt
 CLICK_OFFSETS = [(0, 0), (3, 0), (-3, 0), (0, 3), (0, -3)]   # retry spiral
 
 JSONL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -1022,7 +1024,7 @@ def scan_net(page, ws, area_label, cols, rows, dry, capture):
     for r in range(rows):
         for c in range(cols):
             search_this_area(page)        # trigger the data load
-            time.sleep(1.0)
+            time.sleep(SEARCH_SETTLE)
             n = capture.flush(ws, seen, area_label, dry)
             if n == 0:
                 # dots aren't JSON on this map -> click/geo the dots instead
@@ -1166,7 +1168,18 @@ def main():
                          "the map, no reload/portal flip). 0 = one pass then done.")
     ap.add_argument("--no-update", action="store_true",
                     help="skip the GitHub auto-pull on start (run exactly this code)")
+    ap.add_argument("--fast", action="store_true",
+                    help="cut the wait times for quicker, smoother scanning "
+                         "(use if dots still load fast enough on your connection)")
     args = ap.parse_args()
+
+    if args.fast:
+        global WAIT_AFTER_PAN, WAIT_AFTER_ZOOM, SEARCH_SETTLE, POPUP_POLL_TIMEOUT
+        WAIT_AFTER_PAN = 0.45
+        WAIT_AFTER_ZOOM = 0.45
+        SEARCH_SETTLE = 0.4
+        POPUP_POLL_TIMEOUT = 1.3
+        print("FAST mode: tightened pacing.")
 
     os.makedirs(PROFILE_DIR, exist_ok=True)
 
