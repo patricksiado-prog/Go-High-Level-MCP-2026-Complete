@@ -755,16 +755,10 @@ def close_popup(page):
                 return
         except Exception:
             pass
-    # 2) fallback: click an EMPTY map spot (never a dot) to dismiss
-    try:
-        x, y = empty_map_point(page)
-        page.mouse.click(x, y)
-        time.sleep(0.2)
-    except Exception:
-        pass
-    # 3) last resort
+    # 2) Escape key FIRST (no click -> can't land on nav and flip to portal)
     try:
         page.keyboard.press("Escape")
+        time.sleep(0.15)
     except Exception:
         pass
 
@@ -1303,8 +1297,10 @@ def main():
                 print("Captured %d new fiber addresses from the current view." % n)
                 return n
             # ----- click path (only when --net is off) -----
-            focus_map(page)
-            search_this_area(page)
+            # NOTE: do NOT click focus_map / "Search this area" here -- those
+            # page-level clicks were landing on nav and bouncing us to the
+            # portal. In manual 1x1 mode the dots are already loaded; just read
+            # them. (Panning, when used, re-loads dots itself.)
             mode = "FRESH (new-fiber only)" if args.fresh else "full"
             print("Scanning %d x %d viewports -- %s mode...\n"
                   % (args.cols, args.rows, mode))
