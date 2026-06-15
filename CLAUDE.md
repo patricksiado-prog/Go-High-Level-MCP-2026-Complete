@@ -92,9 +92,41 @@
   `youachieve.att.com/yourefer/fiber`; fresh load = portal, map is behind a "Fiber Availability
   Map" button (`open_map_view()` clicks it). The automated Chromium shows the **dots but not the
   basemap tiles** — normal, the hunter only needs dots. Login saved once via `--login` into
-  `att_profile/`. Popup = `FIBER ELIGIBLE / Address: … / CREATE REFERRAL`. **Top improvement:**
-  capture the dots from AT&T's backend via a Playwright `page.on("response")` listener (every
-  address+lat/lng+status in one shot, no clicking).
+  `att_profile/`. Popup = `FIBER ELIGIBLE / Address: … / CREATE REFERRAL`.
+- **Dots are MAPBOX VECTOR TILES (x-protobuf), not JSON** (confirmed live 2026-06-14 via
+  `--net-debug` → `net_responses.log`). So `--net` JSON capture returned 0 and fell back to
+  clicking. Fix shipped: `NetCapture` now also pulls protobuf tile bodies and decodes them
+  (`decode_vector_tile`, needs `mapbox-vector-tile`), converting each dot's tile-local point to
+  exact lng/lat (web-mercator). `--net-debug` prints the tile's property field names so the
+  address-bearing key can be pinned. If a tile carries only geometry (no street text), the
+  click/popup path still fills the address.
+- **UPDATE ARCHITECTURE (efficient self-update — do NOT make Patrick reinstall).** Three layers,
+  all auto-pulling from GitHub branch `claude/optimus-map-tools-setup-6dcl6o`:
+  1. `precise_fiber_hunter.py` runs `self_update()` at the top of `main()` every launch — `git
+     pull`, and re-exec once if its own file changed (guards: `OPTIMUS_NO_UPDATE=1`,
+     `--no-update`, `GIT_TERMINAL_PROMPT=0`). So the *program* is always latest with zero user
+     action.
+  2. `optimus/install/go.bat` holds the RUN logic and lives in the repo, so `git pull` refreshes
+     it every run.
+  3. `optimus/install/OPTIMUS.bat` is a THIN permanent on-switch (install basics + `git pull` +
+     `call go.bat`). Because behavior lives in go.bat, the on-switch never goes stale and is
+     downloaded only ONCE. Rule: never tell Patrick to re-download a launcher for a code fix —
+     only a change to OPTIMUS.bat *itself* needs a re-download, and that's now rare-to-never.
+  Lesson learned the hard way: a running `.bat` can't rewrite its own file mid-run, which is the
+  *only* reason a launcher can't self-update — so keep launchers thin and put all logic in
+  repo-side files the program/go.bat pull.
+- **Run modes:** `--auto` = unattended (no Enter pauses); without it = MANUAL (opens map, waits
+  for Patrick to position + press Enter, then scans the CURRENT view — no auto-ZIP-jump, set
+  `searched=True`). `--loop SECS` re-scans in place (no reload/portal flip). `--fast` tightens
+  pacing. Default launcher flow is MANUAL + `--loop 30`, NO outer reopen loop (Patrick disliked
+  the browser closing/reopening — "stop telling it to reset"). Closing the browser stops cleanly.
+- **Live status:** `report_status()` writes heartbeats (started/sleeping/done/error) to a
+  **"Hunter Status"** tab in the same Google Sheet (on Drive) + local `run_status.json`, so the
+  run is observable without the terminal. Drive installer folder: **"OPTIMUS SETUP - CLICK HERE"**
+  (id `1IOWTZiDakRuzXtGGYgRCxPxXHNNZkaPc`) holds `OPTIMUS.bat` + a "READ ME" doc. (No Drive
+  delete tool available — old duplicate uploads must be removed by hand.)
+- **Top improvement still open:** pin the address-bearing vector-tile field (from `--net-debug`)
+  so backend capture returns every address with zero clicking.
 
 ## 7. Creds & accounts (Patrick's own — keep it simple)
 - These are Patrick's accounts and creds. Copying or downloading `google_creds.json` to the
