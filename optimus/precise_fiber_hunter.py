@@ -1396,14 +1396,18 @@ def drain_viewport(page, ws, seen, area_label, dry, fresh_only=False):
                 run_frame_probe(page)
             except Exception:
                 pass
-    if n is not None:
+    if n is not None and n > 0:
         return n
-    if not ALLOW_CLICK:
-        return 0
 
-    # ---- LEGACY pixel-click path (only with --allow-click) ----
+    # ---- CLICK path: read each green/gold dot's popup (the proven address
+    # source). Flip-safe now: only GREEN/GOLD dots are clicked (never grey or the
+    # blue portal buttons), popups close with Escape (no empty-spot clicks), and
+    # panning is programmatic (pan_map_js). Only run it when we're actually on the
+    # map, so a portal frame can't be clicked.
+    if not on_map(page):
+        return 0
     greens, golds, gray, label, share, dots = classify_viewport(page)
-    print("  viewport: %d green + %d gold + %d grey -> %s (grey %d%%)"
+    print("  viewport (click): %d green + %d gold + %d grey -> %s (grey %d%%)"
           % (greens, golds, gray, label, round(share * 100)))
     if fresh_only and label in ("MATURE", "EMPTY"):
         print("  skip [%s] -- not new fiber, moving on" % label)
