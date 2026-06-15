@@ -1192,15 +1192,19 @@ def zoom(page, presses, direction):
 
 
 def search_this_area(page):
-    """After a pan/zoom the new view's dots only load when this is clicked."""
+    """After a pan/zoom the new view's dots only load when this is clicked. This
+    is the click that makes AT&T FETCH the dots -- the moment the network capture
+    can grab their data off the wire."""
     try:
         btn = page.get_by_text(SEARCH_THIS_AREA, exact=False)
         if btn.count() > 0:
+            print("  -> pressing 'Search this area' (fetching dots from server)...")
             btn.first.click()
             time.sleep(3.0)
             return True
     except Exception:
         pass
+    print("  -> ('Search this area' button not found this view)")
     return False
 
 
@@ -1265,6 +1269,7 @@ def pan_map_js(page, direction):
 def pan(page, direction):
     """Move to the next cell (programmatic pan, no clicks) then press 'Search this
     area' so the new view's dots load."""
+    print("  -> panning %s to the next patch..." % direction)
     pan_map_js(page, direction)
     time.sleep(WAIT_AFTER_PAN)
     search_this_area(page)   # load the new view's dots (map-scoped button)
@@ -1388,55 +1393,37 @@ def classify_viewport(page):
 
 
 def drain_viewport(page, ws, seen, area_label, dry, fresh_only=False):
-    """Capture the green/gold dots in the current viewport. PRIMARY path is the
-    backend read: exact dot locations from the Mapbox map, coloured by sampling
-    each dot's own pixel -- no clicking, so the view never flips. The legacy
-    whole-screen pixel-detect + click path runs only with --allow-click (it can
-    mis-read portal buttons as dots, which caused the flip)."""
+    """Operator's plan: after search/pan fetches the dots, first try to grab the
+    addresses OFF THE SERVER (network capture, no clicking). Only if the address
+    data didn't materialize on the wire do we fall back to clicking each
+    green/gold dot for its popup address."""
+    # 1) backend map-object read -- hidden on this site, returns None (skips)
     n = drain_viewport_backend(page, ws, seen, area_label, dry)
     if n:
         return n
 
-    # The map object is hidden on this site -> read the dots off the NETWORK.
+    # 2) NETWORK grab -- the search/pan just fetched fresh dots; did the address
+    #    data come over the wire? If so, capture it with NO clicking.
     cap = _NET_CAPTURE[0]
     if cap is not None:
         netn = cap.flush(ws, seen, area_label, dry)
-        if cap.endpoints:
-            print("  network endpoints that returned leads:")
-            for u, c in sorted(cap.endpoints.items(), key=lambda kv: -kv[1])[:6]:
-                print("     %4d  %s" % (c, u[:90]))
         if netn:
-            print("  viewport (network): +%d captured" % netn)
+            print("  viewport (network): +%d captured OFF THE SERVER (no clicks)" % netn)
             drive_log("VIEWPORT network captured=%d" % netn)
             return netn
-        # nothing decoded yet -> dump every endpoint we saw so the dot-data URL
-        # can be identified (printed + net_responses.log).
+        # didn't decode -> show the candidate data feeds once so we can pin it
         if not _AUTO_PROBED[0]:
             _AUTO_PROBED[0] = True
-            print("  (no leads decoded yet -- here is every endpoint the page "
-                  "hit, biggest first, so we can find the dot-data URL:)")
+            print("  (addresses did NOT come over the server this pass -- here are "
+                  "the candidate data feeds, then falling back to clicking:)")
             try:
                 cap.dump_debug(os.path.join(
                     os.path.dirname(os.path.abspath(__file__)), "net_responses.log"))
             except Exception:
                 pass
-            try:
-                run_frame_probe(page)
-            except Exception:
-                pass
-    if n is not None and n > 0:
-        return n
 
-    # NO CLICKING by default (operator preference). Captures come only from the
-    # server/network grab above. If the network decode isn't pinned yet we leave
-    # this pass empty (the endpoint dump above shows where the dots come from so
-    # the decoder can be fixed). The click path is opt-in only via --allow-click.
-    if not ALLOW_CLICK:
-        return 0
-
-    # ---- CLICK path (only with --allow-click): read each green/gold dot's
-    # popup. Flip-safe: only GREEN/GOLD dots clicked, Escape to close, no empty
-    # clicks, programmatic pan, and only when actually on the map.
+    # 3) FALLBACK (operator-approved): the server grab came up empty, so click
+    #    each GREEN/GOLD dot and read its address from the popup.
     if not on_map(page):
         return 0
     greens, golds, gray, label, share, dots = classify_viewport(page)
