@@ -138,11 +138,14 @@
   no zoom). `--allow-click` = old click path; `--probe` dumps map layers/props to
   `probe.json`. Skill: **map-backend-read**. Legend: GREEN=lead, GOLD=upgrade,
   GREY=existing customer (skip); all-grey view = MATURE (go to a newer area).
-- **HARD RULE — NEVER CLICK THE DOTS by default.** Patrick was explicit (2026-06-15):
-  the hunter must grab dots from the backend/server only, no clicking. Clicking is
-  `--allow-click` opt-in ONLY. Do not re-enable the click path in the default flow,
-  ever — even as a "fallback". If the server grab isn't working yet, leave the pass
-  EMPTY and report the endpoints; don't fall back to clicking.
+- **CAPTURE ORDER (Patrick's approved flow, 2026-06-15):** position → Enter → the
+  hunter PANS + presses "Search this area" (this is the fetch that puts the dot data
+  on the wire) → (1) try to grab the addresses OFF THE SERVER via `NetCapture` (no
+  clicking) → (2) ONLY if the address didn't materialize on the wire, fall back to
+  clicking each green/gold dot's popup. Server-first, clicking is the explicit
+  fallback (Patrick OK'd it: "if not then clicking") — NOT the default. The win is
+  pinning the server feed so clicking retires; until then clicking keeps leads
+  flowing. Always prefer/try the server grab first on every patch.
 - **LIVE FINDING (2026-06-15 HP probe): the map object is FULLY HIDDEN.** Frame probe
   showed `hookedMaps:0`, `mapboxgl=false`, `maplibregl=false`, `maps=0` in BOTH frames
   (one is `about:blank`, the real one is `youachieve.att.com/yourefer/fiber`), yet dots
