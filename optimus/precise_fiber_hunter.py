@@ -204,7 +204,10 @@ MAPBOX_PROBE_JS = """
       }
     } catch (e) {}
   }
-  const out = {hookedMaps: maps.length, maps: []};
+  const out = {hookedMaps: maps.length, maps: [],
+               hasMapboxgl: !!(window.mapboxgl),
+               canvases: document.querySelectorAll('canvas').length,
+               mapboxCanvases: document.querySelectorAll('.mapboxgl-canvas').length};
   for (const m of maps) {
     if (!m || !m.queryRenderedFeatures) { out.maps.push({error: 'no queryRenderedFeatures'}); continue; }
     let feats = [];
@@ -347,6 +350,30 @@ def query_map_features(page):
     except Exception:
         return None
     return feats or None
+
+
+def eval_best_frame(page, js):
+    """Run JS in the main page AND every child frame, return the result with the
+    most dots. The AT&T map can live inside an iframe, so the main-page window has
+    no map -- we must ask each frame. Returns (data_dict_or_None, frame_index)."""
+    best, best_n, idx = None, -1, -1
+    try:
+        frames = list(page.frames)
+    except Exception:
+        try:
+            return page.evaluate(js), 0
+        except Exception:
+            return None, -1
+    for i, fr in enumerate(frames):
+        try:
+            d = fr.evaluate(js)
+        except Exception:
+            continue
+        if isinstance(d, dict):
+            n = len(d.get("dots") or [])
+            if n > best_n:
+                best, best_n, idx = d, n, i
+    return best, idx
 
 
 def feature_address(props):
@@ -867,10 +894,7 @@ def drain_viewport_backend(page, ws, seen, area_label, dry, zone_label="WORKING"
     import io
     import numpy as np
     from PIL import Image
-    try:
-        data = page.evaluate(MAPBOX_DOTS_JS)
-    except Exception:
-        return None
+    data, _frame_idx = eval_best_frame(page, MAPBOX_DOTS_JS)
     if not data or not isinstance(data, dict):
         return None
     dots = data.get("dots") or []
@@ -1561,19 +1585,50 @@ def main():
                 input("  Press Enter to PROBE what the map exposes... ")
             except EOFError:
                 pass
+            # probe EVERY frame (the map may be inside an iframe)
+            per_frame = []
             try:
-                data = page.evaluate(MAPBOX_PROBE_JS)
-            except Exception as e:
-                data = {"error": str(e)}
+                frames = list(page.frames)
+            except Exception:
+                frames = [page]
+            for fi, fr in enumerate(frames):
+                try:
+                    d = fr.evaluate(MAPBOX_PROBE_JS)
+                except Exception as e:
+                    d = {"error": str(e)}
+                furl = ""
+                try:
+                    furl = fr.url
+                except Exception:
+                    pass
+                per_frame.append({"frame": fi, "url": furl, "result": d})
+            # pick the frame that actually has a map
+            data = {}
+            for pf in per_frame:
+                d = pf.get("result") or {}
+                if isinstance(d, dict) and d.get("hookedMaps"):
+                    data = d
+                    break
+            else:
+                data = (per_frame[0]["result"] if per_frame else {}) or {}
             out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "probe.json")
             try:
                 with open(out, "w") as f:
-                    json.dump(data, f, indent=2)
+                    json.dump({"frames": per_frame}, f, indent=2)
             except Exception:
                 pass
-            hm = (data or {}).get("hookedMaps")
             print("\n=== MAP PROBE ===")
-            print("  hooked maps: %s" % hm)
+            print("  frames on page: %d" % len(per_frame))
+            for pf in per_frame:
+                d = pf.get("result") or {}
+                if not isinstance(d, dict):
+                    continue
+                print("  frame %d  maps=%s  mapboxgl=%s  canvas=%s  mapboxCanvas=%s  %s"
+                      % (pf["frame"], d.get("hookedMaps"), d.get("hasMapboxgl"),
+                         d.get("canvases"), d.get("mapboxCanvases"),
+                         (pf.get("url") or "")[:40]))
+            hm = (data or {}).get("hookedMaps")
+            print("  --> hooked maps (best frame): %s" % hm)
             for i, mp in enumerate((data or {}).get("maps", [])):
                 if "error" in mp:
                     print("  map %d: error %s" % (i, mp["error"]))
