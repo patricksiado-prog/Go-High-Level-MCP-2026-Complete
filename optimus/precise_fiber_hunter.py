@@ -332,7 +332,18 @@ def _tilepoint_to_lnglat(z, x, y, px, py, extent):
     return lon, math.degrees(lat_rad)
 
 
+def _is_basemap_tile(url):
+    """Mapbox's own street/terrain BASEMAP tiles -- roads & place names, NOT the
+    AT&T fiber dots. Decoding these yields street names that look like addresses
+    (bogus leads), so skip them."""
+    u = url.lower()
+    return ("api.mapbox.com" in u and
+            ("mapbox-streets" in u or "mapbox-terrain" in u or "/v4/mapbox." in u))
+
+
 def _is_vector_tile(url, ct):
+    if _is_basemap_tile(url):
+        return False
     ctl = (ct or "").lower()
     if "mapbox-vector-tile" in ctl or "protobuf" in ctl or "octet-stream" in ctl:
         return True
@@ -354,7 +365,11 @@ def decode_vector_tile(url, body):
         return [], set(), "no-zxy"
     z, x, y = zxy
     try:
-        tile = mapbox_vector_tile.decode(body, y_coord_down=True)
+        # newer mapbox_vector_tile wants default_options=; older wants the kwarg
+        try:
+            tile = mapbox_vector_tile.decode(body, default_options={"y_coord_down": True})
+        except TypeError:
+            tile = mapbox_vector_tile.decode(body, y_coord_down=True)
     except Exception as e:
         return [], set(), "decode-fail:%s" % str(e)[:40]
     leads, keys = [], set()
@@ -1226,6 +1241,8 @@ def main():
 
         ws = None if args.dry else open_sheet()
         searched = [False]   # only search the ZIP on the first pass
+        seen = already_seen(ws)            # resume set, persists across passes
+        area_label = args.zip or "manual"
 
         if args.net_debug:
             # RESEARCH short-circuit: load the map, trigger a few data loads by
@@ -1252,20 +1269,20 @@ def main():
             return
 
         def one_pass():
-            # keep us ON the map -- re-open only if the SPA bounced to the portal
-            # (no page reload here, so the view doesn't flip portal<->map).
-            if open_map_view(page):
-                print("Opened the Fiber Availability Map view.")
-            focus_map(page)
+            # Only touch the map if the SPA bounced us to the PORTAL. When the
+            # map is already showing we DON'T click it -- arbitrary map clicks /
+            # auto-pans were landing on nav and flipping the view to the portal.
+            if not on_map(page):
+                if open_map_view(page):
+                    print("Re-opened the map view.")
+                    time.sleep(2.0)
             if args.zip and not searched[0]:
                 print("Searching area: %s" % args.zip)
                 if not search_zip(page, args.zip):
                     if args.auto:
                         print("Couldn't find the search box -- scanning the current view.")
                     else:
-                        print("Couldn't find the search box -- pan/zoom to your area by hand.")
-                        input("Press Enter when the map shows your area... ")
-                focus_map(page)
+                        print("Couldn't find the search box -- pan to your area by hand.")
                 if args.zoom_in:
                     zoom(page, args.zoom_in, "in")
                 if args.zoom_out:
@@ -1273,12 +1290,21 @@ def main():
                 if args.fresh and args.survey_out:
                     zoom(page, args.survey_out, "out")
                 searched[0] = True
-            search_this_area(page)   # load the current view's dots
             if capture is not None:
-                print("Scanning %d x %d viewports -- NETWORK mode (no clicking)...\n"
-                      % (args.cols, args.rows))
-                return scan_net(page, ws, args.zip or "manual", args.cols, args.rows,
-                                args.dry, capture)
+                # PASSIVE backend capture: decode the dot tiles the browser has
+                # already fetched for the CURRENT view -- no dot-clicking, no
+                # auto-pan, so the view can't get bumped to the portal. Pan the
+                # map yourself to cover more ground; the hunter reads whatever
+                # loads. "Search this area" is a map-scoped button (safe) that
+                # refreshes this view's dots.
+                if on_map(page):
+                    search_this_area(page)
+                n = capture.flush(ws, seen, area_label, dry)
+                print("Captured %d new fiber addresses from the current view." % n)
+                return n
+            # ----- click path (only when --net is off) -----
+            focus_map(page)
+            search_this_area(page)
             mode = "FRESH (new-fiber only)" if args.fresh else "full"
             print("Scanning %d x %d viewports -- %s mode...\n"
                   % (args.cols, args.rows, mode))
