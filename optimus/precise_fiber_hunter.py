@@ -302,11 +302,93 @@ def extract_leads_from_json(obj, out=None, depth=0):
     return out
 
 
+# --- Mapbox vector-tile (protobuf) decoding -- the AT&T dots ride in here ----
+import math
+
+_TILE_XYZ_RE = re.compile(r"/(\d{1,2})/(\d{1,7})/(\d{1,7})(?:[._/]|\?|$)")
+
+
+def _tile_zxy(url):
+    """Pull (z, x, y) out of a vector-tile URL like .../14/3824/6915.pbf."""
+    m = _TILE_XYZ_RE.search(url.split("?")[0])
+    if not m:
+        # some servers pass them as query params ?z=&x=&y=
+        qz = re.search(r"[?&]z=(\d+)", url)
+        qx = re.search(r"[?&]x=(\d+)", url)
+        qy = re.search(r"[?&]y=(\d+)", url)
+        if qz and qx and qy:
+            return int(qz.group(1)), int(qx.group(1)), int(qy.group(1))
+        return None
+    return int(m.group(1)), int(m.group(2)), int(m.group(3))
+
+
+def _tilepoint_to_lnglat(z, x, y, px, py, extent):
+    """Convert a tile-local point (px,py in 0..extent, y down) to lng/lat."""
+    n = 2.0 ** z
+    lon = (x + px / extent) / n * 360.0 - 180.0
+    lat_rad = math.atan(math.sinh(math.pi * (1 - 2 * (y + py / extent) / n)))
+    return lon, math.degrees(lat_rad)
+
+
+def _is_vector_tile(url, ct):
+    ctl = (ct or "").lower()
+    if "mapbox-vector-tile" in ctl or "protobuf" in ctl or "octet-stream" in ctl:
+        return True
+    base = url.split("?")[0].lower()
+    return base.endswith(".pbf") or base.endswith(".mvt")
+
+
+def decode_vector_tile(url, body):
+    """Decode a Mapbox vector tile (protobuf bytes) into leads with exact
+    lng/lat (and address/status when the tile carries them). Returns ([], keys)
+    on any failure so the caller can keep going; `keys` is the set of property
+    names seen, which tells us the tile schema for tightening this later."""
+    try:
+        import mapbox_vector_tile
+    except Exception:
+        return [], set(), "no-mapbox_vector_tile"
+    zxy = _tile_zxy(url)
+    if not zxy:
+        return [], set(), "no-zxy"
+    z, x, y = zxy
+    try:
+        tile = mapbox_vector_tile.decode(body, y_coord_down=True)
+    except Exception as e:
+        return [], set(), "decode-fail:%s" % str(e)[:40]
+    leads, keys = [], set()
+    for _layer, lobj in (tile or {}).items():
+        extent = lobj.get("extent", 4096) or 4096
+        for feat in lobj.get("features", []):
+            props = feat.get("properties") or {}
+            keys.update(props.keys())
+            low = {_nkey(k): v for k, v in props.items()}
+            geom = feat.get("geometry") or {}
+            lng = latv = None
+            if geom.get("type") == "Point":
+                c = geom.get("coordinates")
+                if isinstance(c, (list, tuple)) and len(c) >= 2:
+                    lng, latv = _tilepoint_to_lnglat(z, x, y, c[0], c[1], extent)
+            addr = _pick(low, ADDR_KEYS)
+            status = _pick(low, NET_STATUS_KEYS)
+            ban = _pick(low, NET_BAN_KEYS)
+            # record if we got *something* useful: an address, or a located dot
+            if (addr and isinstance(addr, str)) or (lng is not None):
+                leads.append({
+                    "address": " ".join(addr.split())[:160] if isinstance(addr, str) else None,
+                    "lat": latv, "lng": lng,
+                    "status": status if isinstance(status, str) else None,
+                    "ban": ban,
+                    "props": props,
+                })
+    return leads, keys, "ok:%d" % len(leads)
+
+
 class NetCapture:
     """Collects leads seen on the wire. Attach .handle to page.on('response');
-    call .flush() per viewport to write the new ones. With debug=True it ALSO
-    logs every response (URL, content-type, size) so we can find which endpoint
-    actually carries the dot data."""
+    call .flush() per viewport to write the new ones. Handles BOTH JSON
+    availability responses AND Mapbox vector tiles (protobuf), which is how the
+    AT&T dealer map actually ships the dots. With debug=True it ALSO logs every
+    response (URL, content-type, size) so we can find the dot endpoint."""
     def __init__(self, substr=None, debug=False):
         self.substr = substr        # restrict to URLs containing this, if set
         self.debug = debug
@@ -314,6 +396,8 @@ class NetCapture:
         self.seen = set()
         self.endpoints = {}          # url(no query) -> lead count, for discovery
         self.seen_urls = {}          # base url -> [content_type, hits, max_bytes]
+        self.tile_keys = set()       # property names seen in vector tiles (schema)
+        self.tile_status = {}        # base url -> last decode note (debug aid)
 
     def handle(self, response):
         try:
@@ -328,11 +412,25 @@ class NetCapture:
                 row = self.seen_urls.setdefault(base, [ct, 0, 0])
                 row[1] += 1
                 row[2] = max(row[2], sz)
-            if "json" not in ct.lower():
-                return
             if self.substr and self.substr not in url:
                 return
-            leads = extract_leads_from_json(response.json())
+            ctl = ct.lower()
+            if "json" in ctl:
+                leads = extract_leads_from_json(response.json())
+            elif _is_vector_tile(url, ct):
+                try:
+                    body = response.body()
+                except Exception:
+                    return
+                if not body:
+                    return
+                leads, keys, note = decode_vector_tile(url, body)
+                if keys:
+                    self.tile_keys.update(keys)
+                base = url.split("?")[0]
+                self.tile_status[base] = note
+            else:
+                return
             if leads:
                 base = url.split("?")[0]
                 self.endpoints[base] = self.endpoints.get(base, 0) + len(leads)
@@ -351,12 +449,24 @@ class NetCapture:
         print("  %-9s %-30s %s" % ("bytes", "content-type", "url"))
         for base, (ct, hits, mx) in rows[:25]:
             print("  %-9s %-30s %s" % (mx, ct[:30], base[:90]))
+        if self.tile_keys:
+            print("\n=== vector-tile fields decoded from the dots ===")
+            print("  " + ", ".join(sorted(self.tile_keys)))
+        if self.tile_status:
+            print("\n=== vector-tile decode results ===")
+            for base, note in list(self.tile_status.items())[:15]:
+                print("  %-12s %s" % (note, base[:80]))
         if path:
             try:
                 with open(path, "w") as f:
                     f.write("max_bytes\tcontent_type\thits\turl\n")
                     for base, (ct, hits, mx) in rows:
                         f.write("%d\t%s\t%d\t%s\n" % (mx, ct, hits, base))
+                    f.write("\n# vector-tile property fields seen:\n# %s\n"
+                            % ", ".join(sorted(self.tile_keys)))
+                    f.write("\n# vector-tile decode results:\n")
+                    for base, note in self.tile_status.items():
+                        f.write("# %s\t%s\n" % (note, base))
                 print("  full list -> %s" % path)
             except Exception as e:
                 print("  (couldn't write %s: %s)" % (path, e))
