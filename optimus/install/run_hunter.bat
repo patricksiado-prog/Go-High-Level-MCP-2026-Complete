@@ -29,6 +29,10 @@ git -C "%REPO%" pull origin %BRANCH%
 REM One fresh pass on the newest code (the hunter also self-updates on start).
 python precise_fiber_hunter.py --zip %ZIP% --net --auto
 echo.
+echo ---- adding phone numbers (FREE OpenStreetMap lookup, no API cost) ----
+REM No --paid flag = OSM only, $0. Never calls the paid Google Places API.
+python enrich_phones.py
+echo.
 echo ==== pass done. Restarting on the latest code in %WAIT_SECS%s. Close window to stop. ====
 timeout /t %WAIT_SECS% /nobreak >nul
 goto loop
