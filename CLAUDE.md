@@ -138,12 +138,25 @@
   no zoom). `--allow-click` = old click path; `--probe` dumps map layers/props to
   `probe.json`. Skill: **map-backend-read**. Legend: GREEN=lead, GOLD=upgrade,
   GREY=existing customer (skip); all-grey view = MATURE (go to a newer area).
-- **OPEN RISK / next:** the backend read needs the map hook to attach. If a live
-  `--probe` shows `hookedMaps:0` + empty globals, the map is module-scoped or in an
-  iframe (query the frame). If it shows a map but 0 point features, it may be the
-  "Mapbox Standard" style bug (#13332) → use `querySourceFeatures(srcId)` /
-  `getSource(id)._data`. If dots found but classify None, widen the dot RGB windows
-  in `optimus_dot_detect.py` from a real sampled colour. Needs a live HP `--probe`.
+- **HARD RULE — NEVER CLICK THE DOTS by default.** Patrick was explicit (2026-06-15):
+  the hunter must grab dots from the backend/server only, no clicking. Clicking is
+  `--allow-click` opt-in ONLY. Do not re-enable the click path in the default flow,
+  ever — even as a "fallback". If the server grab isn't working yet, leave the pass
+  EMPTY and report the endpoints; don't fall back to clicking.
+- **LIVE FINDING (2026-06-15 HP probe): the map object is FULLY HIDDEN.** Frame probe
+  showed `hookedMaps:0`, `mapboxgl=false`, `maplibregl=false`, `maps=0` in BOTH frames
+  (one is `about:blank`, the real one is `youachieve.att.com/yourefer/fiber`), yet dots
+  render and the basemap is Mapbox tiles. So the map lib is bundled with NO window
+  global and NO reachable instance — the backend-OBJECT read (`queryRenderedFeatures` /
+  `getSource._data`) is IMPOSSIBLE on this site. Stop trying to read the map object.
+- **THE PATH = NETWORK CAPTURE (no clicking).** The dots come from AT&T's server over
+  the wire; `NetCapture` (now ALWAYS on, `page.on("response")`) decodes JSON +
+  non-basemap vector tiles into leads. Pressing "Search this area" triggers the load
+  that NetCapture reads. NEXT STEP: need the dot-data endpoint — a normal run with no
+  decode prints every URL + writes `net_responses.log`; pin AT&T's dot URL there and
+  point `--api-substring` / the JSON/tile parser at it. Telemetry to read this remotely
+  is blocked (service account can't write to a personal-Gmail Drive; sheet is AI-blocked)
+  — so getting that endpoint list currently needs a screenshot from Patrick.
 
 ## 7. Creds & accounts (Patrick's own — keep it simple)
 - These are Patrick's accounts and creds. Copying or downloading `google_creds.json` to the
