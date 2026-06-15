@@ -1811,18 +1811,6 @@ def main():
                 if args.fresh and args.survey_out:
                     zoom(page, args.survey_out, "out")
                 searched[0] = True
-            if capture is not None:
-                # PASSIVE backend capture: decode the dot tiles the browser has
-                # already fetched for the CURRENT view -- no dot-clicking, no
-                # auto-pan, so the view can't get bumped to the portal. Pan the
-                # map yourself to cover more ground; the hunter reads whatever
-                # loads. "Search this area" is a map-scoped button (safe) that
-                # refreshes this view's dots.
-                if on_map(page):
-                    search_this_area(page)
-                n = capture.flush(ws, seen, area_label, dry)
-                print("Captured %d new fiber addresses from the current view." % n)
-                return n
             # ----- backend read path (default; no dot-clicking) -----
             # "Search this area" is a map-scoped button (safe) that loads the
             # current view's dots; then scan() reads them from the backend and
