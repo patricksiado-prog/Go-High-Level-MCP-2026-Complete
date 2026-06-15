@@ -194,7 +194,16 @@ MAPBOX_QUERY_JS = """
 
 MAPBOX_PROBE_JS = """
 () => {
-  const maps = (window.__optimusMaps || []);
+  let maps = (window.__optimusMaps || []).slice();
+  if (!maps.length) {
+    try {
+      for (const k in window) {
+        let v; try { v = window[k]; } catch (e) { continue; }
+        if (v && typeof v.queryRenderedFeatures === 'function' &&
+            typeof v.project === 'function') { maps.push(v); break; }
+      }
+    } catch (e) {}
+  }
   const out = {hookedMaps: maps.length, maps: []};
   for (const m of maps) {
     if (!m || !m.queryRenderedFeatures) { out.maps.push({error: 'no queryRenderedFeatures'}); continue; }
@@ -214,6 +223,56 @@ MAPBOX_PROBE_JS = """
     out.maps.push({totalFeatures: feats.length, pointFeatures: points, layers, samples});
   }
   return out;
+}
+"""
+
+# Read the AT&T dot features straight from the map: every rendered POINT feature
+# that ISN'T part of the Mapbox basemap (roads/labels/water/etc.), with its exact
+# screen pixel (via map.project) + lng/lat + properties, plus the map canvas rect
+# so the pixels line up with a screenshot. No clicking, no pixel-hunting the whole
+# screen (which mis-detected portal buttons as dots).
+MAPBOX_DOTS_JS = """
+() => {
+  let m = (window.__optimusMaps || [])[0];
+  if (!m || !m.queryRenderedFeatures) {
+    // hook missed it (map loaded as a module?) -> search globals for a map
+    try {
+      for (const k in window) {
+        let v; try { v = window[k]; } catch (e) { continue; }
+        if (v && typeof v.queryRenderedFeatures === 'function' &&
+            typeof v.project === 'function' && typeof v.getContainer === 'function') {
+          m = v; break;
+        }
+      }
+    } catch (e) {}
+  }
+  if (!m || !m.queryRenderedFeatures) return null;
+  let feats;
+  try { feats = m.queryRenderedFeatures(); } catch (e) { return null; }
+  const SKIP = ['road','bridge','tunnel','motorway','street','path','rail',
+    'transit','ferry','label','place','poi','water','waterway','marine','land',
+    'building','structure','boundary','admin','country','state','contour',
+    'hillshade','terrain','park','wood','grass','sand','pitch','aeroway',
+    'airport','housenum','bound','background','bg-'];
+  let rect = {left: 0, top: 0, width: 0, height: 0};
+  try { const r = m.getContainer().getBoundingClientRect();
+        rect = {left: r.left, top: r.top, width: r.width, height: r.height}; } catch (e) {}
+  const out = [];
+  const seen = new Set();
+  for (const f of feats) {
+    if (!f.geometry || f.geometry.type !== 'Point') continue;
+    const lid = ((f.layer && f.layer.id) || '').toLowerCase();
+    if (SKIP.some(s => lid.includes(s))) continue;
+    const c = f.geometry.coordinates;
+    if (!c || c.length < 2) continue;
+    const lng = c[0], lat = c[1];
+    const key = lng.toFixed(6) + ',' + lat.toFixed(6);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    let px; try { px = m.project([lng, lat]); } catch (e) { continue; }
+    out.push({lng, lat, x: px.x, y: px.y, props: f.properties || {}, layer: lid});
+  }
+  return {rect, dots: out};
 }
 """
 
@@ -696,6 +755,106 @@ def find_map_dots(page):
     return out, gray
 
 
+_COLOR_WINDOWS_BY_NAME = [("GREEN", GREEN_MIN, GREEN_MAX),
+                          ("GOLD", GOLD_MIN, GOLD_MAX),
+                          ("GRAY", GRAY_MIN, GRAY_MAX)]
+
+
+def classify_pixel(arr, x, y, rad=4):
+    """Sample a small window around (x, y) in an HxWx3 RGB array and return the
+    dot color there: GREEN / GOLD / GRAY / None. Used to color a dot whose EXACT
+    screen position we already know from the Mapbox backend -- so we never guess
+    on random screen pixels (which mis-read portal buttons)."""
+    import numpy as np
+    h, w = arr.shape[0], arr.shape[1]
+    x, y = int(x), int(y)
+    x0, x1 = max(0, x - rad), min(w, x + rad + 1)
+    y0, y1 = max(0, y - rad), min(h, y + rad + 1)
+    if x0 >= x1 or y0 >= y1:
+        return None
+    patch = arr[y0:y1, x0:x1]
+    r, g, b = patch[:, :, 0], patch[:, :, 1], patch[:, :, 2]
+    best_name, best_n = None, 1
+    for name, cmin, cmax in _COLOR_WINDOWS_BY_NAME:
+        mask = ((r >= cmin[0]) & (r <= cmax[0]) &
+                (g >= cmin[1]) & (g <= cmax[1]) &
+                (b >= cmin[2]) & (b <= cmax[2]))
+        n = int(mask.sum())
+        if n > best_n:
+            best_name, best_n = name, n
+    return best_name
+
+
+def drain_viewport_backend(page, ws, seen, area_label, dry, zone_label="WORKING"):
+    """THE backend read (no clicking). Ask the map for every non-basemap dot,
+    colour each one by sampling its EXACT pixel in a single screenshot, and write
+    the GREEN (eligible) + GOLD (copper-upgrade) ones to the sheet. GREY = existing
+    fiber customer, skipped. Returns the count, or None if the map hook isn't live
+    yet (so the caller knows the read wasn't available)."""
+    import io
+    import numpy as np
+    from PIL import Image
+    try:
+        data = page.evaluate(MAPBOX_DOTS_JS)
+    except Exception:
+        return None
+    if not data or not isinstance(data, dict):
+        return None
+    dots = data.get("dots") or []
+    rect = data.get("rect") or {"left": 0, "top": 0}
+    if not dots:
+        print("  viewport (backend): 0 dots in view")
+        return 0
+    try:
+        raw = page.screenshot(type="png")
+        arr = np.array(Image.open(io.BytesIO(raw)).convert("RGB"))
+    except Exception:
+        return None
+    vp = page.viewport_size or VIEWPORT
+    img_h, img_w = arr.shape[0], arr.shape[1]
+    sx = img_w / vp["width"] if vp.get("width") else 1.0
+    sy = img_h / vp["height"] if vp.get("height") else 1.0
+    rleft, rtop = rect.get("left", 0), rect.get("top", 0)
+    greens = golds = grays = other = captured = 0
+    for d in dots:
+        sxpix = (rleft + d.get("x", 0)) * sx
+        sypix = (rtop + d.get("y", 0)) * sy
+        props = d.get("props") or {}
+        # prefer an explicit status property; else colour from the exact pixel
+        status_txt = feature_status_text(props)
+        color = None
+        if status_txt:
+            cs = classify_status(text=status_txt)
+            color = {"lead": "GREEN", "copper_upgrade": "GOLD",
+                     "customer": "GRAY"}.get(cs)
+        if color is None:
+            color = classify_pixel(arr, sxpix, sypix)
+        if color == "GREEN":
+            greens += 1
+        elif color == "GOLD":
+            golds += 1
+        elif color == "GRAY":
+            grays += 1
+            continue            # existing customer -> skip
+        else:
+            other += 1
+            continue            # not a recognizable dot -> skip
+        addr = feature_address(props)
+        lat, lng = d.get("lat"), d.get("lng")
+        if not addr and lat is not None and lng is not None:
+            addr = "(%.6f, %.6f)" % (lat, lng)   # no street text -> use the pin
+        if not addr:
+            continue
+        dot_status = classify_status(text=status_txt or color, color=color)
+        if record_capture(ws, seen, area_label, dry, addr, status_txt, None,
+                          dot_status, via="backend", zone_label=zone_label,
+                          lat=lat, lng=lng):
+            captured += 1
+    print("  viewport (backend): %d green + %d gold + %d grey (skipped) "
+          "+ %d other -> captured %d" % (greens, golds, grays, other, captured))
+    return captured
+
+
 # ----------------------------------------------------------------------------
 # popup reading (scoped; falls back to body)
 # ----------------------------------------------------------------------------
@@ -886,15 +1045,32 @@ def open_map_view(page):
     return False
 
 
+def pan_map_js(page, direction):
+    """Pan the Mapbox map PROGRAMMATICALLY (no mouse click, no keyboard focus) --
+    a click can land on nav and flip to the portal, so we move the map directly.
+    Shifts ~70% of a viewport so adjacent cells overlap a little."""
+    dx = {"left": -1, "right": 1, "up": 0, "down": 0}[direction]
+    dy = {"left": 0, "right": 0, "up": -1, "down": 1}[direction]
+    try:
+        ok = page.evaluate(
+            """([dx, dy]) => {
+                const m = (window.__optimusMaps || [])[0];
+                if (!m || !m.panBy) return false;
+                const c = m.getContainer().getBoundingClientRect();
+                m.panBy([dx * c.width * 0.7, dy * c.height * 0.7], {duration: 0});
+                return true;
+            }""", [dx, dy])
+        return bool(ok)
+    except Exception:
+        return False
+
+
 def pan(page, direction):
-    focus_map(page)   # make sure arrow keys land on the map
-    key = {"left": "ArrowLeft", "right": "ArrowRight",
-           "up": "ArrowUp", "down": "ArrowDown"}[direction]
-    for _ in range(PAN_PRESSES):
-        page.keyboard.press(key)
-        time.sleep(0.12)
+    """Move to the next cell (programmatic pan, no clicks) then press 'Search this
+    area' so the new view's dots load."""
+    pan_map_js(page, direction)
     time.sleep(WAIT_AFTER_PAN)
-    search_this_area(page)   # load the new view's dots
+    search_this_area(page)   # load the new view's dots (map-scoped button)
 
 
 def search_zip(page, zip_code):
@@ -1015,31 +1191,28 @@ def classify_viewport(page):
 
 
 def drain_viewport(page, ws, seen, area_label, dry, fresh_only=False):
-    """Capture every clickable dot in the current viewport. Classifies the
-    zone first (green+gold vs grey); in --fresh mode a MATURE/EMPTY viewport
-    is skipped fast. Addresses come from the Mapbox geo features when the hook
-    is live, else the pixel-click fallback."""
+    """Capture the green/gold dots in the current viewport. PRIMARY path is the
+    backend read: exact dot locations from the Mapbox map, coloured by sampling
+    each dot's own pixel -- no clicking, so the view never flips. The legacy
+    whole-screen pixel-detect + click path runs only with --allow-click (it can
+    mis-read portal buttons as dots, which caused the flip)."""
+    n = drain_viewport_backend(page, ws, seen, area_label, dry)
+    if n is not None:
+        return n
+
+    # The map hook isn't live yet (attaches once the real map is open).
+    print("  (map backend not live yet -- it attaches when the map is open. "
+          "Not clicking.)")
+    if not ALLOW_CLICK:
+        return 0
+
+    # ---- LEGACY pixel-click path (only with --allow-click) ----
     greens, golds, gray, label, share, dots = classify_viewport(page)
     print("  viewport: %d green + %d gold + %d grey -> %s (grey %d%%)"
           % (greens, golds, gray, label, round(share * 100)))
     if fresh_only and label in ("MATURE", "EMPTY"):
         print("  skip [%s] -- not new fiber, moving on" % label)
         return 0
-
-    # FAST PATH: addresses straight from the map's geo features (no clicking)
-    n = drain_viewport_mapbox(page, ws, seen, area_label, dry, zone_label=label)
-    if n is not None:
-        return n
-
-    # Backend read came back empty. By default DON'T fall back to clicking --
-    # pixel "dots" on a portal/transition page are nav buttons, and clicking
-    # them flips the view. Skip cleanly; run --probe so the read can be wired.
-    if not ALLOW_CLICK:
-        print("  (map backend read empty -- not clicking, to avoid the portal "
-              "flip. Run --probe so the dot read can be fixed.)")
-        return 0
-
-    # FALLBACK (only with --allow-click): click the green/gold dots detected
     captured = 0
     clicked_pixels = set()
     misses = 0
@@ -1382,13 +1555,14 @@ def main():
                 n = capture.flush(ws, seen, area_label, dry)
                 print("Captured %d new fiber addresses from the current view." % n)
                 return n
-            # ----- click path (only when --net is off) -----
-            # NOTE: do NOT click focus_map / "Search this area" here -- those
-            # page-level clicks were landing on nav and bouncing us to the
-            # portal. In manual 1x1 mode the dots are already loaded; just read
-            # them. (Panning, when used, re-loads dots itself.)
+            # ----- backend read path (default; no dot-clicking) -----
+            # "Search this area" is a map-scoped button (safe) that loads the
+            # current view's dots; then scan() reads them from the backend and
+            # pans cell-to-cell PROGRAMMATICALLY (no clicks -> no portal flip).
+            if on_map(page):
+                search_this_area(page)
             mode = "FRESH (new-fiber only)" if args.fresh else "full"
-            print("Scanning %d x %d viewports -- %s mode...\n"
+            print("Scanning %d x %d viewports -- %s mode (backend read)...\n"
                   % (args.cols, args.rows, mode))
             return scan(page, ws, args.zip or "manual", args.cols, args.rows,
                         args.dry, fresh_only=args.fresh)

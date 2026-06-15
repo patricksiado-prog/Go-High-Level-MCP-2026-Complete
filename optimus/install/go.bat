@@ -31,11 +31,12 @@ echo.
 REM Free phone enricher alongside, its own window (OSM only, no API cost).
 start "Optimus Enrich (free)" cmd /c python enrich_phones.py --watch
 
-REM MANUAL start (no --auto): you position the map, press Enter, it reads the
-REM dots in THE CURRENT VIEW only (--cols 1 --rows 1 = no auto-panning, so it
-REM can't bump itself to the portal), then re-checks in place every 30s. Pan the
-REM map yourself to cover new ground. No reopen loop = never restarts.
-python precise_fiber_hunter.py --cols 1 --rows 1 --loop 30
+REM MANUAL start (no --auto): you position the map on the spot you want, press
+REM Enter, and it sweeps a 3x3 block around it -- panning + pressing "Search this
+REM area" cell to cell (programmatic pan = no clicks = never flips to the portal),
+REM reading the GREEN + GOLD dots straight from the map backend and writing them
+REM to the Google Sheet. No zoom. --fast = quick. One sweep, then it waits.
+python precise_fiber_hunter.py --cols 3 --rows 3 --fast
 
 echo.
 echo  Stopped. To run again, just start OPTIMUS again.
