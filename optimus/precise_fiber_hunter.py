@@ -709,7 +709,35 @@ class NetCapture:
             print("  (net-debug: no responses captured)")
             return
         rows = sorted(self.seen_urls.items(), key=lambda kv: -kv[1][2])
-        print("\n=== net-debug: endpoints the map hit (biggest first) ===")
+
+        # SHORT-LIST the likely dot/address feeds: drop fonts/images/css/js and
+        # the Mapbox basemap, keep AT&T app calls + custom tilesets + JSON/pbf.
+        def _is_candidate(url, ct):
+            u = url.lower()
+            if _is_basemap_tile(url):
+                return False
+            if any(u.endswith(e) for e in (".ttf", ".woff", ".woff2", ".png",
+                    ".jpg", ".jpeg", ".gif", ".svg", ".css", ".js", ".ico")):
+                return False
+            if "/fonts/" in u or "/dist/" in u or "sprite" in u or "/static/" in u:
+                return False
+            ctl = (ct or "").lower()
+            looks_data = ("json" in ctl or "protobuf" in ctl or "octet" in ctl
+                          or u.endswith(".pbf") or u.endswith(".mvt")
+                          or u.endswith(".geojson") or "/api/" in u or "/data/" in u
+                          or "graphql" in u or "availab" in u or "fiber" in u
+                          or "referral" in u or "/v4/" in u or "/v1/" in u)
+            return looks_data
+        cands = [(b, v) for b, v in rows if _is_candidate(b, v[0])]
+        print("\n=== CANDIDATE DATA ENDPOINTS (likely the dot/address feed) ===")
+        if cands:
+            print("  %-9s %-22s %s" % ("bytes", "content-type", "url"))
+            for base, (ct, hits, mx) in cands[:20]:
+                print("  %-9s %-22s %s" % (mx, ct[:22], base[:95]))
+        else:
+            print("  (none stood out -- the full list is below / in the log)")
+
+        print("\n=== all endpoints the page hit (biggest first) ===")
         print("  %-9s %-30s %s" % ("bytes", "content-type", "url"))
         for base, (ct, hits, mx) in rows[:25]:
             print("  %-9s %-30s %s" % (mx, ct[:30], base[:90]))
