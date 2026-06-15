@@ -131,6 +131,7 @@ CLICK_OFFSETS = [(0, 0), (3, 0), (-3, 0), (0, 3), (0, -3)]   # retry spiral
 # transitioning/portal page lands on nav buttons and flips the view. We capture
 # from the Mapbox backend read instead; --allow-click re-enables the old way.
 ALLOW_CLICK = False
+_AUTO_PROBED = [False]   # run the frame diagnostic at most once per session
 
 JSONL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           "precise_addresses.jsonl")
@@ -374,6 +375,51 @@ def eval_best_frame(page, js):
             if n > best_n:
                 best, best_n, idx = d, n, i
     return best, idx
+
+
+def run_frame_probe(page):
+    """Probe EVERY frame for a Mapbox map: report maps found, whether mapboxgl
+    exists, canvas counts, and each data source's props. Writes probe.json and
+    prints a summary. Used both by --probe AND automatically by a normal run when
+    the backend read can't find the map (so no separate probe command is needed)."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    per_frame = []
+    try:
+        frames = list(page.frames)
+    except Exception:
+        frames = [page]
+    for fi, fr in enumerate(frames):
+        try:
+            d = fr.evaluate(MAPBOX_PROBE_JS)
+        except Exception as e:
+            d = {"error": str(e)}
+        try:
+            furl = fr.url
+        except Exception:
+            furl = ""
+        per_frame.append({"frame": fi, "url": furl, "result": d})
+    try:
+        with open(os.path.join(here, "probe.json"), "w") as f:
+            json.dump({"frames": per_frame}, f, indent=2)
+    except Exception:
+        pass
+    print("\n=== MAP PROBE (frames) ===")
+    print("  frames on page: %d" % len(per_frame))
+    for pf in per_frame:
+        d = pf.get("result") or {}
+        if not isinstance(d, dict):
+            continue
+        print("  frame %d  maps=%s  mapboxgl=%s  canvas=%s  mapboxCanvas=%s  %s"
+              % (pf["frame"], d.get("hookedMaps"), d.get("hasMapboxgl"),
+                 d.get("canvases"), d.get("mapboxCanvases"), (pf.get("url") or "")[:40]))
+        for mp in (d.get("maps") or []):
+            for sid, sv in (mp.get("sources") or {}).items():
+                sp = sv.get("sampleProps")
+                keys = ",".join(list(sp.keys())[:8]) if isinstance(sp, dict) else "-"
+                print("      src %-20s type=%-7s feats=%s props[%s]"
+                      % (str(sid)[:20], sv.get("type"), sv.get("dataFeatures"), keys))
+    print("  full detail -> %s" % os.path.join(here, "probe.json"))
+    return per_frame
 
 
 def feature_address(props):
@@ -1293,9 +1339,16 @@ def drain_viewport(page, ws, seen, area_label, dry, fresh_only=False):
     if n is not None:
         return n
 
-    # The map hook isn't live yet (attaches once the real map is open).
-    print("  (map backend not live yet -- it attaches when the map is open. "
-          "Not clicking.)")
+    # Couldn't reach the map. Auto-diagnose ONCE (so no separate --probe needed),
+    # then keep going without clicking.
+    print("  (couldn't reach the map's data this pass -- running a one-time "
+          "diagnostic so we can see where the map is...)")
+    if not _AUTO_PROBED[0]:
+        _AUTO_PROBED[0] = True
+        try:
+            run_frame_probe(page)
+        except Exception as e:
+            print("  (diagnostic failed: %s)" % str(e)[:80])
     if not ALLOW_CLICK:
         return 0
 
@@ -1585,70 +1638,7 @@ def main():
                 input("  Press Enter to PROBE what the map exposes... ")
             except EOFError:
                 pass
-            # probe EVERY frame (the map may be inside an iframe)
-            per_frame = []
-            try:
-                frames = list(page.frames)
-            except Exception:
-                frames = [page]
-            for fi, fr in enumerate(frames):
-                try:
-                    d = fr.evaluate(MAPBOX_PROBE_JS)
-                except Exception as e:
-                    d = {"error": str(e)}
-                furl = ""
-                try:
-                    furl = fr.url
-                except Exception:
-                    pass
-                per_frame.append({"frame": fi, "url": furl, "result": d})
-            # pick the frame that actually has a map
-            data = {}
-            for pf in per_frame:
-                d = pf.get("result") or {}
-                if isinstance(d, dict) and d.get("hookedMaps"):
-                    data = d
-                    break
-            else:
-                data = (per_frame[0]["result"] if per_frame else {}) or {}
-            out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "probe.json")
-            try:
-                with open(out, "w") as f:
-                    json.dump({"frames": per_frame}, f, indent=2)
-            except Exception:
-                pass
-            print("\n=== MAP PROBE ===")
-            print("  frames on page: %d" % len(per_frame))
-            for pf in per_frame:
-                d = pf.get("result") or {}
-                if not isinstance(d, dict):
-                    continue
-                print("  frame %d  maps=%s  mapboxgl=%s  canvas=%s  mapboxCanvas=%s  %s"
-                      % (pf["frame"], d.get("hookedMaps"), d.get("hasMapboxgl"),
-                         d.get("canvases"), d.get("mapboxCanvases"),
-                         (pf.get("url") or "")[:40]))
-            hm = (data or {}).get("hookedMaps")
-            print("  --> hooked maps (best frame): %s" % hm)
-            for i, mp in enumerate((data or {}).get("maps", [])):
-                if "error" in mp:
-                    print("  map %d: error %s" % (i, mp["error"]))
-                    continue
-                print("  map %d: %s point features of %s total"
-                      % (i, mp.get("pointFeatures"), mp.get("totalFeatures")))
-                lyr = mp.get("layers") or {}
-                top = sorted(lyr.items(), key=lambda kv: -kv[1])[:12]
-                for lid, n in top:
-                    print("      layer %-28s %d" % (lid[:28], n))
-                srcs = mp.get("sources") or {}
-                if srcs:
-                    print("    data sources:")
-                    for sid, sv in srcs.items():
-                        nf = sv.get("dataFeatures")
-                        sp = sv.get("sampleProps")
-                        keys = ",".join(list(sp.keys())[:8]) if isinstance(sp, dict) else "-"
-                        print("      %-22s type=%-7s features=%s  props[%s]"
-                              % (str(sid)[:22], sv.get("type"), nf, keys))
-            print("  full detail -> %s" % out)
+            run_frame_probe(page)
             if not args.auto:
                 input("\nPress Enter to close the browser... ")
             ctx.close()
