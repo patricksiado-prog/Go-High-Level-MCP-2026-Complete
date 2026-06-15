@@ -1268,6 +1268,20 @@ def main():
             return scan(page, ws, args.zip or "manual", args.cols, args.rows,
                         args.dry, fresh_only=args.fresh)
 
+        if not args.auto:
+            # MANUAL mode: let the user get the map where they want it, then
+            # scan THAT view (don't auto-jump to a ZIP). They press Enter to go.
+            searched[0] = True
+            print("\n  " + "=" * 56)
+            print("  Get the AT&T Fiber Map showing the area you want to scan.")
+            print("  (Log in if needed; pan/zoom to your spot.)")
+            print("  Then come back here and press Enter to START scanning.")
+            print("  " + "=" * 56)
+            try:
+                input("  Press Enter to start... ")
+            except EOFError:
+                pass
+
         report_status(ws, args.zip or "manual", "started",
                       note="loop=%ss" % args.loop if args.loop else "single pass")
         passno = 0
@@ -1276,9 +1290,22 @@ def main():
             try:
                 n = one_pass()
             except Exception as e:
-                report_status(ws, args.zip or "manual", "error",
-                              note=str(e)[:120])
-                raise
+                msg = str(e)
+                report_status(ws, args.zip or "manual", "error", note=msg[:120])
+                closed = "closed" in msg.lower() or "target" in msg.lower()
+                try:
+                    closed = closed or page.is_closed()
+                except Exception:
+                    pass
+                if closed:
+                    print("\nBrowser closed -- stopping. (Run it again to restart.)")
+                    break
+                print("\nHit a snag: %s" % msg[:120])
+                if args.loop and args.loop > 0:
+                    print("  staying open, retrying next pass...\n")
+                    time.sleep(args.loop)
+                    continue
+                break
             print("\nDONE. Captured %d new fiber-eligible addresses." % n)
             print(("They're in the '%s' tab." % OUT_TAB) if ws else "(dry run, nothing written)")
             if args.loop and args.loop > 0:

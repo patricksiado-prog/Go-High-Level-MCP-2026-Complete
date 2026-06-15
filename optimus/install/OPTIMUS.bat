@@ -78,18 +78,22 @@ if not exist "%OPT%\att_profile" (
 
 echo.
 echo  ============================================================
-echo     RUNNING.  Leave it going. Close the windows to stop.
-echo     Target area: %ZIP%   (edit ZIP= in this file to change)
+echo     READY.  A browser will open to the AT^&T Fiber Map.
+echo     1) Log in if asked, and pan/zoom to the area you want.
+echo     2) Come back to this window and press Enter to START.
+echo     It then scans that area and keeps going. Close the
+echo     browser (or this window) to stop. It will NOT reopen.
 echo  ============================================================
 echo.
 
 REM Free phone enricher alongside, its own window (OSM only, no API cost).
 start "Optimus Enrich (free)" cmd /c python enrich_phones.py --watch
 
-:loop
-REM One smooth, fast, non-stop scan that writes leads to your Google Sheet.
-python precise_fiber_hunter.py --zip %ZIP% --net --auto --fast --loop 5
+REM MANUAL start (no --auto): you position the map, press Enter, it scans that
+REM view and re-scans in place every 30s. No outer loop = it never reopens.
+python precise_fiber_hunter.py --net --loop 30
+
 echo.
-echo  (browser closed -- reopening in 10s. Close this window to stop for good.)
-timeout /t 10 /nobreak >nul
-goto loop
+echo  Stopped. To run again, just start OPTIMUS again.
+pause
+
