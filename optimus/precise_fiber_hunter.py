@@ -143,10 +143,10 @@ JSONL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 MAPBOX_HOOK_JS = """
 (() => {
   window.__optimusMaps = window.__optimusMaps || [];
-  const hook = () => {
+  const wrap = (lib) => {
     try {
-      if (window.mapboxgl && window.mapboxgl.Map && !window.mapboxgl.Map.__optimusHooked) {
-        const Orig = window.mapboxgl.Map;
+      if (lib && lib.Map && !lib.Map.__optimusHooked) {
+        const Orig = lib.Map;
         const Wrapped = function(...args) {
           const m = new Orig(...args);
           window.__optimusMaps.push(m);
@@ -155,9 +155,14 @@ MAPBOX_HOOK_JS = """
         Wrapped.prototype = Orig.prototype;
         Object.setPrototypeOf(Wrapped, Orig);
         Wrapped.__optimusHooked = true;
-        window.mapboxgl.Map = Wrapped;
+        lib.Map = Wrapped;
       }
     } catch (e) {}
+  };
+  const hook = () => {
+    // Mapbox GL JS AND MapLibre GL JS (identical API, different global name)
+    wrap(window.mapboxgl);
+    wrap(window.maplibregl);
   };
   hook();
   // keep re-wrapping for a long time: the user logs in + opens the map well
@@ -207,8 +212,10 @@ MAPBOX_PROBE_JS = """
   }
   const out = {hookedMaps: maps.length, maps: [],
                hasMapboxgl: !!(window.mapboxgl),
+               hasMaplibregl: !!(window.maplibregl),
                canvases: document.querySelectorAll('canvas').length,
-               mapboxCanvases: document.querySelectorAll('.mapboxgl-canvas').length};
+               mapboxCanvases: document.querySelectorAll('.mapboxgl-canvas').length,
+               maplibreCanvases: document.querySelectorAll('.maplibregl-canvas').length};
   for (const m of maps) {
     if (!m || !m.queryRenderedFeatures) { out.maps.push({error: 'no queryRenderedFeatures'}); continue; }
     let feats = [];
@@ -409,9 +416,10 @@ def run_frame_probe(page):
         d = pf.get("result") or {}
         if not isinstance(d, dict):
             continue
-        print("  frame %d  maps=%s  mapboxgl=%s  canvas=%s  mapboxCanvas=%s  %s"
+        print("  frame %d  maps=%s  mapboxgl=%s  maplibregl=%s  canvas=%s  mbCanvas=%s  mlCanvas=%s  %s"
               % (pf["frame"], d.get("hookedMaps"), d.get("hasMapboxgl"),
-                 d.get("canvases"), d.get("mapboxCanvases"), (pf.get("url") or "")[:40]))
+                 d.get("hasMaplibregl"), d.get("canvases"), d.get("mapboxCanvases"),
+                 d.get("maplibreCanvases"), (pf.get("url") or "")[:36]))
         for mp in (d.get("maps") or []):
             for sid, sv in (mp.get("sources") or {}).items():
                 sp = sv.get("sampleProps")
@@ -1153,8 +1161,9 @@ MAP_VIEW_TEXTS = ["Fiber Availability Map", "Availability Map", "Fiber Map"]
 def on_map(page):
     """True if the Mapbox map is actually showing (we're on the map view, not
     the portal landing). Checks for the map canvas / controls."""
-    for sel in (".mapboxgl-canvas", ".mapboxgl-map", ".mapboxgl-ctrl-geocoder",
-                "canvas"):
+    for sel in (".mapboxgl-canvas", ".maplibregl-canvas", ".mapboxgl-map",
+                ".maplibregl-map", ".mapboxgl-ctrl-geocoder",
+                ".maplibregl-ctrl-geocoder", "canvas"):
         try:
             el = page.query_selector(sel)
             if el and el.is_visible():
@@ -1450,8 +1459,13 @@ def self_update():
     env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
     try:
         before = open(here, "rb").read()
-        subprocess.run(["git", "-C", repo_root, "pull", "origin", REPO_BRANCH],
+        # fetch + hard reset to origin so a local edit / conflict / divergence
+        # can NEVER leave us stuck on old code (a plain pull silently fails then).
+        subprocess.run(["git", "-C", repo_root, "fetch", "origin", REPO_BRANCH],
                        env=env, timeout=90, capture_output=True, text=True)
+        subprocess.run(["git", "-C", repo_root, "reset", "--hard",
+                        "origin/" + REPO_BRANCH],
+                       env=env, timeout=60, capture_output=True, text=True)
         after = open(here, "rb").read()
     except Exception as e:
         print("(auto-update skipped: %s)" % str(e)[:80])
