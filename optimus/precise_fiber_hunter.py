@@ -127,6 +127,11 @@ POPUP_POLL_INTERVAL = 0.12    # poll the popup instead of fixed sleeps
 POPUP_POLL_TIMEOUT = 2.0      # per click attempt
 CLICK_OFFSETS = [(0, 0), (3, 0), (-3, 0), (0, 3), (0, -3)]   # retry spiral
 
+# Pixel-click fallback is OFF by default: clicking "dots" detected on a
+# transitioning/portal page lands on nav buttons and flips the view. We capture
+# from the Mapbox backend read instead; --allow-click re-enables the old way.
+ALLOW_CLICK = False
+
 JSONL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           "precise_addresses.jsonl")
 
@@ -1026,7 +1031,15 @@ def drain_viewport(page, ws, seen, area_label, dry, fresh_only=False):
     if n is not None:
         return n
 
-    # FALLBACK: click the green/gold dots we already detected
+    # Backend read came back empty. By default DON'T fall back to clicking --
+    # pixel "dots" on a portal/transition page are nav buttons, and clicking
+    # them flips the view. Skip cleanly; run --probe so the read can be wired.
+    if not ALLOW_CLICK:
+        print("  (map backend read empty -- not clicking, to avoid the portal "
+              "flip. Run --probe so the dot read can be fixed.)")
+        return 0
+
+    # FALLBACK (only with --allow-click): click the green/gold dots detected
     captured = 0
     clicked_pixels = set()
     misses = 0
@@ -1228,7 +1241,14 @@ def main():
                     help="DIAGNOSTIC: after you position the map and press Enter, "
                          "dump what the Mapbox map exposes (layers + dot feature "
                          "properties) to probe.json so the backend read can be wired.")
+    ap.add_argument("--allow-click", action="store_true",
+                    help="re-enable the old pixel-click dot capture (off by "
+                         "default because the clicks can flip the view to the portal)")
     args = ap.parse_args()
+
+    if args.allow_click:
+        global ALLOW_CLICK
+        ALLOW_CLICK = True
 
     if args.fast:
         global WAIT_AFTER_PAN, WAIT_AFTER_ZOOM, SEARCH_SETTLE, POPUP_POLL_TIMEOUT
