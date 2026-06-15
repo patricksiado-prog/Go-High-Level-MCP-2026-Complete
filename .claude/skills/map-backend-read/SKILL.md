@@ -30,10 +30,18 @@ The proven, flip-free way to capture AT&T fiber dots. Learned the hard way
    map long after load, so the hook re-wraps for **30 minutes**. If the map was
    loaded as a module (not `window.mapboxgl`), `MAPBOX_DOTS_JS` also **searches
    page globals** for any object with `queryRenderedFeatures`+`project`.
-2. **Read dot locations from the backend.** `MAPBOX_DOTS_JS` →
-   `queryRenderedFeatures()`, keep POINT features whose layer id is NOT basemap
-   (skip road/label/water/poi/building/admin/…). For each: exact pixel via
-   `map.project([lng,lat])`, plus `lng/lat`, `props`, and the map container rect.
+2. **Read the dots from the SOURCE data (best — all dots + full props).**
+   `MAPBOX_DOTS_JS` enumerates `map.getStyle().sources`, skips basemap
+   (composite/mapbox/satellite/terrain), and for each GeoJSON source reads
+   `map.getSource(id)._data` → the **entire FeatureCollection** (every dot in the
+   loaded area, with all properties incl. address/status if AT&T sets them) — NOT
+   limited to the viewport, and immune to the Standard-style query bug. Vector
+   sources fall back to `querySourceFeatures(id)`. Then it **supplements** with
+   `queryRenderedFeatures()` (non-basemap point layers). Each dot: exact pixel via
+   `map.project([lng,lat])`, `lng/lat`, `props`, source id; plus the container rect.
+   - Address-bearing source features are written with **zero clicking and beyond
+     the viewport.** Run `--probe` to see each source's id/type/feature-count and
+     a sample's property keys — that's how you confirm the dot source + address key.
 3. **Colour each dot at its OWN pixel.** `drain_viewport_backend` takes ONE
    screenshot; for each dot it samples a ±4px window at `(rect.left+x, rect.top+y)`
    with `classify_pixel` → GREEN/GOLD/GREY/None (RGB windows from
