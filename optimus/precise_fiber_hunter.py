@@ -132,6 +132,7 @@ CLICK_OFFSETS = [(0, 0), (3, 0), (-3, 0), (0, 3), (0, -3)]   # retry spiral
 # from the Mapbox backend read instead; --allow-click re-enables the old way.
 ALLOW_CLICK = False
 _AUTO_PROBED = [False]   # run the frame diagnostic at most once per session
+_NET_CAPTURE = [None]    # the always-on network capture (set in main)
 
 JSONL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           "precise_addresses.jsonl")
@@ -1365,19 +1366,38 @@ def drain_viewport(page, ws, seen, area_label, dry, fresh_only=False):
     whole-screen pixel-detect + click path runs only with --allow-click (it can
     mis-read portal buttons as dots, which caused the flip)."""
     n = drain_viewport_backend(page, ws, seen, area_label, dry)
-    if n is not None:
+    if n:
         return n
 
-    # Couldn't reach the map. Auto-diagnose ONCE (so no separate --probe needed),
-    # then keep going without clicking.
-    print("  (couldn't reach the map's data this pass -- running a one-time "
-          "diagnostic so we can see where the map is...)")
-    if not _AUTO_PROBED[0]:
-        _AUTO_PROBED[0] = True
-        try:
-            run_frame_probe(page)
-        except Exception as e:
-            print("  (diagnostic failed: %s)" % str(e)[:80])
+    # The map object is hidden on this site -> read the dots off the NETWORK.
+    cap = _NET_CAPTURE[0]
+    if cap is not None:
+        netn = cap.flush(ws, seen, area_label, dry)
+        if cap.endpoints:
+            print("  network endpoints that returned leads:")
+            for u, c in sorted(cap.endpoints.items(), key=lambda kv: -kv[1])[:6]:
+                print("     %4d  %s" % (c, u[:90]))
+        if netn:
+            print("  viewport (network): +%d captured" % netn)
+            drive_log("VIEWPORT network captured=%d" % netn)
+            return netn
+        # nothing decoded yet -> dump every endpoint we saw so the dot-data URL
+        # can be identified (printed + net_responses.log).
+        if not _AUTO_PROBED[0]:
+            _AUTO_PROBED[0] = True
+            print("  (no leads decoded yet -- here is every endpoint the page "
+                  "hit, biggest first, so we can find the dot-data URL:)")
+            try:
+                cap.dump_debug(os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)), "net_responses.log"))
+            except Exception:
+                pass
+            try:
+                run_frame_probe(page)
+            except Exception:
+                pass
+    if n is not None:
+        return n
     if not ALLOW_CLICK:
         return 0
 
@@ -1556,8 +1576,8 @@ def _drive_session():
 
 
 def _ensure_log_file(sess):
-    if _drive_log_id[0]:
-        return _drive_log_id[0]
+    if _drive_log_id[0] is not None:
+        return _drive_log_id[0] or None
     try:
         q = ("name='%s' and '%s' in parents and trashed=false"
              % (TELEMETRY_NAME, TELEMETRY_FOLDER))
@@ -1573,8 +1593,8 @@ def _ensure_log_file(sess):
                             "mimeType": "text/plain"}, timeout=20)
         fid = (r.json() or {}).get("id")
         if not fid:
+            _drive_log_id[0] = False   # give up -- don't retry every call
             return None
-        # share readable to anyone with the link so Claude can read it
         try:
             sess.post("https://www.googleapis.com/drive/v3/files/%s/permissions" % fid,
                       json={"role": "reader", "type": "anyone"}, timeout=20)
@@ -1583,6 +1603,7 @@ def _ensure_log_file(sess):
         _drive_log_id[0] = fid
         return fid
     except Exception:
+        _drive_log_id[0] = False
         return None
 
 
@@ -1707,10 +1728,12 @@ def main():
         ctx.add_init_script(MAPBOX_HOOK_JS)   # hook the map before it loads
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
 
-        capture = None
-        if args.net or args.net_debug:
-            capture = NetCapture(substr=args.api_substring, debug=args.net_debug)
-            page.on("response", capture.handle)   # grab dot data off the wire
+        # ALWAYS capture network responses now -- the map object is hidden on
+        # this site, so the dots have to be read off the wire. debug=True records
+        # every endpoint to net_responses.log so the dot-data URL can be found.
+        capture = NetCapture(substr=args.api_substring, debug=True)
+        page.on("response", capture.handle)   # grab dot data off the wire
+        _NET_CAPTURE[0] = capture
 
         page.goto(MAP_URL, wait_until="domcontentloaded", timeout=60000)
 
