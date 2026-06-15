@@ -1422,8 +1422,11 @@ def drain_viewport(page, ws, seen, area_label, dry, fresh_only=False):
             except Exception:
                 pass
 
-    # 3) FALLBACK (operator-approved): the server grab came up empty, so click
-    #    each GREEN/GOLD dot and read its address from the popup.
+    # 3) Clicking fallback is HELD OFF for now (operator: prove the server grab
+    #    first). Server-only until we confirm whether addresses come over the
+    #    wire. Clicking stays opt-in via --allow-click.
+    if not ALLOW_CLICK:
+        return 0
     if not on_map(page):
         return 0
     greens, golds, gray, label, share, dots = classify_viewport(page)
