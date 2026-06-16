@@ -76,6 +76,38 @@
   both the deliverable setup and what keeps the AT&T dealership clean; owning a list ≠ consent.)
 
 ## 6. Code / deploy
+
+- **CURRENT OBJECTIVE & APPROACH (2026-06-16) — read this first.**
+  - **GOAL:** from the AT&T dealer fiber map (`youachieve.att.com/yourefer/fiber`),
+    capture every GREEN (eligible non-customer = lead) and GOLD (copper-upgrade)
+    dot's exact street address + lat/lng into the Google Sheet ("Precise Fiber"
+    tab), so Patrick can door-knock / DNC-scrubbed-call them. GREY = existing fiber
+    customer = skip.
+  - **HOW (current best path):** the page hides the map object (no
+    mapboxgl/maplibregl global), so we CANNOT read the map object. BUT the dots come
+    from AT&T's **`serviceability` JSON endpoint**, and the existing proven tools
+    (`fiber_precise_pipeline.py`, `fiber_zone_scanner.py` + `optimus_api_capture.extract_features`)
+    already decode that. So: trigger the fetch (search/position/pan), capture the
+    serviceability JSON off the wire with `NetCapture`, run `extract_features` →
+    addresses. NO clicking when this works.
+  - **MOTION (fixed 2026-06-16):** the map only pans the PROVEN way — `focus_map()`
+    clicks the map CANVAS (bbox 18%/22%) to focus, THEN arrow keys. The old
+    programmatic `panBy` did nothing (needs the hidden map object) → "it's not
+    moving." Ported the working motion from `fiber_precise_pipeline.focus_map`.
+  - **PATRICK'S HARD CONSTRAINTS:** (1) ONE program = `precise_fiber_hunter.py`; do
+    NOT send him to a second tool. (2) ONE login (the existing `att_profile`); never
+    make him log in again. (3) ONE command, unchanged (`python precise_fiber_hunter.py`);
+    never make him copy a new command to Drive. (4) Prefer the server/serviceability
+    grab; clicking is the explicit fallback only. (5) He can't see program output —
+    only his screenshots reach Claude (Drive telemetry blocked: service account can't
+    create files in personal Gmail Drive; the sheet is AI-blocked).
+  - **OPEN QUESTION / NEXT:** does the serviceability fetch fire reliably during
+    capture in manual mode? Proven tools trigger it via `search_zip` (type the ZIP).
+    If a normal run still captures 0, the fix is to type the area into the search box
+    to force the fetch while `NetCapture` is listening — bring that into
+    `precise_fiber_hunter` so it stays one-command. Confirm via the next screenshot
+    (look for `viewport (network): +N captured OFF THE SERVER`).
+
 - Curated lead-finder bug fixed on branch `claude/integration-command-control-opts-ULUBC`:
   `crm_find_unworked_leads`/`crm_contact_workspace` searched contacts via GET (→400) and
   omitted the form-submissions `limit` (→422). Fixed: contact search → POST `{locationId,
