@@ -94,6 +94,13 @@ from optimus_dot_detect import (GREEN_MIN, GREEN_MAX, GOLD_MIN, GOLD_MAX,
                                 ELIGIBLE_REGEX, POPUP_READY_HINTS,
                                 find_dots_in_png_bytes)
 
+# proven schema-tolerant JSON walker from the working pipeline -- the AT&T dot
+# layer is the 'serviceability' JSON endpoint; this extracts its addresses.
+try:
+    from optimus_api_capture import extract_features as _extract_features
+except Exception:
+    _extract_features = None
+
 # ----------------------------------------------------------------------------
 # CONFIG
 # ----------------------------------------------------------------------------
@@ -679,8 +686,27 @@ class NetCapture:
             if self.substr and self.substr not in url:
                 return
             ctl = ct.lower()
-            if "json" in ctl:
-                leads = extract_leads_from_json(response.json())
+            low = url.lower()
+            if "json" in ctl or low.endswith(".json"):
+                try:
+                    body = response.body()
+                    if not body or len(body) > 8 * 1024 * 1024:
+                        return
+                    data = json.loads(body)
+                except Exception:
+                    return
+                leads = extract_leads_from_json(data)
+                # ALSO run the proven extractor (catches the AT&T 'serviceability'
+                # endpoint shape that the working pipeline tools rely on)
+                if _extract_features is not None:
+                    try:
+                        for f in _extract_features(data):
+                            leads.append({"address": f.get("address"),
+                                          "lat": f.get("lat"), "lng": f.get("lng"),
+                                          "status": f.get("status"),
+                                          "ban": f.get("ban"), "props": {}})
+                    except Exception:
+                        pass
             elif _is_vector_tile(url, ct):
                 try:
                     body = response.body()
