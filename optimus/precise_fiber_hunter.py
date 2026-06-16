@@ -792,6 +792,33 @@ POPUP_SELECTORS = [".gm-style-iw", "[role='dialog']", ".popup", ".info-window",
                    ".mapboxgl-popup-content"]
 
 SEARCH_THIS_AREA = "Search this area"
+_DUMPED_CONTROLS = [False]
+
+
+def dump_clickables(page):
+    """List the visible buttons/links on the page so we can find the real
+    'search this area' control (its text/label isn't what we guessed)."""
+    try:
+        items = page.evaluate(
+            """() => {
+                const out = [];
+                const els = document.querySelectorAll(
+                  "button, a, [role=button], input[type=button], input[type=submit]");
+                for (const e of els) {
+                    let t = (e.innerText || e.value || e.getAttribute('aria-label')
+                             || e.title || '').trim().replace(/\\s+/g,' ');
+                    const vis = e.offsetParent !== null;
+                    if (vis && t) out.push(t.slice(0, 40));
+                    if (out.length > 50) break;
+                }
+                return out;
+            }""")
+        if items:
+            print("  >> CONTROLS visible on the map (which is the search button?):")
+            for t in items[:50]:
+                print("       [%s]" % t)
+    except Exception:
+        pass
 
 
 def _need(mod, pip_name=None):
@@ -1191,20 +1218,29 @@ def zoom(page, presses, direction):
         time.sleep(WAIT_AFTER_ZOOM)
 
 
+SEARCH_LABELS = ["Search this area", "Search area", "Search this map",
+                 "Redo search in map", "Redo search here", "Search here",
+                 "Search as I move the map", "Update results", "Search nearby"]
+
+
 def search_this_area(page):
-    """After a pan/zoom the new view's dots only load when this is clicked. This
-    is the click that makes AT&T FETCH the dots -- the moment the network capture
-    can grab their data off the wire."""
-    try:
-        btn = page.get_by_text(SEARCH_THIS_AREA, exact=False)
-        if btn.count() > 0:
-            print("  -> pressing 'Search this area' (fetching dots from server)...")
-            btn.first.click()
-            time.sleep(3.0)
-            return True
-    except Exception:
-        pass
-    print("  -> ('Search this area' button not found this view)")
+    """After a pan the new view's dots only load when the map's 'search this
+    area' control is clicked. The exact label varies, so try several; if none
+    match, dump the visible controls ONCE so we can pin the right one."""
+    for label in SEARCH_LABELS:
+        try:
+            btn = page.get_by_text(label, exact=False)
+            if btn.count() > 0:
+                print("  -> pressing '%s' (fetching dots from server)..." % label)
+                btn.first.click()
+                time.sleep(3.0)
+                return True
+        except Exception:
+            pass
+    print("  -> (no 'search this area' control found this view)")
+    if not _DUMPED_CONTROLS[0]:
+        _DUMPED_CONTROLS[0] = True
+        dump_clickables(page)
     return False
 
 
