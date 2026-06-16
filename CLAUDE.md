@@ -146,6 +146,19 @@
   fallback (Patrick OK'd it: "if not then clicking") — NOT the default. The win is
   pinning the server feed so clicking retires; until then clicking keeps leads
   flowing. Always prefer/try the server grab first on every patch.
+- **THE DOT ENDPOINT = `serviceability` JSON (known from the existing tools!).** The
+  working pipeline (`fiber_precise_pipeline.py`, `fiber_zone_scanner.py`) already
+  capture the AT&T dot layer via `--api-substring serviceability` and parse it with
+  `optimus_api_capture.extract_features` (schema-tolerant: pulls address/lat/lng/ban/
+  status from the JSON; address must match `\d+\s+\S+`). `precise_fiber_hunter`'s
+  NetCapture now imports + runs that same `extract_features` on every JSON response,
+  so when the map fetches serviceability data the addresses decode off the server, no
+  clicking. The map fetch fires on search/positioning (and possibly on pan); the
+  trigger to re-fetch on a programmatic pan is the remaining unknown ("Search this
+  area" button text wasn't found live — see `dump_clickables` output). If a normal
+  run still gets 0, the serviceability fetch isn't firing during capture → trigger it
+  via the search box / a `--zip`, or just run the proven `fiber_precise_pipeline.py
+  --zip <z> --api-substring serviceability`.
 - **LIVE FINDING (2026-06-15 HP probe): the map object is FULLY HIDDEN.** Frame probe
   showed `hookedMaps:0`, `mapboxgl=false`, `maplibregl=false`, `maps=0` in BOTH frames
   (one is `about:blank`, the real one is `youachieve.att.com/yourefer/fiber`), yet dots
