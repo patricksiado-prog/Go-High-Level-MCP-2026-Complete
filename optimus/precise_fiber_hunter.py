@@ -1678,6 +1678,10 @@ def _status_sheet(ws):
 # ----------------------------------------------------------------------------
 TELEMETRY_FOLDER = "1IOWTZiDakRuzXtGGYgRCxPxXHNNZkaPc"   # "OPTIMUS SETUP" folder
 TELEMETRY_NAME = "OPTIMUS_HUNTER_LOG.txt"
+# Patrick-OWNED log file (Claude can read it). The service account can't create
+# files in a personal Drive, so we APPEND to this existing file -- which works
+# once Patrick shares it (edit) with the service-account email.
+TELEMETRY_LOG_ID = "1f9Zody99XIBHiY8wFtjPU18mIKE6ftye"
 _drive_sess = [None]      # AuthorizedSession or False (tried+failed)
 _drive_log_id = [None]
 
@@ -1701,35 +1705,8 @@ def _drive_session():
 
 
 def _ensure_log_file(sess):
-    if _drive_log_id[0] is not None:
-        return _drive_log_id[0] or None
-    try:
-        q = ("name='%s' and '%s' in parents and trashed=false"
-             % (TELEMETRY_NAME, TELEMETRY_FOLDER))
-        r = sess.get("https://www.googleapis.com/drive/v3/files",
-                     params={"q": q, "fields": "files(id)", "spaces": "drive"},
-                     timeout=20)
-        files = r.json().get("files", []) if r.ok else []
-        if files:
-            _drive_log_id[0] = files[0]["id"]
-            return _drive_log_id[0]
-        r = sess.post("https://www.googleapis.com/drive/v3/files",
-                      json={"name": TELEMETRY_NAME, "parents": [TELEMETRY_FOLDER],
-                            "mimeType": "text/plain"}, timeout=20)
-        fid = (r.json() or {}).get("id")
-        if not fid:
-            _drive_log_id[0] = False   # give up -- don't retry every call
-            return None
-        try:
-            sess.post("https://www.googleapis.com/drive/v3/files/%s/permissions" % fid,
-                      json={"role": "reader", "type": "anyone"}, timeout=20)
-        except Exception:
-            pass
-        _drive_log_id[0] = fid
-        return fid
-    except Exception:
-        _drive_log_id[0] = False
-        return None
+    # Write to the fixed Patrick-owned file (shared with the service account).
+    return TELEMETRY_LOG_ID
 
 
 def drive_log(msg):
