@@ -1207,10 +1207,36 @@ def close_popup(page):
 # map controls
 # ----------------------------------------------------------------------------
 def focus_map(page):
-    """Focus the map WITHOUT hitting a dot: click an empty corner of the map."""
-    x, y = empty_map_point(page)
-    page.mouse.click(x, y)
-    time.sleep(0.3)
+    """Click an empty part of the MAP CANVAS so keyboard pan/zoom registers.
+    Proven by hand (fiber_precise_pipeline): you must click the map before the
+    arrow keys / +/- work. Uses the canvas bounding box so the click lands ON
+    the map (never on nav), then Escape in case it grazed a dot."""
+    for sel in (".mapboxgl-canvas", ".maplibregl-canvas", "canvas"):
+        try:
+            cv = page.locator(sel).first
+            if cv.count() == 0:
+                continue
+            box = cv.bounding_box()
+            if box and box["width"] > 100 and box["height"] > 100:
+                page.mouse.click(box["x"] + box["width"] * 0.18,
+                                 box["y"] + box["height"] * 0.22)
+                time.sleep(0.35)
+                try:
+                    page.keyboard.press("Escape")
+                except Exception:
+                    pass
+                time.sleep(0.2)
+                return True
+        except Exception:
+            pass
+    # fallback: old fixed-fraction point
+    try:
+        x, y = empty_map_point(page)
+        page.mouse.click(x, y)
+        time.sleep(0.3)
+    except Exception:
+        pass
+    return False
 
 
 def _zoom_once(page, direction):
@@ -1329,12 +1355,22 @@ def pan_map_js(page, direction):
 
 
 def pan(page, direction):
-    """Move to the next cell (programmatic pan, no clicks) then press 'Search this
-    area' so the new view's dots load."""
-    print("  -> panning %s to the next patch..." % direction)
-    pan_map_js(page, direction)
+    """Move to the next patch the PROVEN way: click the map to focus it, then
+    press the arrow key (the programmatic panBy does nothing here because the map
+    object is hidden -- 'it's not moving'). Then 'Search this area' to fetch the
+    new view's dots."""
+    print("  -> clicking map to focus, then arrow-key panning %s..." % direction)
+    focus_map(page)   # click the canvas so the keyboard registers
+    key = {"left": "ArrowLeft", "right": "ArrowRight",
+           "up": "ArrowUp", "down": "ArrowDown"}[direction]
+    for _ in range(PAN_PRESSES):
+        try:
+            page.keyboard.press(key)
+        except Exception:
+            pass
+        time.sleep(0.12)
     time.sleep(WAIT_AFTER_PAN)
-    search_this_area(page)   # load the new view's dots (map-scoped button)
+    search_this_area(page)   # load the new view's dots
 
 
 def search_zip(page, zip_code):
