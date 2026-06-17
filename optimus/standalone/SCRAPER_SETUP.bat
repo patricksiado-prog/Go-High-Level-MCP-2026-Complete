@@ -40,8 +40,17 @@ python -m pip install --upgrade playwright gspread google-auth
 python -m playwright install chromium
 
 echo [3/3] Getting the latest scraper ^(auto-update, every run^)...
-python -c "import urllib.request; urllib.request.urlretrieve('https://drive.google.com/uc?export=download^&id=%PYID%', r'%PY%')" || (echo Could not download the scraper - make sure the Drive guts file is shared. & pause & exit /b 1)
-python -c "import urllib.request; urllib.request.urlretrieve('https://drive.google.com/uc?export=download^&id=%CREDSID%', r'%CREDS%')" 2>nul || echo    (key not downloaded -- CSV output still works fine.)
+python -c "import urllib.request; urllib.request.urlretrieve('https://drive.usercontent.google.com/download?id=%PYID%^&export=download^&confirm=t', r'%PY%')" || (echo Could not reach Drive. Check your internet. & pause & exit /b 1)
+REM verify we got real Python, not a Google permission/HTML page
+findstr /C:"def main" "%PY%" >nul 2>&1 || (
+    echo.
+    echo   *** The scraper did not download correctly. ***
+    echo   The Drive file needs to be shared: Anyone with the link -^> Viewer.
+    echo   Ask the sender to share it, then run this file again.
+    echo.
+    pause & exit /b 1
+)
+python -c "import urllib.request; urllib.request.urlretrieve('https://drive.usercontent.google.com/download?id=%CREDSID%^&export=download^&confirm=t', r'%CREDS%')" 2>nul || echo    (key not downloaded -- CSV output still works fine.)
 
 echo.
 echo  Starting the scraper. A browser opens -- enter your ZIPs when asked.
