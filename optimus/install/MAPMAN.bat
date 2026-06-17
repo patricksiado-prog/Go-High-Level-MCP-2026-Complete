@@ -24,9 +24,21 @@ python commercial_split.py make-queries --zips %ZIPS% || (pause & exit /b 1)
 
 echo.
 echo [2/3] Scraping Google Maps for businesses (this is the slow part)...
-echo       A browser window opens -- let it work. If Google ever shows a
-echo       "before you continue" page, click Accept once and it continues.
-python maps_scraper.py
+REM Prefer gosom (the proven MIT scraper) if the exe is here; otherwise fall back
+REM to the built-in Python scraper so it still runs with no download.
+set "SCRAPER="
+if exist "%OPT%\google-maps-scraper.exe" set "SCRAPER=%OPT%\google-maps-scraper.exe"
+if not defined SCRAPER if exist "%USERPROFILE%\optimus\google-maps-scraper.exe" set "SCRAPER=%USERPROFILE%\optimus\google-maps-scraper.exe"
+if not defined SCRAPER ( where google-maps-scraper.exe >nul 2>&1 && set "SCRAPER=google-maps-scraper.exe" )
+if defined SCRAPER (
+    echo   Using gosom: %SCRAPER%
+    REM -depth 10 = full ~120 results per search; -email crawls sites for an email.
+    "%SCRAPER%" -input queries.txt -results businesses.csv -depth 10 -email -c 2
+) else (
+    echo   gosom not installed -- using the built-in Python scraper instead.
+    echo   ^(To use gosom: put google-maps-scraper.exe in %OPT%, then run again.^)
+    python maps_scraper.py
+)
 
 echo.
 echo [3/3] Splitting commercial vs residential into the Google Sheet...
