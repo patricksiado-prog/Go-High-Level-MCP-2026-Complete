@@ -76,24 +76,53 @@
 - Follow-up agent + recipe added: `examples/agents/customer-follow-up-assistant.md`,
   `examples/recipes/customer-follow-up.json`.
 
+### Busybee write failure — root cause + fix (2026-06-08)
+- **Symptom:** every Command write (`create_contact`, `upsert_contact`, `add_contact_tags`, even
+  `get_contact` by id) returns **400**; only zero-arg calls (`get_pipelines`, health check) work.
+  Cause = the live server advertises every tool with an **empty parameter schema**, so the MCP
+  client strips all arguments before sending and the handler runs on an empty body.
+- **Bug 1 (code):** `src/tool-registry.ts → registerAll()` registered all ~800 tools via
+  `McpServer.registerTool` WITHOUT passing `inputSchema`. Fixed: added a JSON-schema→Zod converter
+  and pass it as `inputSchema` (PR #1, commit `1f9aaf0`; added `zod` dep).
+- **Bug 2 (build):** `scripts/build-server.mjs` imports `typescript`, but `typescript` was a
+  **devDependency** — Railway prunes devDeps on a production install, so `npm run build` couldn't
+  compile and Railway kept serving the OLD image even when the deploy showed "Active." Fixed: moved
+  `typescript` into `dependencies` (PR #2, commit `422bd07`). PR #3 = empty commit to force a build.
+- All three merged to **main** (HEAD `267de5f`). Proven: the same code on the Frontline busybee
+  advertises real params; Command's did not until rebuilt.
+- **Remaining blocker = Railway, not code.** The Command service kept rebuilding an old commit
+  ("feat: add curated CRM agent workflows") instead of main HEAD, even after merges + a GitHub
+  source disconnect/reconnect. To fix, force a clean build of main HEAD:
+  1. **Recreate the service** (deterministic): Railway → New → Deploy from repo → branch `main`;
+     copy all 7 env vars from the old service (Variables → Raw Editor); update the `command`
+     connector URL to the new domain.
+  2. **Official LeadConnector MCP** pointed at Command (Command `pit-` + `locationId` header) —
+     GHL's own hosted MCP, skips Railway entirely.
+  - ⚠️ NOT `busybee.day` — that is an unrelated project-management SaaS (Notion/ClickUp competitor),
+    not a hosted GHL busybee. Name collision only; do not put the GHL token there.
+- **After ANY deploy fix: REMOVE and RE-ADD the `command` connector** — Claude caches the old empty
+  tool schemas; a new chat alone does not refresh them. Verify by loading the `create_contact`
+  schema: empty `{}` = still stale; `firstName/email/phone` listed = fixed.
+- `get_location` **401** is separate: the `pit-` token needs the **View Locations**
+  (`locations.readonly`) scope added in GHL (writes also need Edit Contacts/Opportunities/Conversations).
+
 ## 7. Security
 - Rotate the exposed `pit-` token in GHL (was shown in screenshots/docs). Keep it in Railway
   env only. The public busybee URL has NO auth — URL = full account access. Keep it private.
 
-## 8. Operator context & account custody (added 2026-06-07)
-- **Command & Construct is Patrick's** account to run. **Frontline is a separate team's.**
-  Patrick will NOT take Frontline work done in the last few months — the recent Frontline leads,
-  form opt-ins, and CSV imports belong to that team. **Do not migrate, pull, or text Frontline's
-  recent work into or out of Command.** Treat the Frontline 45,579 / recent opt-ins as off-limits.
-- Patrick's legitimate audience = his **own** contacts (his prior data) plus anyone who opts in to
-  **his** outreach going forward. Recent bulk/CSV/AI-test writes (Wichita auto shops, jeweler/
-  realtor B2B scrape, call-tracking junk) are not consented opt-ins regardless of who loaded them.
+## 8. Operator context & account custody (updated 2026-06-08)
+- **Both accounts are Patrick's** — Command & Construct AND Frontline Direct. A **manager who
+  works for Patrick** operates the Frontline account on his behalf; it is NOT a separate company.
+  Patrick may use the leads/data in either account freely (export, call, door, work them).
+- **Consent still governs OUTREACH regardless of ownership** — owning a list is not permission to
+  text it. This is about TCPA / carrier policy / protecting the AT&T dealership, not about who owns
+  the data. Skip-traced data and bulk/CSV/AI-test writes (Wichita auto shops, jeweler/realtor B2B
+  scrape, call-tracking junk) are not consented opt-ins, whichever account they sit in.
 - **La Porte upload `5181c4eb-6.6.xlsx` (319 rows): SKIP-TRACED, not opt-in.** 184/319 carry a
   DO NOT CALL flag; 135 are clean wireless / non-DNC; every row has at least one wireless line.
   Route = DOOR-KNOCK + manual CALL on the clean non-DNC subset. **Never an SMS drip.**
-- Textable audience = **Patrick's own** opt-ins/customers (his prior relationship or people who
-  opt in to his own outreach) — from one registered number, throttled, opt-out intact. NOT
-  Frontline's recent form opt-ins (that team's work).
+- Textable audience = consented opt-ins/customers (form opt-ins, inbound, replies, YES) — from one
+  registered number, throttled, opt-out intact. Applies across either account he owns.
 
 ## 9. AT&T fiber SMS templates (consent-based)
 Source: Patrick's "GHL SMS Outreach Templates" doc
