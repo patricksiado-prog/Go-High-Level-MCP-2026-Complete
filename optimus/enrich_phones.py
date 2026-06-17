@@ -28,7 +28,7 @@ RUN:
     python enrich_phones.py                 # write enriched_leads.jsonl
 """
 
-import os, sys, json, time, argparse
+import os, sys, json, time, argparse, re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 IN_PATH = os.path.join(HERE, "precise_addresses.jsonl")
@@ -343,10 +343,97 @@ class OverpassClient:
         return self.by_latlng(rec.get("lat"), rec.get("lng"))
 
 
-def enrich_one(rec, cache, overpass, places, allow_paid):
+_PHONE_RE = re.compile(r"\(?\b\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b")
+
+
+class GoogleMapsClient:
+    """FREE business name + phone via Google Maps (Playwright), looked up BY
+    ADDRESS -- so it works even when a capture has no lat/lng (OSM's blind spot).
+    Fragile: Maps blocks bots, so it's CAPPED (does a few) and DISABLES itself on
+    the first block/consent page. Its own headless browser; closes at the end.
+    Phones here are tagged source='gmaps' so the caller knows to verify."""
+
+    def __init__(self, budget=25, headless=True):
+        self.budget = budget          # how many lookups before we stop
+        self.headless = headless
+        self.disabled = False
+        self._pw = self._browser = self._page = None
+
+    def _ensure(self):
+        if self._page is not None:
+            return True
+        try:
+            from playwright.sync_api import sync_playwright
+            self._pw = sync_playwright().start()
+            self._browser = self._pw.chromium.launch(headless=self.headless)
+            self._page = self._browser.new_page()
+            return True
+        except Exception as e:
+            print("  (gmaps off: %s)" % str(e)[:70])
+            self.disabled = True
+            return False
+
+    def by_address(self, address):
+        if self.disabled or self.budget <= 0 or not self._ensure():
+            return {}
+        self.budget -= 1
+        try:
+            import urllib.parse
+            self._page.goto("https://www.google.com/maps/search/"
+                            + urllib.parse.quote(address),
+                            wait_until="domcontentloaded", timeout=20000)
+            self._page.wait_for_timeout(2500)
+            url = self._page.url.lower()
+            html = self._page.content()
+            if ("consent.google" in url or "/sorry/" in url
+                    or "unusual traffic" in html.lower()):
+                self.disabled = True            # blocked -> turn it off
+                return {}
+            phone = name = None
+            try:
+                el = self._page.query_selector("button[data-item-id^='phone']")
+                if el:
+                    phone = el.get_attribute("aria-label") or el.inner_text()
+            except Exception:
+                pass
+            if not phone:
+                m = _PHONE_RE.search(html)
+                phone = m.group(0) if m else None
+            try:
+                h1 = self._page.query_selector("h1")
+                if h1:
+                    name = (h1.inner_text() or "").strip() or None
+            except Exception:
+                pass
+            phone = normalize_phone(phone)
+            if phone or name:
+                return {"name": name, "phone": phone, "types": [],
+                        "business_status": None}
+            return {}
+        except Exception:
+            return {}
+
+    def enrich(self, rec):
+        addr = rec.get("address")
+        if not addr:
+            return {}
+        time.sleep(2.0)                # go slow; Maps blocks bursts
+        return self.by_address(addr)
+
+    def close(self):
+        try:
+            if self._browser:
+                self._browser.close()
+            if self._pw:
+                self._pw.stop()
+        except Exception:
+            pass
+
+
+def enrich_one(rec, cache, overpass, places, allow_paid, gmaps=None):
     """FREE-FIRST chain for one record, with cache so nothing is paid twice.
-    Order: cache -> OSM (free) -> Places (only if --paid and key present).
-    Returns (place_dict, source)."""
+    Order: cache -> OSM (free) -> Google Maps scrape (free, by address) ->
+    Places (paid, if key present). Returns (place_dict, source)."""
     ck = cache_key(rec)
     if ck in cache:
         return cache[ck], "cache"
@@ -355,6 +442,15 @@ def enrich_one(rec, cache, overpass, places, allow_paid):
         place = overpass.enrich(rec) or {}
         if place.get("phone"):
             source = "osm"
+    # FREE Google Maps scrape for a still-missing phone (by address; capped)
+    if not place.get("phone") and gmaps is not None:
+        g = gmaps.enrich(rec) or {}
+        if g.get("name") and not place.get("name"):
+            place["name"] = g["name"]
+        if g.get("phone"):
+            place["phone"] = g["phone"]
+            if source == "none":
+                source = "gmaps"
     if not place.get("phone") and allow_paid and places is not None:
         paid = places.enrich(rec) or {}
         if paid.get("name") or paid.get("phone"):
@@ -369,13 +465,13 @@ def enrich_one(rec, cache, overpass, places, allow_paid):
 # run
 # ---------------------------------------------------------------------------
 def _process(rows, cache, overpass, places, allow_paid, seen, out_f, dry,
-             enriched_ws=None):
+             enriched_ws=None, gmaps=None):
     """Enrich a batch of rows free-first; append new leads to out_f. Returns
     (new_count, phone_count, paid_calls)."""
     new = phones = paid = 0
     sheet_rows = []
     for rec in rows:
-        place, source = enrich_one(rec, cache, overpass, places, allow_paid)
+        place, source = enrich_one(rec, cache, overpass, places, allow_paid, gmaps)
         if source == "places":
             paid += 1
         lead = merge_lead(rec, place)
@@ -415,17 +511,19 @@ def _process(rows, cache, overpass, places, allow_paid, seen, out_f, dry,
 
 def run(in_path, out_path, dry, allow_paid=False, api_key=None,
         overpass=None, places=None, watch=False, watch_interval=10.0,
-        sheet_id=None, creds_file=None):
+        sheet_id=None, creds_file=None, gmaps_max=0):
     """Free-first enrichment. Default costs $0 (OSM only); paid Places is used
     only when allow_paid is set AND a key is present. --watch tails the input
     so it can run in the background while the hunter is still capturing. When
     sheet_id + creds_file are given, identified leads (name/phone) are also
-    written to an 'Enriched Leads' tab in that sheet."""
+    written to an 'Enriched Leads' tab in that sheet. gmaps_max>0 adds a FREE
+    Google Maps scrape (by address) for that many lookups before it stops."""
     cache = load_cache(CACHE_PATH)
     if overpass is None:
         overpass = OverpassClient()
     if places is None and allow_paid and api_key:
         places = PlacesClient(api_key)
+    gmaps = GoogleMapsClient(budget=gmaps_max) if (gmaps_max and not dry) else None
     enriched_ws = _open_enriched_ws(sheet_id, creds_file) if not dry else None
     seen = set()
     for lead in load_jsonl(out_path):    # resume: don't re-emit existing leads
@@ -444,7 +542,8 @@ def run(in_path, out_path, dry, allow_paid=False, api_key=None,
             offset = len(rows)
             if batch:
                 n, p, paid = _process(batch, cache, overpass, places,
-                                      allow_paid, seen, out_f, dry, enriched_ws)
+                                      allow_paid, seen, out_f, dry, enriched_ws,
+                                      gmaps)
                 total_new += n; total_phone += p; total_paid += paid
                 if not dry:
                     save_cache(CACHE_PATH, cache)
@@ -456,6 +555,8 @@ def run(in_path, out_path, dry, allow_paid=False, api_key=None,
     finally:
         if out_f:
             out_f.close()
+        if gmaps is not None:
+            gmaps.close()
 
     print("\n%s | %d new leads | %d with phone | %d paid Places calls (~$%.2f)"
           % ("DRY RUN" if dry else "appended -> " + out_path,
