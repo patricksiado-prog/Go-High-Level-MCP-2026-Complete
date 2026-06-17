@@ -111,3 +111,146 @@ mouse-drag for motion, inside `precise_fiber_hunter.py`.
 - Auth note: AT&T login expires periodically; re-login via
   `python precise_fiber_hunter.py --login`. Service-account key project =
   `fiberscanner-493900`.
+
+---
+
+# KEY CODE (paste-able; this is the heart of it)
+
+## 1. The proven extractor — `extract_features` (optimus_api_capture.py)
+Walks ANY JSON (flat dict, list, or GeoJSON `{geometry,properties}`) and pulls
+out `{address, lat, lng, ban, status}`. The address must "look like" an address
+(starts with a house number, regex `\d+\s+\S+`). This is what turns AT&T's
+serviceability JSON into rows. Field-name candidates are below — extend
+`ADDRESS_KEYS`/`STATUS_KEYS` if AT&T uses a different key.
+
+```python
+import re
+ADDRESS_KEYS = ("address","formattedaddress","fulladdress","addressline1",
+                "streetaddress","siteaddress","serviceaddress","addr")
+LAT_KEYS = ("lat","latitude"); LNG_KEYS = ("lng","lon","long","longitude")
+BAN_KEYS = ("ban","subscriberban","billingaccountnumber","billingaccount","accountnumber")
+STATUS_KEYS = ("status","dotcolor","color","serviceablestatus","customertype",
+               "customerstatus","fiberstatus","servicestatus","eligibility","markercolor")
+_ADDRESS_SHAPE = re.compile(r"\d+\s+\S+")          # "13911 E CYPRESS ..."
+
+def _norm_key(k): return re.sub(r"[^a-z]", "", str(k).lower())
+def _get_first(d, names):
+    for k, v in d.items():
+        if _norm_key(k) in names and v not in (None, ""): return v
+    return None
+def _as_float(v):
+    try: return float(v)
+    except (TypeError, ValueError): return None
+def _looks_like_address(v): return isinstance(v, str) and bool(_ADDRESS_SHAPE.search(v))
+
+def extract_features(obj, out=None):
+    if out is None: out = []
+    if isinstance(obj, list):
+        for it in obj: extract_features(it, out)
+        return out
+    if not isinstance(obj, dict): return out
+    addr = _get_first(obj, ADDRESS_KEYS); lat = _as_float(_get_first(obj, LAT_KEYS))
+    lng = _as_float(_get_first(obj, LNG_KEYS)); ban = _get_first(obj, BAN_KEYS)
+    status = _get_first(obj, STATUS_KEYS)
+    props = obj.get("properties")
+    if isinstance(props, dict):
+        addr = addr or _get_first(props, ADDRESS_KEYS); ban = ban or _get_first(props, BAN_KEYS)
+        status = status or _get_first(props, STATUS_KEYS)
+        if lat is None or lng is None:
+            lat = lat if lat is not None else _as_float(_get_first(props, LAT_KEYS))
+            lng = lng if lng is not None else _as_float(_get_first(props, LNG_KEYS))
+    geom = obj.get("geometry")
+    if (lat is None or lng is None) and isinstance(geom, dict):
+        c = geom.get("coordinates")
+        if isinstance(c, list) and len(c) >= 2 and _as_float(c[0]) is not None:
+            lng, lat = float(c[0]), float(c[1])           # GeoJSON = [lng, lat]
+    if lat is not None and not (-90 <= lat <= 90): lat = None
+    if lng is not None and not (-180 <= lng <= 180): lng = None
+    if _looks_like_address(addr):
+        out.append({"address": re.sub(r"\s+"," ",addr).strip(), "lat": lat, "lng": lng,
+                    "ban": str(ban).strip() if ban else None,
+                    "status": str(status).strip() if status else None})
+    else:
+        for v in obj.values():
+            if isinstance(v, (dict, list)): extract_features(v, out)
+    return out
+```
+
+## 2. The capture (what precise_fiber_hunter does now)
+```python
+captured = []                                  # rows to write
+def on_response(resp):
+    try:
+        url = resp.url.lower()
+        ct  = (resp.headers or {}).get("content-type","").lower()
+        if "json" not in ct and not any(k in url for k in
+            ("serviceability","/api/","graphql","availab","fiber",".json")):
+            return
+        body = resp.body()
+        if not body or len(body) > 8*1024*1024: return
+        data = json.loads(body)
+        for f in extract_features(data):
+            captured.append(f)                 # f = {address,lat,lng,ban,status}
+    except Exception:
+        pass
+page.on("response", on_response)               # attach BEFORE navigating
+```
+
+## 3. THE FIX — reliable trigger + the proven MOUSE-DRAG motion
+Arrow keys and `map.panBy` do nothing here (map object hidden). Drag the canvas.
+```python
+def focus_and_drag(page, dx=-220):
+    box = page.locator(".mapboxgl-canvas, .maplibregl-canvas, canvas").first.bounding_box()
+    cx, cy = box["x"] + box["width"]/2, box["y"] + box["height"]/2
+    page.mouse.move(cx, cy); page.mouse.down()
+    page.mouse.move(cx + dx, cy, steps=12)     # drag left -> pans the map right
+    page.mouse.up(); time.sleep(1.0)
+
+def click_search_this_area(page):              # button only exists AFTER a drag
+    for label in ("Search this area","Search area","Redo search here","Search here"):
+        b = page.get_by_text(label, exact=False)
+        if b.count() > 0: b.first.click(); return True
+    return False
+
+def grab_this_view(page):                      # deterministic capture
+    click_search_this_area(page)
+    try:
+        resp = page.wait_for_response(
+            lambda r: "serviceability" in r.url.lower() and r.status == 200, timeout=8000)
+        return extract_features(resp.json())
+    except Exception:
+        return []
+```
+
+## 4. Proven reference — MapMan's trigger + motion (fiber_precise_pipeline.py)
+`search_zip` TYPES the zip into the search box and hits Enter — THIS is the first
+serviceability fetch. `focus_map` clicks the canvas at 18%/22% before keyboard.
+```python
+def search_zip(page, zipc):
+    geo = page.locator(".mapboxgl-ctrl-geocoder--input, input[placeholder*='Search' i],"
+                       "input[type='search'], input[type='text']")
+    geo.first.click(); geo.first.fill(""); geo.first.type(zipc, delay=60)
+    time.sleep(1.5); geo.first.press("Enter"); time.sleep(4.0)   # centers + fetches
+
+def focus_map(page):                            # "must click the map before +/-"
+    cv = page.locator(".mapboxgl-canvas, canvas").first; box = cv.bounding_box()
+    page.mouse.click(box["x"]+box["width"]*0.18, box["y"]+box["height"]*0.22)
+    page.keyboard.press("Escape")
+```
+
+## 5. The batched write (don't append_row per address -> 429)
+```python
+import gspread
+ws.append_rows(rows, value_input_option="RAW")  # rows = list of lists, chunk at 500
+```
+
+## RECOMMENDED COMPLETE AUTO LOOP
+```
+goto(MAP_URL); page.on("response", on_response)
+click "Fiber Availability Map"; search_zip(zip)          # first fetch
+for each cell in an NxN grid:
+    focus_and_drag(page)                                  # PROVEN motion
+    rows += grab_this_view(page)                          # search + wait_for_response
+ws.append_rows(rows)                                      # batched
+# rows are dicts -> map status to GREEN/GOLD/GREY via classify_status; write GREEN+GOLD.
+```
