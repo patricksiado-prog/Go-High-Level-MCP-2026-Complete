@@ -37,65 +37,30 @@ RESIDENTIAL_TAB = "Residential Leads"
 COMMERCIAL_HEADER = ["Category", "Email", "Business Name", "Address", "Phone"]
 RESIDENTIAL_HEADER = ["Address", "Dot Color", "Zone", "Lat", "Lng"]
 
-# DEEP small-business + IN-HOME category list (one Maps search each, per ZIP).
-# Heavy on owner-operated / mobile / work-from-home businesses -- many of these
-# sit at RESIDENTIAL addresses, so searching them is how we catch the
-# home-based businesses the plain "is it a house?" test would miss.
+# Core small-business + in-home category list (one Maps search each, per ZIP).
+# A normal-sized set focused on owner-operated / mobile / home-based businesses
+# (many sit at RESIDENTIAL addresses, so searching them catches the home-based
+# ones a plain "is it a house?" test would miss). Edit freely.
 CATEGORIES = [
-    # home & property services (often owner-operated / home-based)
-    "house cleaning", "maid service", "carpet cleaning", "window cleaning",
-    "pressure washing", "lawn care", "landscaping", "lawn mowing service",
-    "tree service", "pool cleaning", "pest control", "handyman",
-    "junk removal", "moving company", "appliance repair", "garage door repair",
-    "locksmith", "gutter cleaning", "chimney sweep", "fence company",
-    "blind cleaning", "home organizer", "interior plant service",
-    # trades / contractors (small / owner-operator)
-    "plumber", "electrician", "hvac", "air conditioning repair", "roofing",
-    "general contractor", "remodeling contractor", "painter", "flooring",
-    "tile installer", "drywall", "carpenter", "concrete contractor",
-    "paving contractor", "solar installer", "welding", "masonry",
-    "septic service", "insulation contractor", "cabinet maker",
-    "countertop installer", "irrigation", "landscape lighting",
-    # auto (small / mobile)
-    "auto repair", "mobile mechanic", "auto detailing", "mobile detailing",
-    "tire shop", "windshield repair", "transmission repair", "body shop",
-    "oil change", "car wash", "window tinting",
-    # pets (home-based / mobile)
-    "dog grooming", "mobile dog grooming", "pet sitting", "dog walking",
-    "dog training", "pet boarding",
-    # beauty / personal (small / mobile / home)
-    "hair salon", "barber shop", "nail salon", "lash extensions",
-    "eyebrow threading", "makeup artist", "esthetician", "spray tan",
-    "massage therapist", "med spa", "waxing salon", "tattoo shop",
-    "piercing studio", "hair braiding", "mobile hairstylist",
-    # health / wellness (small practice)
-    "chiropractor", "acupuncture", "physical therapy", "counseling",
-    "therapist", "nutritionist", "dietitian", "personal trainer",
-    "yoga studio", "pilates studio", "dentist", "orthodontist", "optometrist",
-    "podiatrist", "dermatologist",
-    # food (small / home / mobile)
-    "catering", "personal chef", "food truck", "bakery", "cake decorator",
-    "meal prep", "coffee shop", "juice bar", "snowball stand",
-    # creative / professional (solo, work-from-home)
-    "photographer", "videographer", "graphic designer", "web designer",
-    "marketing agency", "bookkeeper", "accountant", "tax preparer",
-    "notary public", "virtual assistant", "real estate agent",
-    "insurance agent", "financial advisor", "mortgage broker", "life coach",
-    "business consultant", "event planner", "wedding planner", "dj service",
-    "florist", "interior designer", "architect", "travel agent",
-    # repair / tech (small)
-    "computer repair", "phone repair", "tv repair", "upholstery",
-    "sewing alterations", "tailor", "shoe repair", "watch repair",
-    "jewelry repair", "screen printing", "embroidery", "sign shop",
-    "print shop", "3d printing service",
-    # education / childcare (home-based)
-    "home daycare", "tutoring", "music lessons", "piano lessons",
-    "guitar lessons", "art classes", "swim lessons", "driving school",
-    "martial arts", "dance studio",
-    # small retail
-    "boutique", "consignment shop", "thrift store", "smoke shop",
-    "vape shop", "cell phone store", "gift shop", "pet store",
-    "bike shop", "hobby shop", "candle shop", "soap maker",
+    # trades / contractors
+    "plumber", "electrician", "hvac", "roofing", "general contractor",
+    "painter", "handyman", "landscaping", "pest control",
+    # home services
+    "house cleaning", "carpet cleaning", "junk removal", "moving company",
+    "appliance repair", "garage door repair", "locksmith", "tree service",
+    # auto
+    "auto repair", "auto detailing", "mobile mechanic",
+    # pets
+    "dog grooming", "pet sitting",
+    # beauty / personal
+    "hair salon", "barber shop", "nail salon", "massage therapist",
+    # health
+    "chiropractor", "dentist",
+    # food
+    "catering", "bakery", "coffee shop",
+    # professional / home-based
+    "photographer", "bookkeeper", "real estate agent", "insurance agent",
+    "tutoring", "home daycare",
 ]
 
 # reuse the don't-call filter (government/civic + national chains)
