@@ -1963,8 +1963,15 @@ def main():
             except EOFError:
                 pass
 
+        # Manual mode keeps watching by default: you pan the map by hand and it
+        # collects the backend dots from each view, every few seconds, until you
+        # close the browser. (auto mode honors --loop.)
+        loop_secs = args.loop if (args.loop and args.loop > 0) else (6 if not args.auto else 0)
         report_status(ws, args.zip or "manual", "started",
-                      note="loop=%ss" % args.loop if args.loop else "single pass")
+                      note="watching every %ss" % loop_secs if loop_secs else "single pass")
+        if loop_secs and not args.auto:
+            print("\n  WATCHING: pan the map by hand to new areas -- it grabs each "
+                  "one off the server every %ds. Close the browser to stop.\n" % loop_secs)
         passno = 0
         while True:
             passno += 1
@@ -1982,24 +1989,26 @@ def main():
                     print("\nBrowser closed -- stopping. (Run it again to restart.)")
                     break
                 print("\nHit a snag: %s" % msg[:120])
-                if args.loop and args.loop > 0:
+                if loop_secs > 0:
                     print("  staying open, retrying next pass...\n")
-                    time.sleep(args.loop)
+                    time.sleep(loop_secs)
                     continue
                 break
+            if loop_secs > 0:
+                report_status(ws, args.zip or "manual", "watching",
+                              found=n, note="pass %d; +%d this pass" % (passno, n))
+                time.sleep(loop_secs)
+                continue
             print("\nDONE. Captured %d new fiber-eligible addresses." % n)
             print(("They're in the '%s' tab." % OUT_TAB) if ws else "(dry run, nothing written)")
-            if args.loop and args.loop > 0:
-                report_status(ws, args.zip or "manual", "sleeping",
-                              found=n, note="pass %d done; next in %ds" % (passno, args.loop))
-                print("Next pass in %ds -- staying on the map, no reload.\n" % args.loop)
-                time.sleep(args.loop)
-                continue
             report_status(ws, args.zip or "manual", "done", found=n,
                           note="pass %d; single run complete" % passno)
             break
         if not args.auto:
-            input("Press Enter to close the browser... ")
+            try:
+                input("Press Enter to close the browser... ")
+            except EOFError:
+                pass
         ctx.close()
 
 
