@@ -654,6 +654,9 @@ def decode_vector_tile(url, body):
     return leads, keys, "ok:%d" % len(leads)
 
 
+_SAVED_RAW = [False]   # save AT&T's raw serviceability JSON once per run
+
+
 class NetCapture:
     """Collects leads seen on the wire. Attach .handle to page.on('response');
     call .flush() per viewport to write the new ones. Handles BOTH JSON
@@ -710,6 +713,22 @@ class NetCapture:
                                           "lat": f.get("lat"), "lng": f.get("lng"),
                                           "status": f.get("status"),
                                           "ban": f.get("ban"), "props": {}})
+                    except Exception:
+                        pass
+                # save the RAW serviceability JSON once, so we can inspect exactly
+                # what AT&T sent (every field) -- locally + a sample to Drive.
+                if leads and not _SAVED_RAW[0]:
+                    _SAVED_RAW[0] = True
+                    try:
+                        here = os.path.dirname(os.path.abspath(__file__))
+                        with open(os.path.join(here, "serviceability_raw.json"), "w") as f:
+                            json.dump(data, f)
+                        print("  (saved raw AT&T response -> serviceability_raw.json)")
+                    except Exception:
+                        pass
+                    try:
+                        drive_log("RAW %s :: %s" % (url.split("?")[0][:55],
+                                                    json.dumps(data)[:480]))
                     except Exception:
                         pass
             elif _is_vector_tile(url, ct):
