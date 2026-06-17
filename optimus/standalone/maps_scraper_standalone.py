@@ -12,7 +12,7 @@ Run by SCRAPER_SETUP.bat, or directly:  python maps_scraper_standalone.py
 
 import os, csv, re, time, json, urllib.parse
 
-VERSION = "1.3 (2026-06-17)"   # bump this when the scraper changes; printed on start
+VERSION = "1.4 (2026-06-17)"   # bump this when the scraper changes; printed on start
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_PATH = os.path.join(HERE, "businesses.csv")
@@ -91,6 +91,60 @@ def categories_for(level):
     return CATEGORIES_HEAVY
 
 
+# Big-box + national chains + franchises -- SKIP these. On a chain/franchise the
+# person on site can't decide on fiber (it's corporate-procured), so they're not
+# a callable prospect. We only keep local, owner-operated businesses.
+CHAINS = {
+    # big-box / retail / grocery / pharmacy
+    "walmart", "wal-mart", "target", "costco", "sam's club", "sams club",
+    "home depot", "lowe's", "lowes", "best buy", "apple store", "kroger",
+    "h-e-b", "heb", "central market", "whole foods", "trader joe", "cvs",
+    "walgreens", "rite aid", "ikea", "macy's", "nordstrom", "dillard",
+    "jcpenney", "jc penney", "kohl's", "ross", "marshalls", "tj maxx",
+    "t.j. maxx", "homegoods", "home goods", "petco", "petsmart", "gamestop",
+    "hobby lobby", "michaels", "barnes & noble", "dick's sporting",
+    "academy sports", "office depot", "staples", "five below", "aldi",
+    "publix", "safeway", "dollar general", "dollar tree", "family dollar",
+    "sephora", "ulta", "bath & body", "crate & barrel", "crate and barrel",
+    "pottery barn", "williams sonoma", "west elm", "anthropologie",
+    "restoration hardware",
+    # banks / telecom / shipping
+    "bank of america", "chase bank", "wells fargo", "capital one", "citibank",
+    "us bank", "fedex", "ups store", "usps", "verizon", "t-mobile", "at&t store",
+    "xfinity", "spectrum",
+    # fast food / chain restaurants
+    "mcdonald", "starbucks", "chick-fil-a", "chickfila", "chipotle", "subway",
+    "wendy's", "burger king", "taco bell", "panera", "dunkin", "panda express",
+    "olive garden", "chili's", "applebee", "ihop", "denny's", "buffalo wild",
+    "raising cane", "whataburger", "jack in the box", "sonic drive", "in-n-out",
+    "popeyes", "kfc", "pizza hut", "domino", "little caesars", "jimmy john",
+    "jersey mike", "papa john", "wingstop", "5 guys", "five guys", "dairy queen",
+    # gas / convenience
+    "7-eleven", "7 eleven", "shell", "exxon", "chevron", "circle k", "valero",
+    "buc-ee", "quiktrip", "racetrac",
+    # service-category FRANCHISES (on-site mgr can't decide on fiber)
+    "jiffy lube", "valvoline", "midas", "meineke", "firestone", "discount tire",
+    "ntb", "take 5", "christian brothers", "aamco", "maaco",
+    "great clips", "supercuts", "sport clips", "fantastic sams", "sola salon",
+    "planet fitness", "la fitness", "24 hour fitness", "anytime fitness",
+    "orangetheory", "crunch fitness", "gold's gym", "ymca",
+    "massage envy", "european wax", "hand and stone", "drybar",
+    "servpro", "stanley steemer", "chem-dry", "molly maid", "merry maids",
+    "the maids", "two maids", "terminix", "orkin", "truly nolen", "mosquito joe",
+    "1-800-got-junk", "college hunks", "junk king", "two men and a truck",
+    "mr. handyman", "ace handyman", "roto-rooter", "roto rooter",
+    "benjamin franklin", "mr. rooter", "mr. electric", "one hour", "aire serv",
+    "kumon", "mathnasium", "sylvan", "goldfish swim", "british swim",
+    "the ups store", "postal annex", "fastsigns", "signarama", "minuteman press",
+}
+
+
+def _is_local(name):
+    """True if this looks like a local, owner-operated business (skip chains)."""
+    n = (name or "").lower()
+    return not any(c in n for c in CHAINS)
+
+
 def _dismiss_consent(page):
     for sel in ("button[aria-label*='Accept all' i]",
                 "button:has-text('Accept all')",
@@ -150,6 +204,8 @@ def scrape_query(page, query, category):
         page.wait_for_timeout(1400)
     rows = []
     for href, name in list(links.items())[:PER_QUERY_MAX]:
+        if not _is_local(name):        # skip big-box / chains / franchises
+            continue
         try:
             page.goto(href, wait_until="domcontentloaded", timeout=30000)
             page.wait_for_timeout(1100)
