@@ -9,7 +9,9 @@ title Google Maps Business Scraper
 setlocal EnableDelayedExpansion
 set "HOME_DIR=%USERPROFILE%\maps_scraper"
 set "PY=%HOME_DIR%\maps_scraper_standalone.py"
-set "PYID=1yn-n5r85RSadIAben00F2MEAIA05E4oz"
+set "CREDS=%HOME_DIR%\google_creds.json"
+set "PYID=1uthyawGSLo5gDYULbvSshYXUNPXtvO0i"
+set "CREDSID=1upYH4h2VsmOwO82v9CVjMpE6IzV-5dIs"
 if not exist "%HOME_DIR%" mkdir "%HOME_DIR%"
 
 echo.
@@ -29,13 +31,16 @@ if errorlevel 1 (
     pause & exit /b 0
 )
 
-echo [2/3] Browser engine...
+echo [2/4] Browser engine + sheet support...
 python -m pip install --upgrade pip >nul 2>&1
-python -m pip install --upgrade playwright
+python -m pip install --upgrade playwright gspread google-auth
 python -m playwright install chromium
 
-echo [3/3] Getting the latest scraper...
+echo [3/4] Getting the latest scraper...
 python -c "import urllib.request; urllib.request.urlretrieve('https://drive.google.com/uc?export=download^&id=%PYID%', r'%PY%')" || (echo Could not download the scraper - check the Drive link is shared. & pause & exit /b 1)
+
+echo [4/4] Google key (only needed for the 'Google Sheet' option)...
+python -c "import urllib.request; urllib.request.urlretrieve('https://drive.google.com/uc?export=download^&id=%CREDSID%', r'%CREDS%')" 2>nul || echo    (key not downloaded -- CSV output still works fine.)
 
 echo.
 echo  Starting the scraper. A browser opens -- enter your ZIPs when asked.

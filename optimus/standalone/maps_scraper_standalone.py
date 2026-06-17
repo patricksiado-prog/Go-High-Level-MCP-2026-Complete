@@ -15,6 +15,10 @@ import os, csv, re, time, urllib.parse
 OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "businesses.csv")
 PROFILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "maps_profile")
 FIELDS = ["name", "address", "phone", "website", "category"]
+
+# Google Sheet destination (option 2). Results go to this sheet's tab below.
+SHEET_ID = "1FhO2BTMXGefm1tLwKbbMPXvzT1160882Auauzep7ooA"
+SHEET_TAB = "Maps Businesses"
 PER_QUERY_MAX = 120
 SCROLL_ROUNDS = 18
 THROTTLE = 0.8
@@ -117,6 +121,55 @@ def scrape_query(page, query, category):
     return rows
 
 
+def _find_creds():
+    for p in (os.path.join(os.path.expanduser("~"), "maps_scraper", "google_creds.json"),
+              os.path.join(os.path.expanduser("~"), "optimus", "google_creds.json"),
+              os.path.join(os.path.dirname(os.path.abspath(__file__)), "google_creds.json")):
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def write_to_sheet(rows):
+    """Append the businesses to the Google Sheet's 'Maps Businesses' tab.
+    Needs google_creds.json on the machine. Dedupes against rows already there."""
+    creds = _find_creds()
+    if not creds:
+        print("\n  (No google_creds.json found -- results are in the CSV only.)")
+        return 0
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
+        scopes = ["https://www.googleapis.com/auth/spreadsheets",
+                  "https://www.googleapis.com/auth/drive"]
+        client = gspread.authorize(Credentials.from_service_account_file(creds, scopes=scopes))
+        sh = client.open_by_key(SHEET_ID)
+        try:
+            ws = sh.worksheet(SHEET_TAB)
+        except Exception:
+            ws = sh.add_worksheet(title=SHEET_TAB, rows="20000", cols="5")
+        if not ws.get_all_values():
+            ws.append_row(["Name", "Address", "Phone", "Website", "Category"])
+        existing = set()
+        try:
+            for r in ws.get_all_values()[1:]:
+                if len(r) >= 2:
+                    existing.add((r[0].strip().upper() + "|" + r[1].strip().upper()))
+        except Exception:
+            pass
+        new = [[r["name"] or "", r["address"] or "", r["phone"] or "",
+                r["website"] or "", r["category"] or ""]
+               for r in rows
+               if ((r["name"] or "").strip().upper() + "|"
+                   + (r["address"] or "").strip().upper()) not in existing]
+        for i in range(0, len(new), 500):
+            ws.append_rows(new[i:i + 500], value_input_option="RAW")
+        return len(new)
+    except Exception as e:
+        print("\n  (Could not write to the sheet: %s -- results are in the CSV.)" % str(e)[:80])
+        return 0
+
+
 def main():
     print("=" * 56)
     print("  GOOGLE MAPS BUSINESS SCRAPER")
@@ -126,13 +179,18 @@ def main():
     if not zips:
         print("No ZIPs entered. Exiting.")
         return
+    print("\nWhere should the results go?")
+    print("  [1] CSV file  (businesses.csv)")
+    print("  [2] Google Sheet  ('%s' tab)" % SHEET_TAB)
+    dest = (input("Choose 1 or 2 (press Enter for 1): ").strip() or "1")
+    to_sheet = dest.startswith("2")
     queries = [("%s in %s" % (c, z), c) for z in zips for c in CATEGORIES]
     print("\nSearching %d categories x %d ZIPs = %d searches -> %s\n"
           % (len(CATEGORIES), len(zips), len(queries), OUT_PATH))
 
     from playwright.sync_api import sync_playwright
     os.makedirs(PROFILE_DIR, exist_ok=True)
-    seen, total = set(), 0
+    seen, total, kept = set(), 0, []
     with sync_playwright() as p:
         ctx = p.chromium.launch_persistent_context(
             PROFILE_DIR, headless=False, viewport={"width": 1280, "height": 900})
@@ -156,6 +214,7 @@ def main():
                     continue
                 seen.add(key)
                 writer.writerow(r)
+                kept.append(r)
                 new += 1
             out_f.flush()
             total += new
@@ -163,7 +222,12 @@ def main():
             print("  [%d/%d] %-32s +%d (%d w/phone)" % (i, len(queries), q[:32], new, withp))
         out_f.close()
         ctx.close()
-    print("\nDONE: %d businesses saved to:\n  %s" % (total, OUT_PATH))
+    print("\nDONE: %d businesses saved to CSV:\n  %s" % (total, OUT_PATH))
+    if to_sheet:
+        print("\nUploading to your Google Sheet...")
+        n = write_to_sheet(kept)
+        if n:
+            print("  +%d businesses added to the '%s' tab." % (n, SHEET_TAB))
     try:
         input("\nPress Enter to close...")
     except EOFError:
