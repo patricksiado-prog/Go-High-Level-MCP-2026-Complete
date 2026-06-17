@@ -1828,7 +1828,8 @@ def _start_enrichment(allow_paid=False):
         try:
             enrich_phones.run(enrich_phones.IN_PATH, enrich_phones.OUT_PATH,
                               dry=False, allow_paid=paid, api_key=key,
-                              watch=True, watch_interval=8.0)
+                              watch=True, watch_interval=8.0,
+                              sheet_id=SHEET_ID, creds_file=find_creds())
         except Exception as e:
             print("(enrichment stopped: %s)" % str(e)[:80])
     threading.Thread(target=_run, daemon=True).start()

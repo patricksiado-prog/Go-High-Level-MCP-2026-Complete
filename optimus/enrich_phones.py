@@ -46,6 +46,51 @@ OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 OVERPASS_RADIUS_M = 35
 OVERPASS_THROTTLE_SECS = 1.1  # public Overpass etiquette: ~1 req/s
 
+# Optional: write enriched leads (name + phone) back into the same Google Sheet
+# the hunter writes to, in an "Enriched Leads" tab, so the numbers show up next
+# to the captured addresses. Off unless run() gets a sheet_id + creds_file.
+ENRICHED_TAB = "Enriched Leads"
+ENRICHED_HEADER = ["Address", "Business Name", "Phone", "Phone Source",
+                   "Dot Color", "Zone", "Lat", "Lng", "Enriched At"]
+_DOT_COLOR = {"lead": "GREEN", "copper_upgrade": "ORANGE", "customer": "GREY"}
+
+
+def _open_enriched_ws(sheet_id, creds_file):
+    """Open (or create) the 'Enriched Leads' tab. Returns a gspread worksheet or
+    None. Best-effort: a failure just means we keep writing the jsonl only."""
+    if not sheet_id or not creds_file:
+        return None
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
+        scopes = ["https://www.googleapis.com/auth/spreadsheets",
+                  "https://www.googleapis.com/auth/drive"]
+        client = gspread.authorize(
+            Credentials.from_service_account_file(creds_file, scopes=scopes))
+        sh = client.open_by_key(sheet_id)
+        try:
+            ws = sh.worksheet(ENRICHED_TAB)
+        except Exception:
+            ws = sh.add_worksheet(title=ENRICHED_TAB, rows="5000",
+                                  cols=str(len(ENRICHED_HEADER)))
+        if not ws.get_all_values():
+            ws.append_row(ENRICHED_HEADER)
+        print("  enriched leads -> '%s' tab in the sheet" % ENRICHED_TAB)
+        return ws
+    except Exception as e:
+        print("  (enriched-sheet off: %s)" % str(e)[:80])
+        return None
+
+
+def _enriched_row(lead, source):
+    """A sheet row for one enriched lead (only the callable fields)."""
+    ds = (lead.get("dot_status") or lead.get("status") or "").lower()
+    return [lead.get("address") or "", lead.get("name") or "",
+            lead.get("phone") or "", source,
+            _DOT_COLOR.get(ds, ""), lead.get("zone_label") or "",
+            lead.get("lat"), lead.get("lng"),
+            time.strftime("%Y-%m-%d %H:%M:%S")]
+
 
 # ---------------------------------------------------------------------------
 # pure helpers (unit-tested; no network)
@@ -261,10 +306,12 @@ def enrich_one(rec, cache, overpass, places, allow_paid):
 # ---------------------------------------------------------------------------
 # run
 # ---------------------------------------------------------------------------
-def _process(rows, cache, overpass, places, allow_paid, seen, out_f, dry):
+def _process(rows, cache, overpass, places, allow_paid, seen, out_f, dry,
+             enriched_ws=None):
     """Enrich a batch of rows free-first; append new leads to out_f. Returns
     (new_count, phone_count, paid_calls)."""
     new = phones = paid = 0
+    sheet_rows = []
     for rec in rows:
         place, source = enrich_one(rec, cache, overpass, places, allow_paid)
         if source == "places":
@@ -284,23 +331,37 @@ def _process(rows, cache, overpass, places, allow_paid, seen, out_f, dry):
         if out_f and not dry:
             out_f.write(json.dumps(lead) + "\n")
             out_f.flush()
+        # to the sheet: only the leads we actually identified (name or phone)
+        if enriched_ws is not None and not dry and (lead.get("phone") or lead.get("name")):
+            sheet_rows.append(_enriched_row(lead, source))
         if source == "osm":
             time.sleep(OVERPASS_THROTTLE_SECS)   # public Overpass etiquette
         elif source == "places":
             time.sleep(THROTTLE_SECS)
+    if enriched_ws is not None and sheet_rows:
+        try:    # ONE batched append (don't blow the per-minute write quota)
+            for i in range(0, len(sheet_rows), 500):
+                enriched_ws.append_rows(sheet_rows[i:i + 500],
+                                        value_input_option="RAW")
+        except Exception as e:
+            print("  (enriched-sheet write error: %s)" % str(e)[:80])
     return new, phones, paid
 
 
 def run(in_path, out_path, dry, allow_paid=False, api_key=None,
-        overpass=None, places=None, watch=False, watch_interval=10.0):
+        overpass=None, places=None, watch=False, watch_interval=10.0,
+        sheet_id=None, creds_file=None):
     """Free-first enrichment. Default costs $0 (OSM only); paid Places is used
     only when allow_paid is set AND a key is present. --watch tails the input
-    so it can run in the background while the hunter is still capturing."""
+    so it can run in the background while the hunter is still capturing. When
+    sheet_id + creds_file are given, identified leads (name/phone) are also
+    written to an 'Enriched Leads' tab in that sheet."""
     cache = load_cache(CACHE_PATH)
     if overpass is None:
         overpass = OverpassClient()
     if places is None and allow_paid and api_key:
         places = PlacesClient(api_key)
+    enriched_ws = _open_enriched_ws(sheet_id, creds_file) if not dry else None
     seen = set()
     for lead in load_jsonl(out_path):    # resume: don't re-emit existing leads
         seen.add(dedupe_key(lead))
@@ -318,7 +379,7 @@ def run(in_path, out_path, dry, allow_paid=False, api_key=None,
             offset = len(rows)
             if batch:
                 n, p, paid = _process(batch, cache, overpass, places,
-                                      allow_paid, seen, out_f, dry)
+                                      allow_paid, seen, out_f, dry, enriched_ws)
                 total_new += n; total_phone += p; total_paid += paid
                 if not dry:
                     save_cache(CACHE_PATH, cache)
