@@ -1975,6 +1975,33 @@ def report_status(ws, area, state, found="", note=""):
 # ----------------------------------------------------------------------------
 # entry
 # ----------------------------------------------------------------------------
+def run_bizmatch():
+    """After capturing, cross-reference the captured fiber leads (Precise Fiber
+    tab) with the scraped businesses (Maps Businesses tab) and write two tabs:
+    'Fiber Green Biz' (green dots that are businesses -> sell new fiber) and
+    'Upgrade Orange Biz' (orange dots that are businesses -> upgrade copper).
+    Best-effort: needs the scraper to have run; never breaks the hunt."""
+    try:
+        import commercial_split as cs
+        businesses = cs.load_businesses_from_sheet()
+        if not businesses:
+            print("  (no 'Maps Businesses' tab yet -- run the scraper to enable "
+                  "the green/orange business match.)")
+            return
+        fiber = cs.load_fiber_from_sheet()
+        idx = cs.build_business_index(businesses)
+        green_biz, orange_biz = cs.split_fiber_biz(fiber, idx)
+        ng, no = cs.write_fiber_biz(green_biz, orange_biz)
+        print("  business match: +%d 'Fiber Green Biz', +%d 'Upgrade Orange Biz'"
+              % (ng, no))
+        try:
+            drive_log("BIZMATCH green=%d orange=%d" % (ng, no))
+        except Exception:
+            pass
+    except Exception as e:
+        print("  (business match skipped: %s)" % str(e)[:90])
+
+
 def main():
     self_update()
     ap = argparse.ArgumentParser()
@@ -2022,6 +2049,9 @@ def main():
                          "default because the clicks can flip the view to the portal)")
     ap.add_argument("--no-enrich", action="store_true",
                     help="don't run phone/business enrichment in the background")
+    ap.add_argument("--no-match", action="store_true",
+                    help="don't cross-reference leads to businesses at the end "
+                         "(skip the Fiber Green Biz / Upgrade Orange Biz tabs)")
     ap.add_argument("--paid", action="store_true",
                     help="let the background enricher use paid Google Places on "
                          "OSM misses (needs GOOGLE_PLACES_API_KEY). Default is FREE.")
@@ -2237,6 +2267,8 @@ def main():
             report_status(ws, args.zip or "manual", "done", found=n,
                           note="pass %d; single run complete" % passno)
             break
+        if not args.dry and not args.no_match:
+            run_bizmatch()
         if not args.auto:
             try:
                 input("Press Enter to close the browser... ")
