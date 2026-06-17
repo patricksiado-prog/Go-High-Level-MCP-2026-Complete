@@ -1892,6 +1892,30 @@ def main():
             return
 
         def one_pass():
+            # MANUAL mode: you already positioned the map, which made AT&T fetch
+            # the serviceability dot data. Just READ what was captured off the
+            # wire -- NO open_map_view, NO search click, NO pan, NO scan. Nothing
+            # navigates, so nothing can flip the view to the loading/portal page.
+            if not args.auto:
+                cap = _NET_CAPTURE[0]
+                n = cap.flush(ws, seen, area_label, args.dry) if cap is not None else 0
+                if n:
+                    print("  captured %d addresses OFF THE SERVER "
+                          "(no clicks, no motion)" % n)
+                    drive_log("MANUAL captured=%d" % n)
+                else:
+                    print("  no serviceability addresses decoded for this view yet.")
+                    drive_log("MANUAL captured=0")
+                    if cap is not None and not _AUTO_PROBED[0]:
+                        _AUTO_PROBED[0] = True
+                        try:
+                            cap.dump_debug(os.path.join(
+                                os.path.dirname(os.path.abspath(__file__)),
+                                "net_responses.log"))
+                        except Exception:
+                            pass
+                return n
+            # ----- AUTO mode: navigate + scan -----
             # Only touch the map if the SPA bounced us to the PORTAL. When the
             # map is already showing we DON'T click it -- arbitrary map clicks /
             # auto-pans were landing on nav and flipping the view to the portal.
