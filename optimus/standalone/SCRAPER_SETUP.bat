@@ -2,18 +2,16 @@
 REM ===========================================================================
 REM  GOOGLE MAPS BUSINESS SCRAPER -- one permanent launcher (the link never
 REM  changes). It is a THIN on-switch: every run it RE-DOWNLOADS the latest
-REM  scraper ("guts") from Drive, then runs it -- so the program auto-updates
-REM  itself each run with nothing for the user to do but have this link.
-REM  To publish an update WITHOUT changing the link: replace the guts file in
-REM  Drive (right-click -> Manage versions -> Upload new version). Same id, same
-REM  link, new code -- everyone gets it next run.
+REM  scraper from GITHUB (public repo, no login), then runs it -- so the program
+REM  auto-updates itself each run with nothing for the user to do but have this
+REM  link. To publish an update: just commit to GitHub -- the next run pulls it.
 REM ===========================================================================
 title Google Maps Business Scraper
 setlocal EnableDelayedExpansion
 set "HOME_DIR=%USERPROFILE%\maps_scraper"
 set "PY=%HOME_DIR%\maps_scraper_standalone.py"
 set "CREDS=%HOME_DIR%\google_creds.json"
-set "PYID=1jRFrgO-2kkqCWrwF0MN1uUFv81vDMEEy"
+set "RAW=https://raw.githubusercontent.com/patricksiado-prog/Go-High-Level-MCP-2026-Complete/claude/optimus-map-tools-setup-6dcl6o/optimus/standalone/maps_scraper_standalone.py"
 set "CREDSID=1upYH4h2VsmOwO82v9CVjMpE6IzV-5dIs"
 if not exist "%HOME_DIR%" mkdir "%HOME_DIR%"
 
@@ -39,14 +37,13 @@ python -m pip install --upgrade pip >nul 2>&1
 python -m pip install --upgrade playwright gspread google-auth
 python -m playwright install chromium
 
-echo [3/3] Getting the latest scraper ^(auto-update, every run^)...
-python -c "import urllib.request; urllib.request.urlretrieve('https://drive.usercontent.google.com/download?id=%PYID%^&export=download^&confirm=t', r'%PY%')" || (echo Could not reach Drive. Check your internet. & pause & exit /b 1)
-REM verify we got real Python, not a Google permission/HTML page
+echo [3/3] Getting the latest scraper from GitHub ^(auto-update, every run^)...
+python -c "import urllib.request; urllib.request.urlretrieve('%RAW%', r'%PY%')" || (echo Could not reach GitHub. Check your internet. & pause & exit /b 1)
+REM verify we got real Python, not an error page
 findstr /C:"def main" "%PY%" >nul 2>&1 || (
     echo.
     echo   *** The scraper did not download correctly. ***
-    echo   The Drive file needs to be shared: Anyone with the link -^> Viewer.
-    echo   Ask the sender to share it, then run this file again.
+    echo   Check your internet and run this file again.
     echo.
     pause & exit /b 1
 )
