@@ -77,6 +77,40 @@
 
 ## 6. Code / deploy
 
+- **FILE MAP & SOLUTION (2026-06-17 — after reading every tool + Mapbox research).**
+  - **optimus_dot_detect.py** ("dot extractor") = canonical dot-colour RGB windows
+    (GREEN 30,130,30–100,210,80 / GOLD / GRAY), `zone_freshness`, `classify_status`,
+    pixel dot-find (`find_dots_in_array`, scipy connected-components + shape filter).
+  - **optimus_api_capture.py** = `ResponseSniffer` (page.on response) + `extract_features`
+    (schema-tolerant JSON → address/lat/lng/ban/status; address must match `\d+\s+\S+`).
+    The PROVEN backend reader.
+  - **fiber_precise_pipeline.py (MapMan)** = PROVEN: `search_zip` (TYPE the ZIP) →
+    serviceability fetch → ResponseSniffer captures → extract_features → writes sheet.
+    Motion = `focus_map` (click the canvas at 18%/22%) then keyboard.
+  - **fiber_zone_scanner.py** = headless multi-instance ZIP scanner, same backend capture.
+  - **fiber_hunter.py (ORIGINAL, in the `optimus-map-tools` repo)** = the first "fiber
+    hunter": motion is a **MOUSE DRAG** (`pyautogui.dragRel`, 150px from map centre,
+    serpentine), pixel-colour dot detect, and a **manually-calibrated "Search this area"**
+    click. So "motion exists in fiber hunter" = the DRAG, not arrow keys.
+  - **precise_fiber_hunter.py (current main)** = `NetCapture` (page.on response) +
+    extract_features; manual WATCH mode (user pans, it flushes every 6s); BATCHED sheet
+    writes; Drive telemetry (log + screenshot + raw json).
+  - **CONFIRMED WORKING (2026-06-16):** the backend grab WORKS — a live run hit Google
+    Sheets `[429] write-requests-per-minute` errors, which PROVES it captured real
+    addresses off the serviceability feed and tried to write them. Fixed by BATCHING
+    (`append_rows`, chunk 500) instead of `append_row` per address.
+  - **SOLUTION / refinements:** (1) capture = `page.on("response")` → serviceability JSON
+    → `extract_features` (done, working). (2) Trigger reliably: the serviceability fetch
+    fires on pan + "Search this area" (button only appears AFTER you move the map); the
+    deterministic version is `page.wait_for_response(lambda r: "serviceability" in r.url)`
+    right after the search click. (3) Auto-motion should use Playwright **mouse drag**
+    (`mouse.move`/`down`/`move`/`up`) — the proven motion; arrow keys / `panBy` do nothing
+    here because the map object is hidden. (4) Verify accuracy via `serviceability_raw.json`
+    / the sheet (sheet is AI-blocked to Claude until the Drive log/folder is shared).
+  - Research (Playwright): passive `page.on("response")` + targeted `wait_for_response`
+    is the standard pattern for scraping a site's hidden JSON API. Sources:
+    playwright.dev/python/docs/mock; the dots are NOT readable from the map object.
+
 - **CURRENT OBJECTIVE & APPROACH (2026-06-16) — read this first.**
   - **GOAL:** from the AT&T dealer fiber map (`youachieve.att.com/yourefer/fiber`),
     capture every GREEN (eligible non-customer = lead) and GOLD (copper-upgrade)
