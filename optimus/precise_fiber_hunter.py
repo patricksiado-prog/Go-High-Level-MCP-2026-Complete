@@ -1300,11 +1300,15 @@ MAP_VIEW_TEXTS = ["Fiber Availability Map", "Availability Map", "Fiber Map"]
 
 
 def on_map(page):
-    """True if the Mapbox map is actually showing (we're on the map view, not
-    the portal landing). Checks for the map canvas / controls."""
+    """True if the Fiber Map is showing (not the portal landing). Checks the map
+    canvas/controls AND the 'Search address' box (which is on the map, never the
+    portal) -- so we don't mistake the map for the portal and click 'Fiber Map',
+    which flips the view."""
     for sel in (".mapboxgl-canvas", ".maplibregl-canvas", ".mapboxgl-map",
                 ".maplibregl-map", ".mapboxgl-ctrl-geocoder",
-                ".maplibregl-ctrl-geocoder", "canvas"):
+                ".maplibregl-ctrl-geocoder", "canvas",
+                "input[placeholder*='Search address' i]",
+                "input[placeholder*='address' i]"):
         try:
             el = page.query_selector(sel)
             if el and el.is_visible():
@@ -1764,8 +1768,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--login", action="store_true", help="open browser to log in once, then quit")
     ap.add_argument("--zip", default=None, help="ZIP/area to search before scanning")
-    ap.add_argument("--cols", type=int, default=3)
-    ap.add_argument("--rows", type=int, default=3)
+    ap.add_argument("--cols", type=int, default=1)
+    ap.add_argument("--rows", type=int, default=1)
     ap.add_argument("--zoom-in", type=int, default=0, help="press zoom-IN this many times after load")
     ap.add_argument("--zoom-out", type=int, default=0, help="press zoom-OUT this many times after load")
     ap.add_argument("--fresh", action="store_true",
