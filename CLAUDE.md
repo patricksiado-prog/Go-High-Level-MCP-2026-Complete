@@ -240,6 +240,80 @@
   is blocked (service account can't write to a personal-Gmail Drive; sheet is AI-blocked)
   — so getting that endpoint list currently needs a screenshot from Patrick.
 
+- **SESSION 2026-06-17 — what got built/learned (read this; supersedes stale bits above).**
+  - **CLAUDE *CAN* READ THE SHEET.** The old "sheet is AI-blocked" note is WRONG. The
+    Drive MCP is connected to Patrick's own Google account, so `read_file_content` on
+    `SHEET_ID 1FhO2BTM…` returns the live data (Precise Fiber rows, Hunter Status
+    heartbeats, the old MapMan tab). This is the real feedback channel — no screenshots
+    needed for data. (The OPTIMUS_HUNTER_LOG.txt / SHOT.png telemetry files stay EMPTY:
+    the service account can't write to Patrick-owned files unless he shares the folder
+    with `fiberscanner@…iam.gserviceaccount.com`, which he never did. Don't rely on them —
+    read the sheet instead.) Drive read returns ~274k chars max (truncates a huge sheet);
+    use python/jq on the saved tool-result file for counts.
+  - **Drive MCP limits:** I can READ files + CREATE files in Patrick's Drive, but CANNOT
+    set sharing (no permission tool → Patrick must "Anyone with link → Viewer" anything I
+    make) and CANNOT update a file in place (no update tool → every change = a NEW file
+    with a NEW id; that's why links churned). Stable distribution = thin launcher that
+    re-downloads a FIXED guts id each run; publish updates via Drive **Manage versions**
+    (keeps the id + link).
+  - **PRECISE HUNTER — fast auto-sweep shipped & confirmed working.** Manual mode now
+    SWEEPS instead of reading one stationary view (that was the `+0 this pass` bug seen in
+    Hunter Status pass 346–353). `mouse_drag()` = the PROVEN fiber_hunter motion (drag the
+    canvas; arrow keys/panBy do nothing). `sweep_backend()` drags cell-to-cell across a
+    grid, flushing the serviceability backend each cell. Root-cause of "not panning":
+    the map canvas can be in a FRAME — `_map_canvas_box` now searches page+frames, and
+    falls back to dragging the VIEWPORT map-region (page.mouse, frame-independent) so it
+    ALWAYS pans. Tunables: `DRAG_FRAC=0.45` (pan distance), `--fast` pacing
+    (WAIT_AFTER_PAN 0.2 / SEARCH_SETTLE 0.25). Default `--cols 3 --rows 3`.
+    LIVE RESULT: Precise Fiber went 312 → 1876 across 155+ River Oaks streets = sweep
+    works. Verified 3108 Locke Ln earlier.
+  - **SHEET = leads only.** Dot Color column writes **GREEN** (lead) / **ORANGE**
+    (copper upgrade); **GREY (existing customer) is SKIPPED entirely** (both write paths).
+  - **PHONE ENRICHMENT runs in-process** (`_start_enrichment` daemon thread →
+    `enrich_phones.run(watch=True)`), reprocesses the whole `precise_addresses.jsonl`
+    backlog, writes name+phone to an **"Enriched Leads"** tab. Excludes government/civic +
+    big-box chains (`_is_callable_prospect`). Columns Patrick wants = Category, Email,
+    Name, Address, Phone. Auto-uses Google Places when `GOOGLE_PLACES_API_KEY` is set (no
+    flag). **HARD TRUTH:** free OSM/Places/Maps only have BUSINESS phones — houses have NO
+    free public number anywhere; residential phones = SKIP-TRACING only (like La Porte).
+  - **COMMERCIAL vs RESIDENTIAL split = `commercial_split.py`.** The scalable MapMan way:
+    bulk-scrape every business in a ZIP by category, then cross-reference to the captured
+    fiber addresses. Match = COMMERCIAL (name+phone → Commercial Leads tab); no match =
+    RESIDENTIAL (door-knock → Residential Leads tab). `normalize_address()` (tested) lines
+    up "3266 Locke Lane, Houston TX" with "3266 LOCKE LN". Category sets QUICK(20)/
+    NORMAL(47)/DEEP(155), small/in-home focus (home-based biz sit at residential
+    addresses — searching them catches them). `MAPMAN.bat` = one-click (ZIPs + depth →
+    scrape → split into sheet); prefers gosom exe, falls back to the built-in scraper.
+  - **THE SCRAPER.** `gosom/google-maps-scraper` (MIT, no key, prebuilt Win binary) is the
+    proven open-source tool — it reads Google's hidden JSON data feed (fast, block-
+    resistant: bulk category searches, not 20k one-by-one lookups). Its easy install is
+    Docker though. So also built **our own** Playwright scraper: `optimus/maps_scraper.py`
+    (in-suite) and `optimus/standalone/maps_scraper_standalone.py` (the standalone product:
+    prompts ZIPs, embedded categories, CSV **or** Google Sheet "Maps Businesses" tab,
+    VERSION stamp). Can't test scrapers from the sandbox (network 403 on Google/Overpass).
+  - **STANDALONE SCRAPER PRODUCT (Drive-hosted, self-installing, auto-updating).**
+    PERMANENT launcher link = Drive id **`1uOR6ijmlQXy61dcoDD1gr7cE9ibLnah1`**
+    ("START - Maps Scraper.bat"). It installs Python+Playwright itself, then RE-DOWNLOADS
+    the **guts** each run from Drive id **`1jRFrgO-2kkqCWrwF0MN1uUFv81vDMEEy`**
+    ("SCRAPER GUTS (update this one)") → auto-update with nothing for the user but the
+    link. People need NO GitHub/git. To update without changing the link: Drive Manage-
+    versions on the guts file. (Couldn't do pure-GitHub auto-update: the repo is PRIVATE,
+    so a GitHub pull would force every recipient to have repo access — breaks "just the
+    link.") Both files must be shared Anyone-with-link → Viewer (Patrick does this).
+    Old duplicate launcher/guts uploads litter the "OPTIMUS SETUP" folder — delete by hand.
+  - **GitHub scope:** this session can only touch `go-high-level-mcp-2026-complete`. The
+    `optimus-map-tools` repo (the ORIGINAL fiber_hunter + MapMan) is DENIED — can't read
+    it. `list_repos`/`add_repo` tools not available here. gosom source IS readable (public)
+    via WebFetch.
+  - **NEXT / OPEN:** (1) prove the standalone scraper on Patrick's PC (was mid-run:
+    `[2/3] Browser engine` = chromium download, slow first time). (2) DIALER: wire
+    scraped Commercial Leads → `business_score` → `ghl_loader` (already builds AT&T
+    Commercial opps + enrolls the "Optimus Fiber Biz — Power Dialer Queue" workflow,
+    human-on-every-call). Missing glue = an adapter from the scraper CSV to ghl_loader's
+    scored-dict input, + GHL_PIT_TOKEN, + power-dialer/number enabled in Command, + DNC
+    scrub. (3) emails drafted in Gmail to `Js@frontlinedirectsales.com` (Jim): Google
+    Cloud Places-API setup + installer — Patrick to review/send.
+
 ## 7. Creds & accounts (Patrick's own — keep it simple)
 - These are Patrick's accounts and creds. Copying or downloading `google_creds.json` to the
   right path on his own device is **routine setup, not a high-stakes event** — just do it and
