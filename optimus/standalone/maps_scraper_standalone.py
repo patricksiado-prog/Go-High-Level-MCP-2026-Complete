@@ -10,12 +10,14 @@ installs. Lives in Drive so it can be updated without re-sharing the installer.
 Run by SCRAPER_SETUP.bat, or directly:  python maps_scraper_standalone.py
 """
 
-import os, csv, re, time, urllib.parse
+import os, csv, re, time, json, urllib.parse
 
-VERSION = "1.2 (2026-06-17)"   # bump this when the scraper changes; printed on start
+VERSION = "1.3 (2026-06-17)"   # bump this when the scraper changes; printed on start
 
-OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "businesses.csv")
-PROFILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "maps_profile")
+HERE = os.path.dirname(os.path.abspath(__file__))
+OUT_PATH = os.path.join(HERE, "businesses.csv")
+PROFILE_DIR = os.path.join(HERE, "maps_profile")
+PROGRESS_PATH = os.path.join(HERE, "maps_progress.json")   # resume: done searches
 FIELDS = ["name", "address", "phone", "website", "category"]
 
 # Google Sheet destination (option 2). Results go to this sheet's tab below.
@@ -170,6 +172,31 @@ def scrape_query(page, query, category):
     return rows
 
 
+def load_progress():
+    """Searches already completed in a prior run (so a stopped run resumes)."""
+    try:
+        with open(PROGRESS_PATH) as f:
+            return set(json.load(f))
+    except Exception:
+        return set()
+
+
+def save_progress(done):
+    try:
+        with open(PROGRESS_PATH, "w") as f:
+            json.dump(sorted(done), f)
+    except Exception:
+        pass
+
+
+def clear_progress():
+    """Wipe progress after a clean full run, so the next run starts fresh."""
+    try:
+        os.remove(PROGRESS_PATH)
+    except Exception:
+        pass
+
+
 def _find_creds():
     for p in (os.path.join(os.path.expanduser("~"), "maps_scraper", "google_creds.json"),
               os.path.join(os.path.expanduser("~"), "optimus", "google_creds.json"),
@@ -259,28 +286,42 @@ def main():
     print("  [3] Deep   (~155 categories - most thorough, slowest)")
     cats = categories_for(input("Choose 1, 2, or 3 (press Enter for 2): ").strip() or "2")
     queries = [("%s in %s" % (c, z), c) for z in zips for c in cats]
-    print("\nSearching %d categories x %d ZIPs = %d searches -> %s\n"
-          % (len(cats), len(zips), len(queries), OUT_PATH))
+
+    # RESUME: skip searches finished in a prior run that stopped early
+    done = load_progress()
+    pending = [(q, cat) for (q, cat) in queries if q not in done]
+    resuming = bool(done) and len(pending) < len(queries)
+    if resuming:
+        print("\nResuming -- %d of %d searches already done; %d left."
+              % (len(queries) - len(pending), len(queries), len(pending)))
+    print("\nSearching %d categories x %d ZIPs = %d searches (%d to do) -> %s\n"
+          % (len(cats), len(zips), len(queries), len(pending), OUT_PATH))
+    if not pending:
+        print("Nothing left to do (already complete). Starting over next time.")
+        clear_progress()
 
     from playwright.sync_api import sync_playwright
     os.makedirs(PROFILE_DIR, exist_ok=True)
     sheet_ws, sheet_seen = (open_sheet() if to_sheet else (None, set()))
-    seen, total, sheet_added = set(), 0, 0
+    seen, total, sheet_added, stopped = set(), 0, 0, False
+    csv_mode = "a" if (resuming and os.path.exists(OUT_PATH)) else "w"
     with sync_playwright() as p:
         ctx = p.chromium.launch_persistent_context(
             PROFILE_DIR, headless=False, viewport={"width": 1280, "height": 900})
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
-        out_f = open(OUT_PATH, "w", newline="", encoding="utf-8")
+        out_f = open(OUT_PATH, csv_mode, newline="", encoding="utf-8")
         writer = csv.DictWriter(out_f, fieldnames=FIELDS)
-        writer.writeheader()
-        for i, (q, cat) in enumerate(queries, 1):
+        if csv_mode == "w":
+            writer.writeheader()
+        for i, (q, cat) in enumerate(pending, 1):
             try:
                 rows = scrape_query(page, q, cat)
             except Exception as e:
-                print("  [%d/%d] %-30s ERROR %s" % (i, len(queries), q, str(e)[:40]))
+                print("  [%d/%d] %-30s ERROR %s" % (i, len(pending), q, str(e)[:40]))
                 continue
             if rows is None:
-                print("  Google blocked the search -- stopping. Try again later.")
+                print("  Google blocked the search -- stopping. Run again to RESUME here.")
+                stopped = True
                 break
             new, q_new = 0, []
             for r in rows:
@@ -295,13 +336,19 @@ def main():
             if sheet_ws is not None and q_new:      # add to the sheet as we go
                 sheet_added += append_sheet(sheet_ws, q_new, sheet_seen)
             total += new
+            done.add(q)                              # mark this search complete
+            save_progress(done)
             withp = sum(1 for r in rows if r.get("phone"))
-            print("  [%d/%d] %-32s +%d (%d w/phone)" % (i, len(queries), q[:32], new, withp))
+            print("  [%d/%d] %-32s +%d (%d w/phone)" % (i, len(pending), q[:32], new, withp))
         out_f.close()
         ctx.close()
+    if not stopped:
+        clear_progress()                             # finished -> fresh next time
     print("\nDONE: %d businesses saved to CSV:\n  %s" % (total, OUT_PATH))
     if to_sheet:
         print("  %d added to the '%s' tab (written live as it ran)." % (sheet_added, SHEET_TAB))
+    if stopped:
+        print("\n  Stopped early -- just run this again and it picks up where it left off.")
     try:
         input("\nPress Enter to close...")
     except EOFError:
