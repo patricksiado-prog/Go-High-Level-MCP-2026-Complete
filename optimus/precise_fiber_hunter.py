@@ -1534,6 +1534,41 @@ def sweep_backend(page, ws, seen, area_label, dry, cols, rows, capture):
     return total
 
 
+def sweep_continuous(page, ws, seen, area_label, dry, capture):
+    """Keep sweeping OUTWARD in a spiral, capturing each viewport off the
+    backend, until the browser is closed -- no fixed grid. Set it on a spot/ZIP
+    and it covers that area and keeps expanding past it until the computer (or
+    you closing the window) stops it. Returns the total captured."""
+    dirs = ["right", "down", "left", "up"]
+    di, run, cell, total = 0, 1, 0, 0
+    print("Continuous sweep -- panning outward until you close the browser.\n")
+    try:
+        while True:
+            for _arm in range(2):           # spiral: 2 arms per run-length, then grow
+                for _ in range(run):
+                    if on_map(page):
+                        search_this_area(page)
+                    time.sleep(SEARCH_SETTLE)
+                    n = capture.flush(ws, seen, area_label, dry)
+                    total += n
+                    cell += 1
+                    print("  [cell %d] +%d  (total %d)" % (cell, n, total))
+                    if cell % 15 == 0:
+                        report_status(ws, area_label, "watching", found=total,
+                                      note="continuous: %d cells, %d leads" % (cell, total))
+                    if not mouse_drag(page, dirs[di]):
+                        return total        # canvas gone -> stop
+                di = (di + 1) % 4
+            run += 1
+    except Exception as e:
+        msg = str(e).lower()
+        if "closed" in msg or "target" in msg:
+            print("\nBrowser closed -- stopping the sweep. (%d leads this run.)" % total)
+        else:
+            print("\nSweep stopped: %s" % str(e)[:100])
+        return total
+
+
 def search_zip(page, zip_code):
     """Type the ZIP into the AT&T map's search box and submit. Tries the
     Mapbox geocoder input, visible text inputs, then the textbox role."""
@@ -2157,11 +2192,8 @@ def main():
                 cap = _NET_CAPTURE[0]
                 if cap is None:
                     n = 0
-                elif args.cols * args.rows > 1:
-                    n = sweep_backend(page, ws, seen, area_label, args.dry,
-                                      args.cols, args.rows, cap)
-                else:
-                    n = cap.flush(ws, seen, area_label, args.dry)
+                else:                    # CONTINUOUS: sweep outward until stopped
+                    n = sweep_continuous(page, ws, seen, area_label, args.dry, cap)
                 if n:
                     print("  captured %d addresses OFF THE SERVER "
                           "(backend read, no dot-clicking)" % n)
@@ -2206,11 +2238,12 @@ def main():
             # pans cell-to-cell PROGRAMMATICALLY (no clicks -> no portal flip).
             if on_map(page):
                 search_this_area(page)
-            mode = "FRESH (new-fiber only)" if args.fresh else "full"
-            print("Scanning %d x %d viewports -- %s mode (backend read)...\n"
-                  % (args.cols, args.rows, mode))
-            return scan(page, ws, args.zip or "manual", args.cols, args.rows,
-                        args.dry, fresh_only=args.fresh)
+            cap = _NET_CAPTURE[0]
+            print("Continuous sweep of %s (backend read)...\n" % (args.zip or "this area"))
+            if cap is None:
+                return 0
+            return sweep_continuous(page, ws, seen, args.zip or "manual",
+                                    args.dry, cap)
 
         if not args.auto:
             # MANUAL mode: let the user get the map where they want it, then
@@ -2229,7 +2262,9 @@ def main():
         # Manual mode keeps watching by default: you pan the map by hand and it
         # collects the backend dots from each view, every few seconds, until you
         # close the browser. (auto mode honors --loop.)
-        loop_secs = args.loop if (args.loop and args.loop > 0) else (6 if not args.auto else 0)
+        # the continuous sweep loops internally until you close the browser, so
+        # the outer loop is a single pass unless you explicitly pass --loop.
+        loop_secs = args.loop if (args.loop and args.loop > 0) else 0
         report_status(ws, args.zip or "manual", "started",
                       note="watching every %ss" % loop_secs if loop_secs else "single pass")
         if loop_secs and not args.auto:
