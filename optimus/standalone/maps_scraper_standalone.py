@@ -12,6 +12,8 @@ Run by SCRAPER_SETUP.bat, or directly:  python maps_scraper_standalone.py
 
 import os, csv, re, time, urllib.parse
 
+VERSION = "1.2 (2026-06-17)"   # bump this when the scraper changes; printed on start
+
 OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "businesses.csv")
 PROFILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "maps_profile")
 FIELDS = ["name", "address", "phone", "website", "category"]
@@ -172,7 +174,7 @@ def write_to_sheet(rows):
 
 def main():
     print("=" * 56)
-    print("  GOOGLE MAPS BUSINESS SCRAPER")
+    print("  GOOGLE MAPS BUSINESS SCRAPER   v%s" % VERSION)
     print("=" * 56)
     zips = input("\nEnter ZIP codes (comma-separated, e.g. 77027,77019): ").strip()
     zips = [z.strip() for z in zips.split(",") if z.strip()]
