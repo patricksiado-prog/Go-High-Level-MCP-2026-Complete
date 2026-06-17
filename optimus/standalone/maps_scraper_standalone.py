@@ -179,13 +179,14 @@ def _find_creds():
     return None
 
 
-def write_to_sheet(rows):
-    """Append the businesses to the Google Sheet's 'Maps Businesses' tab.
-    Needs google_creds.json on the machine. Dedupes against rows already there."""
+def open_sheet():
+    """Open (or create) the 'Maps Businesses' tab ONCE at the start, and read the
+    rows already there so we don't duplicate. Returns (worksheet, seen-keys-set)
+    or (None, set()) if there's no key. Needs google_creds.json on the machine."""
     creds = _find_creds()
     if not creds:
-        print("\n  (No google_creds.json found -- results are in the CSV only.)")
-        return 0
+        print("\n  (No google_creds.json found -- results go to the CSV only.)")
+        return None, set()
     try:
         import gspread
         from google.oauth2.service_account import Credentials
@@ -199,23 +200,42 @@ def write_to_sheet(rows):
             ws = sh.add_worksheet(title=SHEET_TAB, rows="20000", cols="5")
         if not ws.get_all_values():
             ws.append_row(["Name", "Address", "Phone", "Website", "Category"])
-        existing = set()
+        seen = set()
         try:
             for r in ws.get_all_values()[1:]:
                 if len(r) >= 2:
-                    existing.add((r[0].strip().upper() + "|" + r[1].strip().upper()))
+                    seen.add(r[0].strip().upper() + "|" + r[1].strip().upper())
         except Exception:
             pass
-        new = [[r["name"] or "", r["address"] or "", r["phone"] or "",
-                r["website"] or "", r["category"] or ""]
-               for r in rows
-               if ((r["name"] or "").strip().upper() + "|"
-                   + (r["address"] or "").strip().upper()) not in existing]
+        print("  -> writing to the '%s' tab live, as it runs." % SHEET_TAB)
+        return ws, seen
+    except Exception as e:
+        print("\n  (Could not open the sheet: %s -- results go to the CSV.)" % str(e)[:80])
+        return None, set()
+
+
+def append_sheet(ws, rows, sheet_seen):
+    """Append the new (not-already-in-sheet) rows NOW. Updates sheet_seen.
+    Called after each category so the sheet fills continually."""
+    if ws is None or not rows:
+        return 0
+    new = []
+    for r in rows:
+        key = ((r.get("name") or "").strip().upper() + "|"
+               + (r.get("address") or "").strip().upper())
+        if key in sheet_seen:
+            continue
+        sheet_seen.add(key)
+        new.append([r.get("name") or "", r.get("address") or "", r.get("phone") or "",
+                    r.get("website") or "", r.get("category") or ""])
+    if not new:
+        return 0
+    try:
         for i in range(0, len(new), 500):
             ws.append_rows(new[i:i + 500], value_input_option="RAW")
         return len(new)
     except Exception as e:
-        print("\n  (Could not write to the sheet: %s -- results are in the CSV.)" % str(e)[:80])
+        print("  (sheet write hiccup, will retry next batch: %s)" % str(e)[:60])
         return 0
 
 
@@ -244,7 +264,8 @@ def main():
 
     from playwright.sync_api import sync_playwright
     os.makedirs(PROFILE_DIR, exist_ok=True)
-    seen, total, kept = set(), 0, []
+    sheet_ws, sheet_seen = (open_sheet() if to_sheet else (None, set()))
+    seen, total, sheet_added = set(), 0, 0
     with sync_playwright() as p:
         ctx = p.chromium.launch_persistent_context(
             PROFILE_DIR, headless=False, viewport={"width": 1280, "height": 900})
@@ -261,16 +282,18 @@ def main():
             if rows is None:
                 print("  Google blocked the search -- stopping. Try again later.")
                 break
-            new = 0
+            new, q_new = 0, []
             for r in rows:
                 key = (r["name"] or "") + "|" + (r["address"] or "")
                 if key in seen:
                     continue
                 seen.add(key)
                 writer.writerow(r)
-                kept.append(r)
+                q_new.append(r)
                 new += 1
             out_f.flush()
+            if sheet_ws is not None and q_new:      # add to the sheet as we go
+                sheet_added += append_sheet(sheet_ws, q_new, sheet_seen)
             total += new
             withp = sum(1 for r in rows if r.get("phone"))
             print("  [%d/%d] %-32s +%d (%d w/phone)" % (i, len(queries), q[:32], new, withp))
@@ -278,10 +301,7 @@ def main():
         ctx.close()
     print("\nDONE: %d businesses saved to CSV:\n  %s" % (total, OUT_PATH))
     if to_sheet:
-        print("\nUploading to your Google Sheet...")
-        n = write_to_sheet(kept)
-        if n:
-            print("  +%d businesses added to the '%s' tab." % (n, SHEET_TAB))
+        print("  %d added to the '%s' tab (written live as it ran)." % (sheet_added, SHEET_TAB))
     try:
         input("\nPress Enter to close...")
     except EOFError:
