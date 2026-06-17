@@ -28,14 +28,12 @@ echo     (or this window) to stop. It will NOT reopen.
 echo  ============================================================
 echo.
 
-REM Free phone enricher alongside, its own window (OSM only, no API cost).
-start "Optimus Enrich (free)" cmd /c python enrich_phones.py --watch
-
-REM MANUAL start (no --auto): you position the map on the spot you want, press
-REM Enter, and it sweeps a 3x3 block around it -- panning + pressing "Search this
-REM area" cell to cell (programmatic pan = no clicks = never flips to the portal),
-REM reading the GREEN + GOLD dots straight from the map backend and writing them
-REM to the Google Sheet. No zoom. --fast = quick. One sweep, then it waits.
+REM MANUAL start (no --auto): you position + zoom the map on the spot you want,
+REM press Enter, and it sweeps a 3x3 block around it -- DRAGGING the map cell to
+REM cell (the proven fiber_hunter mouse-drag motion = pans the hidden map, never
+REM flips to the portal), reading the GREEN + GOLD dots straight from the AT&T
+REM backend and writing them to the Google Sheet. Phone + business enrichment
+REM now runs IN-PROCESS automatically (free OSM), so no separate window. --fast.
 python precise_fiber_hunter.py --cols 3 --rows 3 --fast
 
 echo.

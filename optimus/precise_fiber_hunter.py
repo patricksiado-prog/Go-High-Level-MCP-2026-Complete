@@ -86,6 +86,7 @@ RUN:
 import os, sys, time, argparse, re
 
 import json
+import threading
 
 from optimus_dot_detect import (GREEN_MIN, GREEN_MAX, GOLD_MIN, GOLD_MAX,
                                 GRAY_MIN, GRAY_MAX, classify_status,
@@ -129,7 +130,12 @@ MAP_RIGHT_FRAC = 0.98
 WAIT_AFTER_PAN = 0.9
 WAIT_AFTER_ZOOM = 0.9
 SEARCH_SETTLE = 0.8           # wait after "Search this area" for dots to load
+SEARCH_CLICK_WAIT = 1.5       # wait after CLICKING the search control for the fetch
 PAN_PRESSES = 6
+# fiber_hunter's proven motion is a MOUSE DRAG across the canvas (the original
+# used pyautogui.dragRel). DRAG_FRAC = how far to drag, as a fraction of the
+# canvas, per cell (<1 so adjacent cells overlap a little and miss nothing).
+DRAG_FRAC = 0.62
 POPUP_POLL_INTERVAL = 0.12    # poll the popup instead of fixed sleeps
 POPUP_POLL_TIMEOUT = 2.0      # per click attempt
 CLICK_OFFSETS = [(0, 0), (3, 0), (-3, 0), (0, 3), (0, -3)]   # retry spiral
@@ -1336,7 +1342,7 @@ def search_this_area(page):
             if btn.count() > 0:
                 print("  -> pressing '%s' (fetching dots from server)..." % label)
                 btn.first.click()
-                time.sleep(3.0)
+                time.sleep(SEARCH_CLICK_WAIT)
                 return True
         except Exception:
             pass
@@ -1426,6 +1432,70 @@ def pan(page, direction):
         time.sleep(0.12)
     time.sleep(WAIT_AFTER_PAN)
     search_this_area(page)   # load the new view's dots
+
+
+def _map_canvas_box(page):
+    """Bounding box of the map canvas (or None)."""
+    for sel in (".mapboxgl-canvas", ".maplibregl-canvas", "canvas"):
+        try:
+            cv = page.locator(sel).first
+            if cv.count() == 0:
+                continue
+            b = cv.bounding_box()
+            if b and b["width"] > 100 and b["height"] > 100:
+                return b
+        except Exception:
+            pass
+    return None
+
+
+def mouse_drag(page, direction):
+    """PROVEN fiber_hunter motion: DRAG the map canvas to pan (the original
+    fiber_hunter used pyautogui.dragRel, ~150px serpentine). A drag is a map
+    gesture, so it pans the HIDDEN Mapbox map where arrow keys / panBy do
+    nothing -- and because it stays on the canvas it never lands on nav (no
+    portal flip). Drag the content the OPPOSITE way you want the viewport to
+    move, then the serviceability fetch fires for the new area."""
+    box = _map_canvas_box(page)
+    if not box:
+        return False
+    cx = box["x"] + box["width"] / 2.0
+    cy = box["y"] + box["height"] / 2.0
+    sx, sy = {"right": (-1, 0), "left": (1, 0),
+              "down": (0, -1), "up": (0, 1)}[direction]
+    dx = sx * box["width"] * DRAG_FRAC
+    dy = sy * box["height"] * DRAG_FRAC
+    try:
+        page.mouse.move(cx, cy)
+        page.mouse.down()
+        page.mouse.move(cx + dx, cy + dy, steps=8)   # smooth drag -> map pans
+        page.mouse.up()
+    except Exception:
+        return False
+    time.sleep(WAIT_AFTER_PAN)
+    return True
+
+
+def sweep_backend(page, ws, seen, area_label, dry, cols, rows, capture):
+    """FAST auto-sweep with the proven mouse-drag motion. Per cell: nudge the
+    serviceability fetch, then FLUSH the backend capture (no clicking) to the
+    sheet; then DRAG to the next cell, snaking across a cols x rows grid. The
+    drag itself triggers AT&T's fetch and NetCapture reads it off the wire."""
+    total = 0
+    for r in range(rows):
+        for c in range(cols):
+            if on_map(page):
+                search_this_area(page)        # belt+suspenders fetch trigger
+            time.sleep(SEARCH_SETTLE)
+            n = capture.flush(ws, seen, area_label, dry)
+            total += n
+            print("  [cell r%d c%d] +%d off the server" % (r, c, n))
+            if c < cols - 1:
+                mouse_drag(page, "right" if r % 2 == 0 else "left")
+        if r < rows - 1:
+            mouse_drag(page, "down")
+    total += capture.flush(ws, seen, area_label, dry)   # final drain
+    return total
 
 
 def search_zip(page, zip_code):
@@ -1701,6 +1771,34 @@ def self_update():
 
 
 # ----------------------------------------------------------------------------
+# phone + business enrichment, running alongside the hunt (in-process)
+# ----------------------------------------------------------------------------
+def _start_enrichment(allow_paid=False):
+    """Launch phone/business enrichment in a background daemon thread so leads
+    get a name + phone while the scan keeps running. FREE OpenStreetMap first;
+    paid Google Places only when allow_paid AND GOOGLE_PLACES_API_KEY is set. It
+    tails precise_addresses.jsonl -> enriched_leads.jsonl. Best-effort; a daemon
+    thread dies with the program and never blocks or breaks the hunt."""
+    def _run():
+        try:
+            import enrich_phones
+        except Exception as e:
+            print("(enrichment not started: %s)" % str(e)[:80])
+            return
+        key = os.environ.get("GOOGLE_PLACES_API_KEY")
+        paid = bool(allow_paid and key)
+        try:
+            enrich_phones.run(enrich_phones.IN_PATH, enrich_phones.OUT_PATH,
+                              dry=False, allow_paid=paid, api_key=key,
+                              watch=True, watch_interval=8.0)
+        except Exception as e:
+            print("(enrichment stopped: %s)" % str(e)[:80])
+    threading.Thread(target=_run, daemon=True).start()
+    mode = "free OSM -> paid Places on misses" if allow_paid else "free OSM ($0)"
+    print("Enrichment running in the background (%s) -> enriched_leads.jsonl" % mode)
+
+
+# ----------------------------------------------------------------------------
 # live status -> Drive (a tab in the same Google Sheet) + a local file
 # ----------------------------------------------------------------------------
 _status_ws = [None]   # cached "Hunter Status" worksheet handle
@@ -1879,6 +1977,11 @@ def main():
     ap.add_argument("--allow-click", action="store_true",
                     help="re-enable the old pixel-click dot capture (off by "
                          "default because the clicks can flip the view to the portal)")
+    ap.add_argument("--no-enrich", action="store_true",
+                    help="don't run phone/business enrichment in the background")
+    ap.add_argument("--paid", action="store_true",
+                    help="let the background enricher use paid Google Places on "
+                         "OSM misses (needs GOOGLE_PLACES_API_KEY). Default is FREE.")
     args = ap.parse_args()
 
     if args.allow_click:
@@ -1886,10 +1989,12 @@ def main():
         ALLOW_CLICK = True
 
     if args.fast:
-        global WAIT_AFTER_PAN, WAIT_AFTER_ZOOM, SEARCH_SETTLE, POPUP_POLL_TIMEOUT
+        global WAIT_AFTER_PAN, WAIT_AFTER_ZOOM, SEARCH_SETTLE, SEARCH_CLICK_WAIT
+        global POPUP_POLL_TIMEOUT
         WAIT_AFTER_PAN = 0.45
         WAIT_AFTER_ZOOM = 0.45
         SEARCH_SETTLE = 0.4
+        SEARCH_CLICK_WAIT = 0.7
         POPUP_POLL_TIMEOUT = 1.3
         print("FAST mode: tightened pacing.")
 
@@ -1962,18 +2067,31 @@ def main():
             ctx.close()
             return
 
+        # Phone + business enrichment runs IN-PROCESS alongside the hunt (free
+        # OSM first; paid Places only with --paid + a key). It tails
+        # precise_addresses.jsonl, so every address the hunter writes gets a
+        # name/phone attached while the scan keeps going. Daemon = dies with us.
+        if not args.no_enrich and not args.dry:
+            _start_enrichment(args.paid)
+
         def one_pass():
-            # MANUAL mode: you already positioned the map, which made AT&T fetch
-            # the serviceability dot data. Just READ what was captured off the
-            # wire -- NO open_map_view, NO search click, NO pan, NO scan. Nothing
-            # navigates, so nothing can flip the view to the loading/portal page.
+            # MANUAL mode: you already positioned + zoomed the map (which made
+            # AT&T fetch the serviceability dots). READ what's captured off the
+            # wire, then DRAG cell-to-cell (proven fiber_hunter motion) across a
+            # cols x rows grid to keep going -- no clicking, no reload/flip.
             if not args.auto:
                 drive_screenshot(page)   # so Claude can see the screen
                 cap = _NET_CAPTURE[0]
-                n = cap.flush(ws, seen, area_label, args.dry) if cap is not None else 0
+                if cap is None:
+                    n = 0
+                elif args.cols * args.rows > 1:
+                    n = sweep_backend(page, ws, seen, area_label, args.dry,
+                                      args.cols, args.rows, cap)
+                else:
+                    n = cap.flush(ws, seen, area_label, args.dry)
                 if n:
                     print("  captured %d addresses OFF THE SERVER "
-                          "(no clicks, no motion)" % n)
+                          "(backend read, no dot-clicking)" % n)
                     drive_log("MANUAL captured=%d" % n)
                 else:
                     print("  no serviceability addresses decoded for this view yet.")
