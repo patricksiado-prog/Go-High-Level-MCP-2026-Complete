@@ -1,10 +1,10 @@
 @echo off
 REM ===========================================================================
 REM  MAPMAN.bat -- commercial vs residential split + business phones.
-REM  Asks for ZIPs, builds the search list, runs the open-source Google Maps
-REM  scraper, then splits your captured fiber leads into the sheet:
-REM    Commercial Leads (name + phone)  |  Residential Leads (door-knock).
-REM  One-time: download the scraper exe (link shown below if it's missing).
+REM  Asks for ZIPs, then: builds the search list -> scrapes Google Maps with the
+REM  built-in Python scraper (NO download, uses the browser OPTIMUS installed) ->
+REM  splits your captured fiber leads into the sheet:
+REM    Commercial Leads (Category, Email, Name, Address, Phone)  |  Residential.
 REM ===========================================================================
 setlocal EnableDelayedExpansion
 set "OPT=%USERPROFILE%\optimus\repo\optimus"
@@ -22,28 +22,11 @@ echo.
 echo [1/3] Building the business search list...
 python commercial_split.py make-queries --zips %ZIPS% || (pause & exit /b 1)
 
-REM locate the scraper exe: this folder, the optimus home, or PATH
-set "SCRAPER="
-if exist "%OPT%\google-maps-scraper.exe" set "SCRAPER=%OPT%\google-maps-scraper.exe"
-if not defined SCRAPER if exist "%USERPROFILE%\optimus\google-maps-scraper.exe" set "SCRAPER=%USERPROFILE%\optimus\google-maps-scraper.exe"
-if not defined SCRAPER ( where google-maps-scraper.exe >nul 2>&1 && set "SCRAPER=google-maps-scraper.exe" )
-if not defined SCRAPER (
-    echo.
-    echo   *** One-time setup: the Google Maps scraper isn't installed yet. ***
-    echo   1^) Open https://github.com/gosom/google-maps-scraper/releases/latest
-    echo   2^) Download the Windows zip, unzip it
-    echo   3^) Put  google-maps-scraper.exe  in this folder:
-    echo        %OPT%
-    echo   Then run MAPMAN again.
-    echo.
-    pause & exit /b 1
-)
-
 echo.
-echo [2/3] Scraping businesses with %SCRAPER% (this is the slow part)...
-REM -email crawls each business website for an email (slower, but "email if available").
-REM -depth 10 = scroll deep so we get the full ~120 results per search (better coverage).
-"%SCRAPER%" -input queries.txt -results businesses.csv -depth 10 -email -c 2
+echo [2/3] Scraping Google Maps for businesses (this is the slow part)...
+echo       A browser window opens -- let it work. If Google ever shows a
+echo       "before you continue" page, click Accept once and it continues.
+python maps_scraper.py
 
 echo.
 echo [3/3] Splitting commercial vs residential into the Google Sheet...
