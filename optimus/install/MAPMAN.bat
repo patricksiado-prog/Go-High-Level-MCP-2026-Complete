@@ -19,8 +19,16 @@ set /p ZIPS="Enter ZIP codes to scan (comma-separated, e.g. 77027,77019): "
 if "%ZIPS%"=="" (echo No ZIPs entered. & pause & exit /b 1)
 
 echo.
+echo  How many business categories to search?
+echo    [1] Quick   (~20 categories - fastest)
+echo    [2] Normal  (~47 categories - default)
+echo    [3] Deep    (~160 categories - thorough, slow)
+set /p LEVEL="Choose 1, 2, or 3 (press Enter for 2): "
+if "%LEVEL%"=="" set "LEVEL=2"
+
+echo.
 echo [1/3] Building the business search list...
-python commercial_split.py make-queries --zips %ZIPS% || (pause & exit /b 1)
+python commercial_split.py make-queries --zips %ZIPS% --level %LEVEL% || (pause & exit /b 1)
 
 echo.
 echo [2/3] Scraping Google Maps for businesses (this is the slow part)...

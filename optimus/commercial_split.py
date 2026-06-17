@@ -37,10 +37,21 @@ RESIDENTIAL_TAB = "Residential Leads"
 COMMERCIAL_HEADER = ["Category", "Email", "Business Name", "Address", "Phone"]
 RESIDENTIAL_HEADER = ["Address", "Dot Color", "Zone", "Lat", "Lng"]
 
-# Core small-business + in-home category list (one Maps search each, per ZIP).
-# A normal-sized set focused on owner-operated / mobile / home-based businesses
-# (many sit at RESIDENTIAL addresses, so searching them catches the home-based
-# ones a plain "is it a house?" test would miss). Edit freely.
+# Three category sets you pick from at the start of a run (MAPMAN asks). All are
+# small-business + in-home focused (owner-operated / mobile / home-based -- many
+# sit at RESIDENTIAL addresses, so searching them catches the home-based ones a
+# plain "is it a house?" test would miss). Edit freely.
+
+# QUICK (~20): the highest-value common small businesses; fastest scrape.
+CATEGORIES_CORE = [
+    "plumber", "electrician", "hvac", "roofing", "general contractor",
+    "painter", "handyman", "landscaping", "house cleaning", "junk removal",
+    "auto repair", "dog grooming", "hair salon", "barber shop", "nail salon",
+    "chiropractor", "dentist", "photographer", "real estate agent",
+    "insurance agent",
+]
+
+# NORMAL (~47): the default -- a solid, balanced set.
 CATEGORIES = [
     # trades / contractors
     "plumber", "electrician", "hvac", "roofing", "general contractor",
@@ -64,6 +75,48 @@ CATEGORIES = [
     "photographer", "bookkeeper", "real estate agent", "insurance agent",
     "tutoring", "home daycare", "notary public",
 ]
+
+# DEEP (~160): thorough, slow -- normal plus a long tail of niche home/mobile biz.
+_DEEP_EXTRA = [
+    "maid service", "window cleaning", "lawn mowing service", "gutter cleaning",
+    "chimney sweep", "fence company", "blind cleaning", "home organizer",
+    "air conditioning repair", "remodeling contractor", "tile installer",
+    "drywall", "carpenter", "concrete contractor", "paving contractor",
+    "solar installer", "welding", "masonry", "septic service",
+    "insulation contractor", "cabinet maker", "countertop installer",
+    "irrigation", "landscape lighting", "mobile detailing", "windshield repair",
+    "transmission repair", "body shop", "oil change", "car wash",
+    "window tinting", "mobile dog grooming", "dog walking", "pet boarding",
+    "lash extensions", "eyebrow threading", "makeup artist", "spray tan",
+    "med spa", "waxing salon", "piercing studio", "hair braiding",
+    "mobile hairstylist", "acupuncture", "counseling", "therapist",
+    "nutritionist", "dietitian", "personal trainer", "yoga studio",
+    "pilates studio", "orthodontist", "optometrist", "podiatrist",
+    "dermatologist", "personal chef", "cake decorator", "meal prep",
+    "juice bar", "videographer", "graphic designer", "web designer",
+    "marketing agency", "accountant", "tax preparer", "virtual assistant",
+    "financial advisor", "mortgage broker", "life coach", "business consultant",
+    "event planner", "wedding planner", "dj service", "florist",
+    "interior designer", "architect", "travel agent", "computer repair",
+    "phone repair", "tv repair", "upholstery", "sewing alterations", "tailor",
+    "shoe repair", "watch repair", "jewelry repair", "screen printing",
+    "embroidery", "sign shop", "print shop", "music lessons", "piano lessons",
+    "guitar lessons", "art classes", "swim lessons", "driving school",
+    "martial arts", "dance studio", "boutique", "consignment shop",
+    "thrift store", "smoke shop", "vape shop", "gift shop", "bike shop",
+    "hobby shop", "candle shop", "soap maker",
+]
+CATEGORIES_DEEP = CATEGORIES + _DEEP_EXTRA
+
+
+def categories_for(level):
+    """Pick a category set: 'core'/'1', 'deep'/'3', else normal/'2'."""
+    lv = str(level or "normal").lower()
+    if lv.startswith("c") or lv == "1":
+        return CATEGORIES_CORE
+    if lv.startswith("d") or lv == "3":
+        return CATEGORIES_DEEP
+    return CATEGORIES
 
 # reuse the don't-call filter (government/civic + national chains)
 try:
@@ -287,6 +340,8 @@ def main():
 
     q = sub.add_parser("make-queries", help="write queries.txt for the scraper")
     q.add_argument("--zips", required=True, help="comma-separated ZIPs, e.g. 77027,77019")
+    q.add_argument("--level", default="normal",
+                   help="category set: core/1 (~20, quick), normal/2 (~47), deep/3 (~160)")
     q.add_argument("--out", default=os.path.join(HERE, "queries.txt"))
 
     s = sub.add_parser("split", help="cross-reference businesses vs fiber addresses")
@@ -296,11 +351,12 @@ def main():
     args = ap.parse_args()
     if args.cmd == "make-queries":
         zips = [z.strip() for z in args.zips.split(",") if z.strip()]
-        qs = build_queries(zips)
+        cats = categories_for(args.level)
+        qs = build_queries(zips, cats)
         with open(args.out, "w") as f:
             f.write("\n".join(qs) + "\n")
         print("Wrote %d queries (%d categories x %d ZIPs) -> %s"
-              % (len(qs), len(CATEGORIES), len(zips), args.out))
+              % (len(qs), len(cats), len(zips), args.out))
         print("Next: google-maps-scraper -input %s -results businesses.csv -depth 1"
               % args.out)
     elif args.cmd == "split":
