@@ -1468,7 +1468,10 @@ def mouse_drag(page, direction):
     try:
         page.mouse.move(cx, cy)
         page.mouse.down()
-        page.mouse.move(cx + dx, cy + dy, steps=8)   # smooth drag -> map pans
+        # FAST flick: few steps = a quick drag (like fiber_hunter's pyautogui
+        # dragRel). Mapbox adds a little inertia, so it pans snappy AND a touch
+        # further -> covers ground faster without missing dots.
+        page.mouse.move(cx + dx, cy + dy, steps=4)
         page.mouse.up()
     except Exception:
         return False
@@ -1991,10 +1994,10 @@ def main():
     if args.fast:
         global WAIT_AFTER_PAN, WAIT_AFTER_ZOOM, SEARCH_SETTLE, SEARCH_CLICK_WAIT
         global POPUP_POLL_TIMEOUT
-        WAIT_AFTER_PAN = 0.45
+        WAIT_AFTER_PAN = 0.3
         WAIT_AFTER_ZOOM = 0.45
-        SEARCH_SETTLE = 0.4
-        SEARCH_CLICK_WAIT = 0.7
+        SEARCH_SETTLE = 0.35
+        SEARCH_CLICK_WAIT = 0.6
         POPUP_POLL_TIMEOUT = 1.3
         print("FAST mode: tightened pacing.")
 
