@@ -136,6 +136,16 @@ PAN_PRESSES = 6
 # used pyautogui.dragRel). DRAG_FRAC = how far to drag, as a fraction of the
 # canvas, per cell (<1 so adjacent cells overlap a little and miss nothing).
 DRAG_FRAC = 0.62
+
+# Map the internal dot status -> the on-map LEGEND COLOR, so the sheet says
+# GREEN / ORANGE / GREY at a glance (green = eligible lead, orange = copper
+# upgrade, grey = existing customer/skip) instead of "lead"/"customer".
+DOT_COLOR = {"lead": "GREEN", "copper_upgrade": "ORANGE", "customer": "GREY"}
+
+
+def dot_color(dot_status):
+    """Legend color word for a classified dot status (defaults to GREEN)."""
+    return DOT_COLOR.get((dot_status or "").lower(), "GREEN")
 POPUP_POLL_INTERVAL = 0.12    # poll the popup instead of fixed sleeps
 POPUP_POLL_TIMEOUT = 2.0      # per click attempt
 CLICK_OFFSETS = [(0, 0), (3, 0), (-3, 0), (0, 3), (0, -3)]   # retry spiral
@@ -837,7 +847,8 @@ class NetCapture:
             dot_status = classify_status(text=ld.get("status"), ban=ld.get("ban"))
             ts = time.strftime("%Y-%m-%d %H:%M:%S")
             new_rows.append([addr, ld.get("status") or "", ld.get("ban") or "",
-                             "FIBER ELIGIBLE", ts, area_label, dot_status, "WORKING"])
+                             "FIBER ELIGIBLE", ts, area_label,
+                             dot_color(dot_status), "WORKING"])
             new_records.append({"address": addr, "dot_status": dot_status,
                                 "zone_label": "WORKING", "popup_status": ld.get("status"),
                                 "ban": ld.get("ban"), "area": area_label, "ts": ts,
@@ -990,7 +1001,7 @@ def open_sheet():
             ws = sh.add_worksheet(title=OUT_TAB, rows="5000", cols="8")
         if not ws.get_all_values():
             ws.append_row(["Address", "Status", "Subscriber BAN", "Eligible",
-                           "Captured At", "ZIP/Area", "Dot Status"])
+                           "Captured At", "ZIP/Area", "Dot Color", "Zone"])
         return ws
     except Exception as e:
         print("WARNING: couldn't open the Google Sheet (%s)." % str(e)[:100])
@@ -1552,7 +1563,7 @@ def record_capture(ws, seen, area_label, dry, address, popup_status, ban,
     seen.add(addr_key)
     ts = time.strftime("%Y-%m-%d %H:%M:%S")
     row = [address, popup_status or "", ban or "", "FIBER ELIGIBLE",
-           ts, area_label, dot_status, zone_label]
+           ts, area_label, dot_color(dot_status), zone_label]
     if dry or not ws:
         print("   + [%s/%s/%s] %s | %s | BAN %s" %
               (zone_label, dot_status, via, address,
