@@ -82,6 +82,68 @@ def _open_enriched_ws(sheet_id, creds_file):
         return None
 
 
+# Leads we should NOT cold-call: government/civic/institutional places, and
+# national big-box chains (corporate-procured -- not a local AT&T dealer sale).
+# Excluded from the callable 'Enriched Leads' tab. Tune freely; matching is
+# case-insensitive substring on the business name + place types.
+EXCLUDE_TYPES = {
+    "local_government_office", "city_hall", "courthouse", "police",
+    "fire_station", "post_office", "library", "school", "primary_school",
+    "secondary_school", "university", "college", "kindergarten",
+    "place_of_worship", "church", "mosque", "synagogue", "hindu_temple",
+    "embassy", "hospital", "parking", "atm", "bank", "gas_station", "fuel",
+    "department_store", "supermarket", "shopping_mall", "stadium", "airport",
+    "transit_station", "train_station", "bus_station", "townhall",
+    "public_building", "prison", "government",
+}
+EXCLUDE_NAME_WORDS = (
+    "city of ", " county", "police dep", "fire dep", "fire station",
+    "post office", "court house", "courthouse", "city hall", "municipal",
+    " dmv", "public library", "school district", "elementary", "middle school",
+    "high school", " isd", " university", " college", "department of",
+    "us postal", "embassy", "district court", "sheriff", "city council",
+    "church", "ministries", "chapel", "mosque", "synagogue",
+)
+CHAIN_NAMES = {
+    "walmart", "wal-mart", "target", "costco", "sam's club", "sams club",
+    "home depot", "lowe's", "lowes", "best buy", "apple store", "kroger",
+    "h-e-b", "heb", "central market", "whole foods", "trader joe", "cvs",
+    "walgreens", "rite aid", "starbucks", "mcdonald", "chick-fil-a", "chickfila",
+    "chipotle", "subway", "wendy's", "burger king", "taco bell", "panera",
+    "dunkin", "ikea", "macy's", "nordstrom", "dillard", "jcpenney", "jc penney",
+    "kohl's", "ross dress", "marshalls", "tj maxx", "t.j. maxx", "homegoods",
+    "home goods", "petco", "petsmart", "gamestop", "bank of america",
+    "chase bank", "wells fargo", "capital one", "citibank", "us bank", "fedex",
+    "ups store", "usps", "autozone", "o'reilly", "advance auto", "dollar general",
+    "dollar tree", "family dollar", "7-eleven", "7 eleven", "shell", "exxon",
+    "chevron", "circle k", "crate & barrel", "crate and barrel", "j.crew",
+    "j crew", "anthropologie", "restoration hardware", "pottery barn",
+    "williams sonoma", "west elm", "sephora", "ulta", "bath & body", "verizon",
+    "t-mobile", "office depot", "staples", "five below", "aldi", "publix",
+    "safeway", "panda express", "olive garden", "chili's", "applebee", "ihop",
+    "denny's", "buffalo wild", "raising cane", "whataburger", "jack in the box",
+    "sonic drive", "in-n-out", "popeyes", "kfc", "pizza hut", "domino",
+    "little caesars", "jimmy john", "jersey mike", "planet fitness", "la fitness",
+    "24 hour fitness", "anytime fitness", "great clips", "supercuts",
+    "massage envy", "european wax", "hobby lobby", "michaels", "barnes & noble",
+    "dick's sporting", "academy sports", "at&t store", "xfinity", "spectrum",
+}
+
+
+def _is_callable_prospect(lead):
+    """True if this is a local business we'd actually cold-call for fiber.
+    Excludes government/civic/institutional places and national big-box chains."""
+    name = (lead.get("name") or "").lower()
+    types = [str(t).lower() for t in (lead.get("types") or [])]
+    if any(t in EXCLUDE_TYPES for t in types):
+        return False
+    if any(w in name for w in EXCLUDE_NAME_WORDS):
+        return False
+    if any(c in name for c in CHAIN_NAMES):
+        return False
+    return True
+
+
 def _enriched_row(lead, source):
     """A sheet row for one enriched lead (only the callable fields)."""
     ds = (lead.get("dot_status") or lead.get("status") or "").lower()
@@ -331,8 +393,11 @@ def _process(rows, cache, overpass, places, allow_paid, seen, out_f, dry,
         if out_f and not dry:
             out_f.write(json.dumps(lead) + "\n")
             out_f.flush()
-        # to the sheet: only the leads we actually identified (name or phone)
-        if enriched_ws is not None and not dry and (lead.get("phone") or lead.get("name")):
+        # to the sheet: identified leads (name or phone) we can actually call --
+        # skip government/civic + big-box chains.
+        if (enriched_ws is not None and not dry
+                and (lead.get("phone") or lead.get("name"))
+                and _is_callable_prospect(lead)):
             sheet_rows.append(_enriched_row(lead, source))
         if source == "osm":
             time.sleep(OVERPASS_THROTTLE_SECS)   # public Overpass etiquette
