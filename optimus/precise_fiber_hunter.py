@@ -795,20 +795,42 @@ class NetCapture:
                 print("  (couldn't write %s: %s)" % (path, e))
 
     def flush(self, ws, seen, area_label, dry):
-        n = 0
+        """Write the new captured addresses. BATCHED -- one append_rows call for
+        all of them, not one append_row per address (which blew the Google Sheets
+        'write requests per minute' quota -> 429 errors)."""
         self.seen = seen
+        new_rows, new_records = [], []
         while self.pending:
             ld = self.pending.pop()
             addr = (ld.get("address") or "").strip()
             if not addr:
                 continue
+            key = addr.upper()
+            if key in seen:
+                continue
+            seen.add(key)
             dot_status = classify_status(text=ld.get("status"), ban=ld.get("ban"))
-            if record_capture(ws, seen, area_label, dry, addr,
-                              ld.get("status"), ld.get("ban"), dot_status,
-                              via="network", zone_label="WORKING",
-                              lat=ld.get("lat"), lng=ld.get("lng")):
-                n += 1
-        return n
+            ts = time.strftime("%Y-%m-%d %H:%M:%S")
+            new_rows.append([addr, ld.get("status") or "", ld.get("ban") or "",
+                             "FIBER ELIGIBLE", ts, area_label, dot_status, "WORKING"])
+            new_records.append({"address": addr, "dot_status": dot_status,
+                                "zone_label": "WORKING", "popup_status": ld.get("status"),
+                                "ban": ld.get("ban"), "area": area_label, "ts": ts,
+                                "via": "network", "lat": ld.get("lat"), "lng": ld.get("lng")})
+        if not new_rows:
+            return 0
+        for rec in new_records:        # local backup (no quota)
+            append_jsonl(rec)
+        if dry or ws is None:
+            for r in new_rows[:20]:
+                print("   + %s | %s" % (r[0], r[6]))
+        else:
+            try:
+                for i in range(0, len(new_rows), 500):   # ONE call per 500 rows
+                    ws.append_rows(new_rows[i:i + 500], value_input_option="RAW")
+            except Exception as e:
+                print("   batch write error: %s" % str(e)[:120])
+        return len(new_rows)
 
 # --- popup parsing (canonical regexes from optimus_dot_detect) ---
 POPUP_KEYS = {
