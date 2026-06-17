@@ -26,8 +26,15 @@ SCROLL_ROUNDS = 18
 THROTTLE = 0.8
 _PHONE_RE = re.compile(r"\+?\d[\d\-\.\s\(\)]{8,}\d")
 
-# small-business + in-home categories (one Maps search each, per ZIP)
-CATEGORIES = [
+# category sets -- the run asks Light / Heavy / Deep at the start.
+CATEGORIES_LIGHT = [
+    "plumber", "electrician", "hvac", "roofing", "general contractor",
+    "painter", "handyman", "landscaping", "house cleaning", "junk removal",
+    "auto repair", "dog grooming", "hair salon", "barber shop", "nail salon",
+    "chiropractor", "dentist", "photographer", "real estate agent",
+    "insurance agent",
+]
+CATEGORIES_HEAVY = [
     "plumber", "electrician", "hvac", "roofing", "general contractor",
     "painter", "handyman", "landscaping", "pest control", "flooring",
     "house cleaning", "carpet cleaning", "junk removal", "moving company",
@@ -40,6 +47,46 @@ CATEGORIES = [
     "food truck", "photographer", "bookkeeper", "real estate agent",
     "insurance agent", "tutoring", "home daycare", "notary public",
 ]
+_DEEP_EXTRA = [
+    "maid service", "window cleaning", "lawn mowing service", "gutter cleaning",
+    "chimney sweep", "fence company", "blind cleaning", "home organizer",
+    "air conditioning repair", "remodeling contractor", "tile installer",
+    "drywall", "carpenter", "concrete contractor", "paving contractor",
+    "solar installer", "welding", "masonry", "septic service",
+    "insulation contractor", "cabinet maker", "countertop installer",
+    "irrigation", "landscape lighting", "mobile detailing", "windshield repair",
+    "transmission repair", "body shop", "oil change", "car wash",
+    "window tinting", "mobile dog grooming", "dog walking", "pet boarding",
+    "lash extensions", "eyebrow threading", "makeup artist", "spray tan",
+    "med spa", "waxing salon", "piercing studio", "hair braiding",
+    "mobile hairstylist", "acupuncture", "counseling", "therapist",
+    "nutritionist", "dietitian", "personal trainer", "yoga studio",
+    "pilates studio", "orthodontist", "optometrist", "podiatrist",
+    "dermatologist", "personal chef", "cake decorator", "meal prep",
+    "juice bar", "videographer", "graphic designer", "web designer",
+    "marketing agency", "accountant", "tax preparer", "virtual assistant",
+    "financial advisor", "mortgage broker", "life coach", "business consultant",
+    "event planner", "wedding planner", "dj service", "florist",
+    "interior designer", "architect", "travel agent", "computer repair",
+    "phone repair", "tv repair", "upholstery", "sewing alterations", "tailor",
+    "shoe repair", "watch repair", "jewelry repair", "screen printing",
+    "embroidery", "sign shop", "print shop", "music lessons", "piano lessons",
+    "guitar lessons", "art classes", "swim lessons", "driving school",
+    "martial arts", "dance studio", "boutique", "consignment shop",
+    "thrift store", "smoke shop", "vape shop", "gift shop", "bike shop",
+    "hobby shop", "candle shop", "soap maker",
+]
+CATEGORIES_DEEP = CATEGORIES_HEAVY + _DEEP_EXTRA
+
+
+def categories_for(level):
+    """Pick a set: '1'/light, '3'/deep, else heavy ('2')."""
+    lv = str(level or "2").strip().lower()
+    if lv.startswith("1") or lv.startswith("l"):
+        return CATEGORIES_LIGHT
+    if lv.startswith("3") or lv.startswith("d"):
+        return CATEGORIES_DEEP
+    return CATEGORIES_HEAVY
 
 
 def _dismiss_consent(page):
@@ -186,9 +233,14 @@ def main():
     print("  [2] Google Sheet  ('%s' tab)" % SHEET_TAB)
     dest = (input("Choose 1 or 2 (press Enter for 1): ").strip() or "1")
     to_sheet = dest.startswith("2")
-    queries = [("%s in %s" % (c, z), c) for z in zips for c in CATEGORIES]
+    print("\nHow deep should it search?")
+    print("  [1] Light  (~20 categories - fastest)")
+    print("  [2] Heavy  (~47 categories)")
+    print("  [3] Deep   (~155 categories - most thorough, slowest)")
+    cats = categories_for(input("Choose 1, 2, or 3 (press Enter for 2): ").strip() or "2")
+    queries = [("%s in %s" % (c, z), c) for z in zips for c in cats]
     print("\nSearching %d categories x %d ZIPs = %d searches -> %s\n"
-          % (len(CATEGORIES), len(zips), len(queries), OUT_PATH))
+          % (len(cats), len(zips), len(queries), OUT_PATH))
 
     from playwright.sync_api import sync_playwright
     os.makedirs(PROFILE_DIR, exist_ok=True)
