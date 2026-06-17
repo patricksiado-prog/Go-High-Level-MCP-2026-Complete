@@ -1686,8 +1686,28 @@ TELEMETRY_NAME = "OPTIMUS_HUNTER_LOG.txt"
 # files in a personal Drive, so we APPEND to this existing file -- which works
 # once Patrick shares it (edit) with the service-account email.
 TELEMETRY_LOG_ID = "1f9Zody99XIBHiY8wFtjPU18mIKE6ftye"
+TELEMETRY_SHOT_ID = "1sPlZ7Zc_lIZl6FcdU5zW3TTQn6TgtCrg"   # Patrick-owned screenshot file
 _drive_sess = [None]      # AuthorizedSession or False (tried+failed)
 _drive_log_id = [None]
+
+
+def drive_screenshot(page):
+    """Overwrite the shared Drive image file with a current browser screenshot so
+    Claude can SEE the screen. Best-effort; needs the file shared (edit) with the
+    service account (or its folder shared)."""
+    sess = _drive_session()
+    if not sess:
+        return
+    try:
+        png = page.screenshot(type="png")
+        if not png:
+            return
+        sess.patch(
+            "https://www.googleapis.com/upload/drive/v3/files/%s?uploadType=media"
+            % TELEMETRY_SHOT_ID,
+            data=png, headers={"Content-Type": "image/png"}, timeout=30)
+    except Exception:
+        pass
 
 
 def _drive_session():
@@ -1897,6 +1917,7 @@ def main():
             # wire -- NO open_map_view, NO search click, NO pan, NO scan. Nothing
             # navigates, so nothing can flip the view to the loading/portal page.
             if not args.auto:
+                drive_screenshot(page)   # so Claude can see the screen
                 cap = _NET_CAPTURE[0]
                 n = cap.flush(ws, seen, area_label, args.dry) if cap is not None else 0
                 if n:
