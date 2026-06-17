@@ -44,23 +44,25 @@ RESIDENTIAL_HEADER = ["Address", "Dot Color", "Zone", "Lat", "Lng"]
 CATEGORIES = [
     # trades / contractors
     "plumber", "electrician", "hvac", "roofing", "general contractor",
-    "painter", "handyman", "landscaping", "pest control",
+    "painter", "handyman", "landscaping", "pest control", "flooring",
     # home services
     "house cleaning", "carpet cleaning", "junk removal", "moving company",
     "appliance repair", "garage door repair", "locksmith", "tree service",
+    "pressure washing", "pool cleaning",
     # auto
-    "auto repair", "auto detailing", "mobile mechanic",
+    "auto repair", "auto detailing", "mobile mechanic", "tire shop",
     # pets
-    "dog grooming", "pet sitting",
+    "dog grooming", "pet sitting", "dog training",
     # beauty / personal
     "hair salon", "barber shop", "nail salon", "massage therapist",
+    "esthetician", "tattoo shop",
     # health
-    "chiropractor", "dentist",
+    "chiropractor", "dentist", "physical therapy",
     # food
-    "catering", "bakery", "coffee shop",
+    "catering", "bakery", "coffee shop", "food truck",
     # professional / home-based
     "photographer", "bookkeeper", "real estate agent", "insurance agent",
-    "tutoring", "home daycare",
+    "tutoring", "home daycare", "notary public",
 ]
 
 # reuse the don't-call filter (government/civic + national chains)
