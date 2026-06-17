@@ -34,8 +34,7 @@ FIBER_JSONL = os.path.join(HERE, "precise_addresses.jsonl")
 SHEET_ID = "1FhO2BTMXGefm1tLwKbbMPXvzT1160882Auauzep7ooA"
 COMMERCIAL_TAB = "Commercial Leads"
 RESIDENTIAL_TAB = "Residential Leads"
-COMMERCIAL_HEADER = ["Address", "Business Name", "Phone", "Website",
-                     "Dot Color", "Zone", "Category", "Lat", "Lng"]
+COMMERCIAL_HEADER = ["Category", "Email", "Business Name", "Address", "Phone"]
 RESIDENTIAL_HEADER = ["Address", "Dot Color", "Zone", "Lat", "Lng"]
 
 # SMB categories worth a fiber call (one Maps search each, per ZIP). Bandwidth-
@@ -130,6 +129,7 @@ def split_leads(fiber, biz_index):
             merged = dict(f)
             merged["name"] = b.get("name")
             merged["phone"] = b.get("phone")
+            merged["email"] = b.get("email")
             merged["website"] = b.get("website")
             merged["category"] = b.get("category")
             merged["types"] = [b.get("category")] if b.get("category") else []
@@ -165,9 +165,10 @@ def load_businesses_csv(path):
                            or low.get("formatted_address"),
                 "phone": low.get("phone") or low.get("phone_number")
                          or low.get("formatted_phone_number"),
+                "email": low.get("email") or low.get("emails") or low.get("email_1"),
                 "website": low.get("website") or low.get("site"),
                 "category": low.get("category") or low.get("type")
-                            or low.get("main_category"),
+                            or low.get("main_category") or low.get("query"),
             })
     return rows
 
@@ -221,12 +222,14 @@ def _find_creds():
     return None
 
 
-def _existing_keys(ws):
-    """Addresses already in a tab, so re-runs don't duplicate."""
+def _existing_keys(ws, addr_col=0):
+    """Addresses already in a tab (read from column addr_col), so re-runs don't
+    duplicate -- the address column isn't always column A."""
     if not ws:
         return set()
     try:
-        return set(r[0].strip().upper() for r in ws.get_all_values()[1:] if r and r[0].strip())
+        return set(r[addr_col].strip().upper() for r in ws.get_all_values()[1:]
+                   if len(r) > addr_col and r[addr_col].strip())
     except Exception:
         return set()
 
@@ -234,10 +237,11 @@ def _existing_keys(ws):
 def write_split(commercial, residential):
     cw = _open_ws(COMMERCIAL_TAB, COMMERCIAL_HEADER)
     rw = _open_ws(RESIDENTIAL_TAB, RESIDENTIAL_HEADER)
-    c_seen, r_seen = _existing_keys(cw), _existing_keys(rw)
-    c_rows = [[c.get("address"), c.get("name") or "", c.get("phone") or "",
-               c.get("website") or "", _dot_color(c), c.get("zone_label") or "",
-               c.get("category") or "", c.get("lat"), c.get("lng")]
+    c_seen = _existing_keys(cw, addr_col=3)   # Address is the 4th column now
+    r_seen = _existing_keys(rw, addr_col=0)
+    # Commercial tab order: Category, Email, Business Name, Address, Phone
+    c_rows = [[c.get("category") or "", c.get("email") or "", c.get("name") or "",
+               c.get("address"), c.get("phone") or ""]
               for c in commercial
               if (c.get("address") or "").strip().upper() not in c_seen]
     r_rows = [[r.get("address"), _dot_color(r), r.get("zone_label") or "",

@@ -41,7 +41,8 @@ if not defined SCRAPER (
 
 echo.
 echo [2/3] Scraping businesses with %SCRAPER% (this is the slow part)...
-"%SCRAPER%" -input queries.txt -results businesses.csv -depth 1
+REM -email crawls each business website for an email (slower, but "email if available")
+"%SCRAPER%" -input queries.txt -results businesses.csv -depth 1 -email
 
 echo.
 echo [3/3] Splitting commercial vs residential into the Google Sheet...
