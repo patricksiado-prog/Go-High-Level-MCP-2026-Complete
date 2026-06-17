@@ -135,7 +135,7 @@ PAN_PRESSES = 6
 # fiber_hunter's proven motion is a MOUSE DRAG across the canvas (the original
 # used pyautogui.dragRel). DRAG_FRAC = how far to drag, as a fraction of the
 # canvas, per cell (<1 so adjacent cells overlap a little and miss nothing).
-DRAG_FRAC = 0.62
+DRAG_FRAC = 0.45
 
 # Map the internal dot status -> the on-map LEGEND COLOR, so the sheet says
 # GREEN / ORANGE / GREY at a glance (green = eligible lead, orange = copper
@@ -2029,10 +2029,10 @@ def main():
     if args.fast:
         global WAIT_AFTER_PAN, WAIT_AFTER_ZOOM, SEARCH_SETTLE, SEARCH_CLICK_WAIT
         global POPUP_POLL_TIMEOUT
-        WAIT_AFTER_PAN = 0.3
+        WAIT_AFTER_PAN = 0.2
         WAIT_AFTER_ZOOM = 0.45
-        SEARCH_SETTLE = 0.35
-        SEARCH_CLICK_WAIT = 0.6
+        SEARCH_SETTLE = 0.25
+        SEARCH_CLICK_WAIT = 0.5
         POPUP_POLL_TIMEOUT = 1.3
         print("FAST mode: tightened pacing.")
 
