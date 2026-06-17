@@ -37,6 +37,14 @@ RESIDENTIAL_TAB = "Residential Leads"
 COMMERCIAL_HEADER = ["Category", "Email", "Business Name", "Address", "Phone"]
 RESIDENTIAL_HEADER = ["Address", "Dot Color", "Zone", "Lat", "Lng"]
 
+# bizmatch: cross-reference captured fiber leads (Precise Fiber tab) with scraped
+# businesses (Maps Businesses tab) and split the business ones by dot color.
+PRECISE_TAB = "Precise Fiber"
+MAPS_TAB = "Maps Businesses"
+FIBER_GREEN_TAB = "Fiber Green Biz"        # green dot = sell NEW fiber
+UPGRADE_ORANGE_TAB = "Upgrade Orange Biz"  # orange dot = upgrade copper -> fiber
+BIZ_HEADER = ["Business Name", "Phone", "Address", "Website", "Category"]
+
 # Three category sets you pick from at the start of a run (MAPMAN asks). All are
 # small-business + in-home focused (owner-operated / mobile / home-based -- many
 # sit at RESIDENTIAL addresses, so searching them catches the home-based ones a
@@ -332,6 +340,113 @@ def _append(ws, rows):
 
 
 # -------------------------------------------------------------------------
+# bizmatch: fiber leads x businesses -> green-biz + orange-biz tabs
+# -------------------------------------------------------------------------
+_SS = [None]
+
+
+def _spreadsheet():
+    """The Google Sheet (cached). Needs google_creds.json on the box."""
+    if _SS[0] is not None:
+        return _SS[0]
+    creds = _find_creds()
+    if not creds:
+        print("No google_creds.json found -- can't read/write the sheet.")
+        return None
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
+        scopes = ["https://www.googleapis.com/auth/spreadsheets",
+                  "https://www.googleapis.com/auth/drive"]
+        client = gspread.authorize(Credentials.from_service_account_file(creds, scopes=scopes))
+        _SS[0] = client.open_by_key(SHEET_ID)
+        return _SS[0]
+    except Exception as e:
+        print("Could not open the sheet: %s" % str(e)[:90])
+        return None
+
+
+def load_businesses_from_sheet():
+    """Scraped businesses from the 'Maps Businesses' tab."""
+    sh = _spreadsheet()
+    if not sh:
+        return []
+    try:
+        ws = sh.worksheet(MAPS_TAB)
+    except Exception:
+        print("No '%s' tab -- run the scraper first." % MAPS_TAB)
+        return []
+    out = []
+    for r in ws.get_all_values()[1:]:        # header: Name,Address,Phone,Website,Category
+        r = (list(r) + [""] * 5)[:5]
+        out.append({"name": r[0], "address": r[1], "phone": r[2],
+                    "website": r[3], "category": r[4]})
+    return out
+
+
+def load_fiber_from_sheet():
+    """Captured fiber leads from the 'Precise Fiber' tab. Dot Color (col 7) ->
+    green = lead, orange = copper_upgrade."""
+    sh = _spreadsheet()
+    if not sh:
+        return []
+    try:
+        ws = sh.worksheet(PRECISE_TAB)
+    except Exception:
+        print("No '%s' tab -- run the precise hunter first." % PRECISE_TAB)
+        return []
+    out = []
+    for r in ws.get_all_values()[1:]:        # Address,Status,BAN,Eligible,At,ZIP,DotColor,Zone
+        if not r or not r[0].strip():
+            continue
+        color = (r[6] if len(r) > 6 else "").strip().upper()
+        ds = "copper_upgrade" if color == "ORANGE" else "lead"
+        out.append({"address": r[0], "dot_status": ds})
+    return out
+
+
+def split_fiber_biz(fiber, biz_index):
+    """Fiber leads that match a (callable) business, split by dot color.
+    Returns (green_biz, orange_biz)."""
+    green_biz, orange_biz = [], []
+    for f in fiber:
+        key = normalize_address(f.get("address"))
+        b = biz_index.get(key) if key else None
+        if not (b and (b.get("phone") or b.get("name"))):
+            continue
+        merged = dict(f)
+        merged["name"] = b.get("name")
+        merged["phone"] = b.get("phone")
+        merged["website"] = b.get("website")
+        merged["category"] = b.get("category")
+        merged["types"] = [b.get("category")] if b.get("category") else []
+        if not _is_callable_prospect(merged):
+            continue
+        if (f.get("dot_status") or "").lower() == "copper_upgrade":
+            orange_biz.append(merged)
+        else:
+            green_biz.append(merged)
+    return green_biz, orange_biz
+
+
+def _biz_rows(leads):
+    return [[c.get("name") or "", c.get("phone") or "", c.get("address") or "",
+             c.get("website") or "", c.get("category") or ""] for c in leads]
+
+
+def write_fiber_biz(green_biz, orange_biz):
+    gw = _open_ws(FIBER_GREEN_TAB, BIZ_HEADER)
+    ow = _open_ws(UPGRADE_ORANGE_TAB, BIZ_HEADER)
+    g_seen = _existing_keys(gw, addr_col=2)   # Address is the 3rd column
+    o_seen = _existing_keys(ow, addr_col=2)
+    g_rows = [row for row in _biz_rows(green_biz) if row[2].strip().upper() not in g_seen]
+    o_rows = [row for row in _biz_rows(orange_biz) if row[2].strip().upper() not in o_seen]
+    _append(gw, g_rows)
+    _append(ow, o_rows)
+    return len(g_rows), len(o_rows)
+
+
+# -------------------------------------------------------------------------
 # CLI
 # -------------------------------------------------------------------------
 def main():
@@ -347,6 +462,10 @@ def main():
     s = sub.add_parser("split", help="cross-reference businesses vs fiber addresses")
     s.add_argument("--businesses", required=True, help="businesses.csv from the scraper")
     s.add_argument("--fiber", default=FIBER_JSONL, help="captured fiber addresses (jsonl)")
+
+    sub.add_parser("bizmatch", help="match captured fiber leads (Precise Fiber tab) to "
+                   "scraped businesses (Maps Businesses tab) -> Fiber Green Biz + "
+                   "Upgrade Orange Biz tabs. Reads + writes the sheet.")
 
     args = ap.parse_args()
     if args.cmd == "make-queries":
@@ -369,6 +488,17 @@ def main():
               % (len(commercial), len(residential)))
         nc, nr = write_split(commercial, residential)
         print("  wrote +%d commercial, +%d residential (new rows)" % (nc, nr))
+    elif args.cmd == "bizmatch":
+        businesses = load_businesses_from_sheet()
+        fiber = load_fiber_from_sheet()
+        idx = build_business_index(businesses)
+        green_biz, orange_biz = split_fiber_biz(fiber, idx)
+        print("fiber leads: %d | businesses: %d" % (len(fiber), len(businesses)))
+        print("  -> GREEN fiber biz: %d | ORANGE upgrade biz: %d"
+              % (len(green_biz), len(orange_biz)))
+        ng, no = write_fiber_biz(green_biz, orange_biz)
+        print("  wrote +%d to '%s', +%d to '%s'"
+              % (ng, FIBER_GREEN_TAB, no, UPGRADE_ORANGE_TAB))
     else:
         ap.print_help()
 
