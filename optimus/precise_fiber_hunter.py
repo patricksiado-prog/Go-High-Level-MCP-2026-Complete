@@ -687,7 +687,12 @@ class NetCapture:
                 return
             ctl = ct.lower()
             low = url.lower()
-            if "json" in ctl or low.endswith(".json"):
+            # treat it as data if the content-type OR the URL looks like data --
+            # AT&T's serviceability feed must be caught even if mislabeled.
+            data_url = ("serviceability" in low or "serviceab" in low
+                        or "/api/" in low or "graphql" in low or "availab" in low
+                        or "fiber" in low or low.endswith(".json"))
+            if "json" in ctl or data_url:
                 try:
                     body = response.body()
                     if not body or len(body) > 8 * 1024 * 1024:
