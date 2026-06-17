@@ -845,6 +845,8 @@ class NetCapture:
                 continue
             seen.add(key)
             dot_status = classify_status(text=ld.get("status"), ban=ld.get("ban"))
+            if dot_color(dot_status) == "GREY":
+                continue   # GREY = existing fiber customer -> leave out
             ts = time.strftime("%Y-%m-%d %H:%M:%S")
             new_rows.append([addr, ld.get("status") or "", ld.get("ban") or "",
                              "FIBER ELIGIBLE", ts, area_label,
@@ -1561,6 +1563,8 @@ def record_capture(ws, seen, area_label, dry, address, popup_status, ban,
     if addr_key in seen:
         return False
     seen.add(addr_key)
+    if dot_color(dot_status) == "GREY":
+        return False   # GREY = existing fiber customer -> leave out
     ts = time.strftime("%Y-%m-%d %H:%M:%S")
     row = [address, popup_status or "", ban or "", "FIBER ELIGIBLE",
            ts, area_label, dot_color(dot_status), zone_label]
