@@ -12,7 +12,7 @@ Run by SCRAPER_SETUP.bat, or directly:  python maps_scraper_standalone.py
 
 import os, csv, re, time, json, urllib.parse
 
-VERSION = "1.4 (2026-06-17)"   # bump this when the scraper changes; printed on start
+VERSION = "1.5 (2026-06-17)"   # bump this when the scraper changes; printed on start
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_PATH = os.path.join(HERE, "businesses.csv")
@@ -183,6 +183,7 @@ def _collect_links(page):
 
 
 def scrape_query(page, query, category):
+    target_zip = query.split(" in ")[-1].strip() if " in " in query else ""
     page.goto("https://www.google.com/maps/search/" + urllib.parse.quote(query),
               wait_until="domcontentloaded", timeout=45000)
     page.wait_for_timeout(2500)
@@ -219,8 +220,10 @@ def scrape_query(page, query, category):
             if phone_lbl:
                 m = _PHONE_RE.search(phone_lbl)
                 phone = m.group(0).strip() if m else None
-            rows.append({"name": name,
-                         "address": (addr or "").replace("Address: ", "").strip(),
+            addr = (addr or "").replace("Address: ", "").strip()
+            if target_zip and target_zip not in addr:
+                continue                 # keep only businesses actually in the ZIP
+            rows.append({"name": name, "address": addr,
                          "phone": phone, "website": website, "category": category})
         except Exception:
             continue
