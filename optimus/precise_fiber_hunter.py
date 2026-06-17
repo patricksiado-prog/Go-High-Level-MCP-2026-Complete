@@ -873,6 +873,12 @@ class NetCapture:
                     ws.append_rows(new_rows[i:i + 500], value_input_option="RAW")
             except Exception as e:
                 print("   batch write error: %s" % str(e)[:120])
+        # COMBO: match these just-captured leads against the scraped businesses and
+        # write any hits to the green/gold business tabs -- live, as we sweep.
+        try:
+            match_leads_to_biz(new_records)
+        except Exception as e:
+            print("   (biz match skipped: %s)" % str(e)[:80])
         return len(new_rows)
 
 # --- popup parsing (canonical regexes from optimus_dot_detect) ---
@@ -2010,31 +2016,175 @@ def report_status(ws, area, state, found="", note=""):
 # ----------------------------------------------------------------------------
 # entry
 # ----------------------------------------------------------------------------
-def run_bizmatch():
-    """After capturing, cross-reference the captured fiber leads (Precise Fiber
-    tab) with the scraped businesses (Maps Businesses tab) and write two tabs:
-    'Fiber Green Biz' (green dots that are businesses -> sell new fiber) and
-    'Upgrade Orange Biz' (orange dots that are businesses -> upgrade copper).
-    Best-effort: needs the scraper to have run; never breaks the hunt."""
+# ----------------------------------------------------------------------------
+# COMBO (lives in the hunter): as it captures each address, match it against the
+# scraped businesses (the standalone scraper fills the 'Maps Businesses' tab) and
+# write the matches -- GREEN dot business -> 'Fiber Green Biz', GOLD/ORANGE dot
+# business -> 'Upgrade Orange Biz'. The businesses are already local-only (the
+# scraper drops chains), so any match is a callable lead.
+# ----------------------------------------------------------------------------
+MAPS_TAB = "Maps Businesses"
+GREEN_BIZ_TAB = "Fiber Green Biz"
+ORANGE_BIZ_TAB = "Upgrade Orange Biz"
+BIZ_HEADER = ["Business Name", "Phone", "Address", "Website", "Category"]
+
+_BIZ_SUFFIX = {"ST": "ST", "STREET": "ST", "AVE": "AVE", "AV": "AVE",
+               "AVENUE": "AVE", "RD": "RD", "ROAD": "RD", "DR": "DR",
+               "DRIVE": "DR", "LN": "LN", "LANE": "LN", "BLVD": "BLVD",
+               "BOULEVARD": "BLVD", "CT": "CT", "COURT": "CT", "PL": "PL",
+               "PLACE": "PL", "WAY": "WAY", "CIR": "CIR", "CIRCLE": "CIR",
+               "TER": "TER", "TERRACE": "TER", "TRL": "TRL", "TRAIL": "TRL",
+               "PKWY": "PKWY", "PARKWAY": "PKWY", "HWY": "HWY", "HIGHWAY": "HWY"}
+_BIZ_UNIT_RE = re.compile(r"\b(APT|APARTMENT|UNIT|STE|SUITE|#|BLDG|BUILDING|FL|"
+                          r"FLOOR|RM|ROOM|OFC|OFFICE|TRLR|LOT|SPC)\b.*$", re.I)
+
+# live state: business index + the two output tabs, loaded once at start
+_BIZ = {"index": None, "green_ws": None, "orange_ws": None,
+        "green_seen": set(), "orange_seen": set()}
+
+
+def _norm_addr(addr):
+    """Address -> 'HOUSE|STREET CORE' match key (drops unit/city/zip, standardizes
+    the street suffix) so the captured address lines up with the scraped one."""
+    if not addr:
+        return ""
+    s = addr.upper().strip().split(",")[0]
+    s = _BIZ_UNIT_RE.sub("", s)
+    s = re.sub(r"[^A-Z0-9 ]", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    m = re.match(r"^(\d+)\s+(.*)$", s)
+    if not m:
+        return ""
+    house, rest = m.group(1), m.group(2).split()
+    if not rest:
+        return ""
+    if rest[-1] in _BIZ_SUFFIX:
+        rest[-1] = _BIZ_SUFFIX[rest[-1]]
+    rest = ["N" if t == "NORTH" else "S" if t == "SOUTH" else "E" if t == "EAST"
+            else "W" if t == "WEST" else t for t in rest]
+    return "%s|%s" % (house, " ".join(rest))
+
+
+def _ensure_biz_tab(sh, title):
     try:
-        import commercial_split as cs
-        businesses = cs.load_businesses_from_sheet()
-        if not businesses:
-            print("  (no 'Maps Businesses' tab yet -- run the scraper to enable "
-                  "the green/orange business match.)")
-            return
-        fiber = cs.load_fiber_from_sheet()
-        idx = cs.build_business_index(businesses)
-        green_biz, orange_biz = cs.split_fiber_biz(fiber, idx)
-        ng, no = cs.write_fiber_biz(green_biz, orange_biz)
-        print("  business match: +%d 'Fiber Green Biz', +%d 'Upgrade Orange Biz'"
-              % (ng, no))
+        ws = sh.worksheet(title)
+    except Exception:
+        ws = sh.add_worksheet(title=title, rows="20000", cols="5")
+    if not ws.get_all_values():
+        ws.append_row(BIZ_HEADER)
+    return ws
+
+
+def _biz_seen(ws):
+    try:
+        return set(r[2].strip().upper() for r in ws.get_all_values()[1:]
+                   if len(r) > 2 and r[2].strip())
+    except Exception:
+        return set()
+
+
+def init_bizmatch(ws):
+    """Load the scraped businesses ONCE + open the two business tabs, so each
+    captured address can be matched live as the hunter sweeps. No-op if there's
+    no 'Maps Businesses' tab yet (run the scraper first)."""
+    if ws is None or _BIZ["index"] is not None:
+        return
+    try:
+        sh = ws.spreadsheet
         try:
-            drive_log("BIZMATCH green=%d orange=%d" % (ng, no))
+            mb = sh.worksheet(MAPS_TAB)
         except Exception:
-            pass
+            print("  (no '%s' tab yet -- run the scraper to enable the green/gold "
+                  "business match.)" % MAPS_TAB)
+            _BIZ["index"] = {}
+            return
+        idx = {}
+        for r in mb.get_all_values()[1:]:        # Name,Address,Phone,Website,Category
+            r = (list(r) + [""] * 5)[:5]
+            key = _norm_addr(r[1])
+            if key and key not in idx:
+                idx[key] = {"name": r[0], "phone": r[2], "website": r[3], "category": r[4]}
+        _BIZ["index"] = idx
+        _BIZ["green_ws"] = _ensure_biz_tab(sh, GREEN_BIZ_TAB)
+        _BIZ["orange_ws"] = _ensure_biz_tab(sh, ORANGE_BIZ_TAB)
+        _BIZ["green_seen"] = _biz_seen(_BIZ["green_ws"])
+        _BIZ["orange_seen"] = _biz_seen(_BIZ["orange_ws"])
+        print("  business match ON: %d scraped businesses loaded -> matches go to "
+              "'%s' / '%s' live." % (len(idx), GREEN_BIZ_TAB, ORANGE_BIZ_TAB))
+        # BACKLOG: match every lead captured in prior runs (local jsonl, no quota)
+        # so leads grabbed before the scraper ran still get a business name+phone.
+        # The green/orange seen-sets above keep this from re-writing duplicates.
+        _backlog_match()
     except Exception as e:
-        print("  (business match skipped: %s)" % str(e)[:90])
+        print("  (live business match off: %s)" % str(e)[:80])
+        _BIZ["index"] = {}
+
+
+def _backlog_match():
+    """One-time pass: read previously captured addresses from precise_addresses.jsonl
+    and match them against the loaded businesses. Cheap -- a local file read plus
+    dict lookups, written with match_leads_to_biz's batched appends."""
+    if not _BIZ.get("index") or not os.path.exists(JSONL_PATH):
+        return
+    recs = []
+    try:
+        with open(JSONL_PATH) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    d = json.loads(line)
+                except Exception:
+                    continue
+                if d.get("address"):
+                    recs.append({"address": d.get("address"),
+                                 "dot_status": d.get("dot_status")})
+    except Exception as e:
+        print("  (backlog match skipped: %s)" % str(e)[:60])
+        return
+    if recs:
+        print("  business match: scanning %d prior captures for business hits..." % len(recs))
+        match_leads_to_biz(recs)
+
+
+def match_leads_to_biz(new_records):
+    """Called from flush with the just-captured leads ({address, dot_status}).
+    Any whose address matches a scraped business is written to the green/gold
+    business tab by dot color -- live, while the hunt runs."""
+    idx = _BIZ["index"]
+    if not idx:
+        return
+    g_rows, o_rows = [], []
+    for ld in new_records:
+        key = _norm_addr(ld.get("address"))
+        b = idx.get(key) if key else None
+        if not b:
+            continue
+        addr = ld.get("address") or ""
+        au = addr.strip().upper()
+        row = [b.get("name") or "", b.get("phone") or "", addr,
+               b.get("website") or "", b.get("category") or ""]
+        if (ld.get("dot_status") or "").lower() == "copper_upgrade":
+            if au in _BIZ["orange_seen"]:
+                continue
+            _BIZ["orange_seen"].add(au)
+            o_rows.append(row)
+        else:
+            if au in _BIZ["green_seen"]:
+                continue
+            _BIZ["green_seen"].add(au)
+            g_rows.append(row)
+    try:
+        if g_rows and _BIZ["green_ws"]:
+            _BIZ["green_ws"].append_rows(g_rows, value_input_option="RAW")
+        if o_rows and _BIZ["orange_ws"]:
+            _BIZ["orange_ws"].append_rows(o_rows, value_input_option="RAW")
+        if g_rows or o_rows:
+            print("    business match: +%d Fiber Green Biz, +%d Upgrade Orange Biz"
+                  % (len(g_rows), len(o_rows)))
+    except Exception as e:
+        print("    (biz tab write hiccup: %s)" % str(e)[:60])
 
 
 def main():
@@ -2085,8 +2235,9 @@ def main():
     ap.add_argument("--no-enrich", action="store_true",
                     help="don't run phone/business enrichment in the background")
     ap.add_argument("--no-match", action="store_true",
-                    help="don't cross-reference leads to businesses at the end "
-                         "(skip the Fiber Green Biz / Upgrade Orange Biz tabs)")
+                    help="don't cross-reference captured leads to the scraped "
+                         "businesses live (skip the Fiber Green Biz / Upgrade "
+                         "Orange Biz tabs)")
     ap.add_argument("--paid", action="store_true",
                     help="let the background enricher use paid Google Places on "
                          "OSM misses (needs GOOGLE_PLACES_API_KEY). Default is FREE.")
@@ -2138,6 +2289,11 @@ def main():
         searched = [False]   # only search the ZIP on the first pass
         seen = already_seen(ws)            # resume set, persists across passes
         area_label = args.zip or "manual"
+
+        # COMBO: load the scraped businesses ONCE so flush() can match captured
+        # green/gold leads to a business name+phone live (no separate program).
+        if not args.dry and not args.no_match:
+            init_bizmatch(ws)
 
         if args.net_debug:
             # RESEARCH short-circuit: load the map, trigger a few data loads by
@@ -2302,8 +2458,6 @@ def main():
             report_status(ws, args.zip or "manual", "done", found=n,
                           note="pass %d; single run complete" % passno)
             break
-        if not args.dry and not args.no_match:
-            run_bizmatch()
         if not args.auto:
             try:
                 input("Press Enter to close the browser... ")
