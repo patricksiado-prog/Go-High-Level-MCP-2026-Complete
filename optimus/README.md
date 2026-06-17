@@ -154,9 +154,16 @@ phone enrichment and door routes land on the exact rooftop.
 | `optimus_targets.py` | Shared lease-based ZIP queue + news/outage signal ingestion |
 | `fiber_zone_scanner.py` | Headless multi-instance discovery; zone freshness score + new-fiber diff |
 | `bdc_diff.py` | FCC BDC snapshot diff → new AT&T-fiber ZIPs → TargetQueue (footprint-wide signal) |
+| `themapman.py` | MapMan: address → business name + phone + type via Google Places (enrich) |
 | `business_score.py` | Rank enriched businesses best-first (zone + status + type + reachability) |
 | `ghl_loader.py` | Scored businesses → GHL Command opps + power-dialer queue (dry by default) |
 | `weekly_run.py` | Resumable orchestrator: signals → scan → enrich → score → load |
+
+**MapMan key:** `themapman.py` reads the Google Maps key from the
+`GOOGLE_MAPS_API_KEY` env var (it is no longer embedded in the file — the old
+key was committed to a public repo and must be rotated). Run standalone with
+`export GOOGLE_MAPS_API_KEY=… && python themapman.py`, or let `weekly_run.py`
+call its resolver in-process (`--leads <scanner leads JSON>` with the key set).
 
 Deps: `pip install playwright gspread google-auth numpy pillow scipy requests`
 then `python -m playwright install chromium`. (OpenCV no longer needed.)

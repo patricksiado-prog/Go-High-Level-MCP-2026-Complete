@@ -143,10 +143,20 @@ Built (this branch, continued):
   Dry by default; `--enqueue` to load the queue. Tested.
 - `weekly_run` — the orchestrator/cron (stage 7). One resumable command walks
   signals → scan → enrich → score → load in order, recording finished stages
-  in a small state file so a re-run picks up where it left off. It checkpoints
-  honestly at `enrich` (MapMan runs on Pydroid, a separate device): if MapMan's
-  output isn't ready it stops cleanly and resumes there next run. Load stays
-  DRY unless `--commit` + GHL_PIT_TOKEN. Never dials, never texts. Tested.
+  in a small state file so a re-run picks up where it left off. The `enrich`
+  stage now has three paths: use a MapMan-produced file if present; else, given
+  scanner `--leads` + `GOOGLE_MAPS_API_KEY`, run MapMan's resolver IN-PROCESS
+  to produce it (closes the old hand-off gap); else checkpoint cleanly and
+  resume next run. Load stays DRY unless `--commit` + GHL_PIT_TOKEN. Never
+  dials, never texts. Tested.
+- `themapman` (MapMan, now in-repo) — the enrichment tool: address → business
+  name + phone + type via Google Places (nearest operational commercial
+  non-chain tenant ≤150 m). Copied in from the `optimus-map-tools` repo; still
+  runs standalone on Pydroid/HP, and now also imports as a library for
+  `weekly_run`'s in-process enrich (`resolve` / `enrich_leads`). The Google
+  Maps key is read from `GOOGLE_MAPS_API_KEY` — no longer embedded (the old key
+  was public; rotate + restrict it). Pure resolver logic tested; the live
+  Places path runs on the HP, not the container.
 
 New to build (in priority order):
 1. **More WIDE signal loaders** — news/Reddit watcher (wire to

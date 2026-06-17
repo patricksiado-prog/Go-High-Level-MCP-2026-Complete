@@ -13,7 +13,7 @@ Requires numpy (a listed dep; optimus_dot_detect imports it). No browser,
 sheet, or GHL credentials are touched.
 """
 
-import os, sys, json, time, tempfile, unittest
+import os, sys, json, time, tempfile, types, unittest
 
 # make the optimus/ modules importable when run from anywhere
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -25,6 +25,7 @@ import business_score as score
 import ghl_loader as loader
 import bdc_diff
 import weekly_run
+import themapman
 import fiber_zone_scanner as fzs
 
 
@@ -351,6 +352,103 @@ class TestWeeklyRun(unittest.TestCase):
             st["done"].append("signals")
             weekly_run.save_state(p, st)
             self.assertEqual(weekly_run.load_state(p)["done"], ["signals"])
+
+
+class TestMapMan(unittest.TestCase):
+    def test_haversine(self):
+        self.assertAlmostEqual(themapman.haversine(29.76, -95.37, 29.76, -95.37), 0.0, places=3)
+        d = themapman.haversine(29.7600, -95.3700, 29.7600, -95.3690)  # ~10^-3 deg lng
+        self.assertTrue(80 < d < 120)   # ~96 m at this latitude
+
+    def test_is_blocked(self):
+        self.assertTrue(themapman.is_blocked("Walmart Supercenter"))
+        self.assertTrue(themapman.is_blocked("AT&T Store"))      # carrier chain blocked
+        self.assertFalse(themapman.is_blocked("Joe's Taqueria"))
+        self.assertFalse(themapman.is_blocked(""))
+
+    def test_is_commercial(self):
+        self.assertTrue(themapman.is_commercial(["restaurant", "point_of_interest"]))
+        self.assertFalse(themapman.is_commercial(["route"]))
+        self.assertFalse(themapman.is_commercial([]))
+
+    def test_has_phone(self):
+        self.assertTrue(themapman.has_phone("(713) 555-0100"))
+        self.assertFalse(themapman.has_phone("12"))
+        self.assertFalse(themapman.has_phone(None))
+
+    def test_lead_to_business_shape(self):
+        lead = {"address": "5 Main St", "lat": 29.7, "lng": -95.3, "state": "TX",
+                "zone_label": "FRESH", "status": dot.STATUS_LEAD}
+        resolved = {"name": "Joe's Cafe", "phone": "(713) 555-0100",
+                    "address": "5 Main St, Houston, TX", "website": "x.com",
+                    "types": "restaurant, food, point_of_interest",
+                    "fiber_lat": 29.7, "fiber_lng": -95.3, "status": "RESOLVED"}
+        b = themapman.lead_to_business(lead, resolved)
+        self.assertEqual(b["name"], "Joe's Cafe")
+        self.assertTrue(b["has_phone"])
+        self.assertEqual(b["types"], ["restaurant", "food", "point_of_interest"])
+        self.assertEqual(b["zone_label"], "FRESH")     # carried from the lead
+        self.assertEqual(b["status"], dot.STATUS_LEAD)
+        # the shaped dict scores as a callable business
+        self.assertTrue(score.score_business(b)["callable"])
+
+    def test_enrich_leads_uses_resolver(self):
+        orig = themapman.resolve
+        themapman.resolve = lambda addr, lat=None, lng=None, st=None, api_key=None: {
+            "name": "Clinic", "phone": "7135550100", "address": addr,
+            "types": "doctor", "fiber_lat": lat, "fiber_lng": lng, "status": "RESOLVED"}
+        try:
+            out = themapman.enrich_leads([{"address": "9 Oak", "lat": 1, "lng": 2,
+                                           "status": dot.STATUS_LEAD}])
+        finally:
+            themapman.resolve = orig
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["name"], "Clinic")
+        self.assertTrue(out[0]["has_phone"])
+
+    def test_key_resolution(self):
+        self.assertEqual(themapman._key("abc"), "abc")        # explicit key wins
+        orig = themapman.API_KEY
+        themapman.API_KEY = ""
+        try:
+            with self.assertRaises(RuntimeError):              # none anywhere -> error
+                themapman._key(None)
+        finally:
+            themapman.API_KEY = orig
+
+
+class TestWeeklyEnrichInProcess(unittest.TestCase):
+    def test_enrich_runs_mapman_when_no_output_file(self):
+        orig = themapman.resolve
+        themapman.resolve = lambda addr, lat=None, lng=None, st=None, api_key=None: {
+            "name": "Clinic", "phone": "7135550100", "address": addr,
+            "types": "doctor", "fiber_lat": lat, "fiber_lng": lng, "status": "RESOLVED"}
+        prev_key = os.environ.get("GOOGLE_MAPS_API_KEY")
+        os.environ["GOOGLE_MAPS_API_KEY"] = "test-key"
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                leads = os.path.join(d, "leads.json")
+                enriched = os.path.join(d, "enriched.json")
+                with open(leads, "w") as f:
+                    json.dump([{"address": "9 Oak St", "lat": 1.0, "lng": 2.0,
+                                "status": dot.STATUS_LEAD, "zone_label": "FRESH"}], f)
+                args = types.SimpleNamespace(enriched=enriched, leads=leads)
+                self.assertTrue(weekly_run.stage_enrich(args))
+                with open(enriched) as f:
+                    out = json.load(f)
+                self.assertEqual(len(out), 1)
+                self.assertEqual(out[0]["name"], "Clinic")
+        finally:
+            themapman.resolve = orig
+            if prev_key is None:
+                os.environ.pop("GOOGLE_MAPS_API_KEY", None)
+            else:
+                os.environ["GOOGLE_MAPS_API_KEY"] = prev_key
+
+    def test_enrich_checkpoints_when_nothing_available(self):
+        with tempfile.TemporaryDirectory() as d:
+            args = types.SimpleNamespace(enriched=os.path.join(d, "missing.json"), leads=None)
+            self.assertFalse(weekly_run.stage_enrich(args))
 
 
 def _temp_queue():

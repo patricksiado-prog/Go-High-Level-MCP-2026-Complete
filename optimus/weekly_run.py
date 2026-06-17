@@ -161,27 +161,55 @@ def stage_scan(args, q):
 
 
 def stage_enrich(args):
-    """CHECKPOINT on MapMan. MapMan (Pydroid) reads the scanner's exact
-    addresses and writes back business name + phone + type. We just confirm its
-    output exists and is non-empty; if not, stop cleanly so a later re-run
-    resumes here once MapMan has finished."""
+    """MapMan enrichment (address -> business name + phone). Three ways, in
+    order: (1) use an enriched-businesses file MapMan already produced
+    (Pydroid/Sheet export); (2) if none, but scanner leads + a Google Maps key
+    are available, run MapMan's resolver IN-PROCESS here to produce it; (3)
+    otherwise CHECKPOINT cleanly so a later re-run resumes once MapMan output
+    exists."""
     path = args.enriched
-    if not os.path.exists(path):
-        print("[enrich] waiting on MapMan: %s not found." % path)
-        print("         Run themapman.py (Pydroid) on the Precise tab, export the")
-        print("         enriched businesses to that path, then re-run weekly_run.")
-        return False
-    try:
-        with open(path) as f:
-            data = json.load(f)
-    except Exception as e:
-        print("[enrich] %s is not valid JSON yet (%s) -- waiting." % (path, str(e)[:80]))
-        return False
-    if not data:
-        print("[enrich] %s is empty -- MapMan hasn't written businesses yet." % path)
-        return False
-    print("[enrich] MapMan output ready: %d enriched business(es)." % len(data))
-    return True
+
+    # (1) MapMan output already present
+    if os.path.exists(path):
+        try:
+            with open(path) as f:
+                data = json.load(f)
+        except Exception as e:
+            print("[enrich] %s is not valid JSON yet (%s) -- waiting." % (path, str(e)[:80]))
+            return False
+        if not data:
+            print("[enrich] %s is empty -- MapMan hasn't written businesses yet." % path)
+            return False
+        print("[enrich] MapMan output ready: %d enriched business(es)." % len(data))
+        return True
+
+    # (2) in-process enrichment from scanner leads
+    if args.leads and os.path.exists(args.leads):
+        key = os.environ.get("GOOGLE_MAPS_API_KEY")
+        if not key:
+            print("[enrich] %s present but GOOGLE_MAPS_API_KEY not set -- can't enrich "
+                  "in-process." % args.leads)
+            print("         Set the key (rotate the old exposed one first) or drop a")
+            print("         MapMan-produced %s in place, then re-run." % path)
+            return False
+        import themapman
+        with open(args.leads) as f:
+            leads = json.load(f)
+        businesses = themapman.enrich_leads(leads, api_key=key)
+        resolved = [b for b in businesses if b.get("has_phone")]
+        os.makedirs(os.path.dirname(os.path.abspath(path)) or ".", exist_ok=True)
+        with open(path, "w") as f:
+            json.dump(resolved, f, indent=2)
+        print("[enrich] MapMan (in-process) resolved %d/%d lead(s) to a business with a "
+              "phone -> %s" % (len(resolved), len(leads), path))
+        return bool(resolved)
+
+    # (3) nothing to work with -> checkpoint
+    print("[enrich] waiting on MapMan: %s not found." % path)
+    print("         Either run themapman.py on the Precise tab and export to that path,")
+    print("         or pass --leads <scanner leads JSON> with GOOGLE_MAPS_API_KEY set to")
+    print("         enrich in-process. Re-run weekly_run to resume here.")
+    return False
 
 
 def stage_score(args):
@@ -277,6 +305,8 @@ def main():
     ap.add_argument("--scan-once", action="store_true", help="drain ONE ZIP inline (else just report)")
     ap.add_argument("--api-substring", help="dot-layer JSON substring (for --scan-once)")
     # enrich / score / load
+    ap.add_argument("--leads", help="scanner leads JSON to enrich in-process via MapMan "
+                                    "(needs GOOGLE_MAPS_API_KEY) when --enriched is absent")
     ap.add_argument("--enriched", default=DEFAULT_ENRICHED, help="MapMan output (enriched businesses JSON)")
     ap.add_argument("--ranked", default=DEFAULT_RANKED, help="where to write the ranked list")
     ap.add_argument("--agents", default="", help="comma-separated GHL user ids to round-robin")
