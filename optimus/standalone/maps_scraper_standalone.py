@@ -12,7 +12,7 @@ Run by SCRAPER_SETUP.bat, or directly:  python maps_scraper_standalone.py
 
 import os, csv, re, time, json, urllib.parse
 
-VERSION = "1.5 (2026-06-17)"   # bump this when the scraper changes; printed on start
+VERSION = "1.6 (2026-06-17)"   # bump this when the scraper changes; printed on start
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_PATH = os.path.join(HERE, "businesses.csv")
@@ -32,9 +32,8 @@ _PHONE_RE = re.compile(r"\+?\d[\d\-\.\s\(\)]{8,}\d")
 CATEGORIES_LIGHT = [
     "plumber", "electrician", "hvac", "roofing", "general contractor",
     "painter", "handyman", "landscaping", "house cleaning", "junk removal",
-    "auto repair", "dog grooming", "hair salon", "barber shop", "nail salon",
-    "chiropractor", "dentist", "photographer", "real estate agent",
-    "insurance agent",
+    "auto repair", "dog grooming", "hair salon", "barber shop",
+    "chiropractor", "photographer", "real estate agent", "insurance agent",
 ]
 CATEGORIES_HEAVY = [
     "plumber", "electrician", "hvac", "roofing", "general contractor",
@@ -43,9 +42,9 @@ CATEGORIES_HEAVY = [
     "appliance repair", "garage door repair", "locksmith", "tree service",
     "pressure washing", "pool cleaning", "auto repair", "auto detailing",
     "mobile mechanic", "tire shop", "dog grooming", "pet sitting",
-    "dog training", "hair salon", "barber shop", "nail salon",
+    "dog training", "hair salon", "barber shop",
     "massage therapist", "esthetician", "tattoo shop", "chiropractor",
-    "dentist", "physical therapy", "catering", "bakery", "coffee shop",
+    "physical therapy", "catering", "bakery", "coffee shop",
     "food truck", "photographer", "bookkeeper", "real estate agent",
     "insurance agent", "tutoring", "home daycare", "notary public",
 ]
