@@ -1448,45 +1448,65 @@ def pan(page, direction):
 
 
 def _map_canvas_box(page):
-    """Bounding box of the map canvas (or None)."""
-    for sel in (".mapboxgl-canvas", ".maplibregl-canvas", "canvas"):
-        try:
-            cv = page.locator(sel).first
-            if cv.count() == 0:
-                continue
-            b = cv.bounding_box()
-            if b and b["width"] > 100 and b["height"] > 100:
-                return b
-        except Exception:
-            pass
+    """Bounding box (viewport coords) of the map canvas, searching the top page
+    AND every child frame -- the AT&T map can render inside a frame, in which
+    case a top-page query finds nothing (that's why it 'wasn't moving')."""
+    sels = (".mapboxgl-canvas", ".maplibregl-canvas", "canvas")
+    contexts = [page] + list(page.frames)
+    for ctx in contexts:
+        for sel in sels:
+            try:
+                cv = ctx.locator(sel).first
+                if cv.count() == 0:
+                    continue
+                b = cv.bounding_box()
+                if b and b["width"] > 100 and b["height"] > 100:
+                    return b
+            except Exception:
+                pass
     return None
 
 
+def _viewport_map_box(page):
+    """Fallback drag region = the map area of the VIEWPORT (config fractions).
+    Used when no canvas element is reachable (it's in a hidden/cross-origin
+    frame). page.mouse works in viewport coords, so dragging here pans the map
+    exactly like fiber_hunter's pyautogui drag from the map centre."""
+    vp = page.viewport_size or VIEWPORT
+    return {"x": vp["width"] * MAP_LEFT_FRAC,
+            "y": vp["height"] * MAP_TOP_FRAC,
+            "width": vp["width"] * (MAP_RIGHT_FRAC - MAP_LEFT_FRAC),
+            "height": vp["height"] * (MAP_BOTTOM_FRAC - MAP_TOP_FRAC)}
+
+
 def mouse_drag(page, direction):
-    """PROVEN fiber_hunter motion: DRAG the map canvas to pan (the original
-    fiber_hunter used pyautogui.dragRel, ~150px serpentine). A drag is a map
-    gesture, so it pans the HIDDEN Mapbox map where arrow keys / panBy do
-    nothing -- and because it stays on the canvas it never lands on nav (no
-    portal flip). Drag the content the OPPOSITE way you want the viewport to
-    move, then the serviceability fetch fires for the new area."""
+    """PROVEN fiber_hunter motion: DRAG to pan (the original used
+    pyautogui.dragRel, ~150px serpentine). A drag is a map gesture, so it pans
+    the HIDDEN Mapbox map where arrow keys / panBy do nothing. We drag the map
+    CANVAS if we can find it (even in a frame); otherwise we drag the map REGION
+    of the screen -- either way page.mouse moves the map. Drag the content the
+    OPPOSITE way you want the viewport to move."""
     box = _map_canvas_box(page)
+    src = "canvas"
     if not box:
-        return False
+        box = _viewport_map_box(page)   # canvas hidden in a frame -> drag screen
+        src = "screen"
     cx = box["x"] + box["width"] / 2.0
     cy = box["y"] + box["height"] / 2.0
     sx, sy = {"right": (-1, 0), "left": (1, 0),
               "down": (0, -1), "up": (0, 1)}[direction]
     dx = sx * box["width"] * DRAG_FRAC
     dy = sy * box["height"] * DRAG_FRAC
+    print("  -> PAN %s: drag %s from (%d,%d)" % (direction, src, int(cx), int(cy)))
     try:
         page.mouse.move(cx, cy)
         page.mouse.down()
-        # FAST flick: few steps = a quick drag (like fiber_hunter's pyautogui
-        # dragRel). Mapbox adds a little inertia, so it pans snappy AND a touch
-        # further -> covers ground faster without missing dots.
+        # FAST flick: few steps = a quick drag (like fiber_hunter's dragRel);
+        # Mapbox adds a little inertia so it pans snappy AND a touch further.
         page.mouse.move(cx + dx, cy + dy, steps=4)
         page.mouse.up()
-    except Exception:
+    except Exception as e:
+        print("     drag failed: %s" % str(e)[:70])
         return False
     time.sleep(WAIT_AFTER_PAN)
     return True
@@ -1955,8 +1975,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--login", action="store_true", help="open browser to log in once, then quit")
     ap.add_argument("--zip", default=None, help="ZIP/area to search before scanning")
-    ap.add_argument("--cols", type=int, default=1)
-    ap.add_argument("--rows", type=int, default=1)
+    ap.add_argument("--cols", type=int, default=3)   # grid so it ALWAYS sweeps
+    ap.add_argument("--rows", type=int, default=3)   # (drag pan), even run direct
     ap.add_argument("--zoom-in", type=int, default=0, help="press zoom-IN this many times after load")
     ap.add_argument("--zoom-out", type=int, default=0, help="press zoom-OUT this many times after load")
     ap.add_argument("--fresh", action="store_true",
