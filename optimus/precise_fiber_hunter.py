@@ -821,6 +821,11 @@ class NetCapture:
             return 0
         for rec in new_records:        # local backup (no quota)
             append_jsonl(rec)
+        try:    # sample addresses to the Drive log so Claude can verify accuracy
+            drive_log("ADDRS +%d e.g.: %s" % (
+                len(new_rows), " | ".join(r[0] for r in new_rows[:4])))
+        except Exception:
+            pass
         if dry or ws is None:
             for r in new_rows[:20]:
                 print("   + %s | %s" % (r[0], r[6]))
