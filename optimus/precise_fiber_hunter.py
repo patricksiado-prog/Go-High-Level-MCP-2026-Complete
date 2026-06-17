@@ -1824,7 +1824,10 @@ def _start_enrichment(allow_paid=False):
             print("(enrichment not started: %s)" % str(e)[:80])
             return
         key = os.environ.get("GOOGLE_PLACES_API_KEY")
-        paid = bool(allow_paid and key)
+        # Use Google Places whenever a key is present (best source for business
+        # name + phone, and it can match by ADDRESS even with no lat/lng). No
+        # --paid flag needed -- the moment Zack's key is set, it kicks in.
+        paid = bool(key) or allow_paid
         try:
             enrich_phones.run(enrich_phones.IN_PATH, enrich_phones.OUT_PATH,
                               dry=False, allow_paid=paid, api_key=key,
