@@ -113,16 +113,53 @@ def _read_tab(sh, title, status):
     return out
 
 
+def _read_precise_fiber(sh):
+    """Pull matched businesses straight from the merged Precise Fiber tab
+    (Address, Dot Color, Captured At, Business, Phone) -- the freshest matches the
+    hunter writes inline. Only rows that have a Business + a real Phone."""
+    try:
+        ws = sh.worksheet("Precise Fiber")
+    except Exception:
+        return []
+    out = []
+    for r in ws.get_all_values()[1:]:
+        r = (list(r) + [""] * 5)[:5]
+        addr, color, ts, name, phone = (c.strip() for c in r)
+        if not name or len(_digits(phone)) < 10:
+            continue
+        status = STATUS_COPPER_UPGRADE if color.upper() == "ORANGE" else STATUS_LEAD
+        out.append({
+            "name": name, "phone": phone, "address": addr, "website": "",
+            "types": [], "status": status, "zone_label": "WORKING",
+            "has_phone": True, "phone_type": None, "in_ghl": False,
+            "source_tab": "Precise Fiber",
+        })
+    return out
+
+
 def gather_leads(sh):
-    """Both tabs -> scored, ranked, DNC-scrubbed business dicts (best-first)."""
-    raw = _read_tab(sh, GREEN_TAB, STATUS_LEAD) + _read_tab(sh, ORANGE_TAB, STATUS_COPPER_UPGRADE)
+    """All match sources -> deduped, scored, DNC-scrubbed business dicts (best-first).
+    Reads the green/orange biz tabs AND the merged Precise Fiber tab so it always
+    pulls the most recent matches; dedupes by phone so a business is loaded once."""
+    raw = (_read_tab(sh, GREEN_TAB, STATUS_LEAD)
+           + _read_tab(sh, ORANGE_TAB, STATUS_COPPER_UPGRADE)
+           + _read_precise_fiber(sh))
+    # dedupe by phone (same business shows up across tabs + apartment units)
+    seen, dedup = set(), []
+    for b in raw:
+        ph = _digits(b.get("phone"))[-10:]
+        key = ph if len(ph) == 10 else (b.get("name", "").lower() + "|" + b.get("address", "").lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        dedup.append(b)
+    raw = dedup
     dnc = _load_dnc()
     if dnc:
         for b in raw:
             if _digits(b.get("phone"))[-10:] in dnc:
                 b["on_dnc"] = True
     ranked = business_score.rank_businesses(raw)   # drops non-callable (no phone / DNC / customer)
-    # flatten to ghl_loader's expected shape: the business dict with 'score' set
     leads = []
     for r in ranked:
         b = dict(r["business"])
