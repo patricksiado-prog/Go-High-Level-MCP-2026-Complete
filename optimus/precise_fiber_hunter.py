@@ -125,11 +125,12 @@ MAP_BOTTOM_FRAC = 0.96
 MAP_LEFT_FRAC = 0.02
 MAP_RIGHT_FRAC = 0.98
 
-# --- pacing (seconds) -- tightened for smooth continuous scanning; --fast cuts
-#     them further. These are module globals so main() can lower them on --fast.
-WAIT_AFTER_PAN = 0.9
-WAIT_AFTER_ZOOM = 0.9
-SEARCH_SETTLE = 0.8           # wait after "Search this area" for dots to load
+# --- pacing (seconds) -- FAST by default now (speed is the priority); --slow
+#     restores the relaxed timing if dots aren't loading in time on a slow link.
+#     Module globals so main() can adjust them.
+WAIT_AFTER_PAN = 0.2
+WAIT_AFTER_ZOOM = 0.45
+SEARCH_SETTLE = 0.3           # wait after "Search this area" for dots to load
 SEARCH_CLICK_WAIT = 1.5       # wait after CLICKING the search control for the fetch
 PAN_PRESSES = 6
 # fiber_hunter's proven motion is a MOUSE DRAG across the canvas (the original
@@ -2347,9 +2348,11 @@ def main():
                     help="RESEARCH: log EVERY network response (url, type, size) "
                          "so we can find which endpoint carries the dot data. "
                          "Prints the biggest endpoints + writes net_responses.log.")
-    ap.add_argument("--spiral", action="store_true",
-                    help="pan in an outward SPIRAL instead of the default sequential "
-                         "GRID (lawnmower, row by row). Both run until you close the browser.")
+    ap.add_argument("--grid", action="store_true",
+                    help="pan in a sequential GRID (lawnmower, row by row) instead of "
+                         "the default outward SPIRAL. Spiral is best for covering a "
+                         "larger and larger area; grid is for one bounded patch. Both "
+                         "run until you close the browser.")
     ap.add_argument("--dry", action="store_true", help="don't write to the sheet, just print")
     ap.add_argument("--auto", action="store_true",
                     help="UNATTENDED: no 'press Enter' pauses, auto-close at the end. "
@@ -2360,8 +2363,10 @@ def main():
     ap.add_argument("--no-update", action="store_true",
                     help="skip the GitHub auto-pull on start (run exactly this code)")
     ap.add_argument("--fast", action="store_true",
-                    help="cut the wait times for quicker, smoother scanning "
-                         "(use if dots still load fast enough on your connection)")
+                    help="(default now) tight pacing for quick scanning")
+    ap.add_argument("--slow", action="store_true",
+                    help="restore the relaxed wait times -- use only if leads come "
+                         "back 0 because dots aren't loading in time on a slow link")
     ap.add_argument("--probe", action="store_true",
                     help="DIAGNOSTIC: after you position the map and press Enter, "
                          "dump what the Mapbox map exposes (layers + dot feature "
@@ -2384,15 +2389,20 @@ def main():
         global ALLOW_CLICK
         ALLOW_CLICK = True
 
-    if args.fast:
-        global WAIT_AFTER_PAN, WAIT_AFTER_ZOOM, SEARCH_SETTLE, SEARCH_CLICK_WAIT
-        global POPUP_POLL_TIMEOUT
+    global WAIT_AFTER_PAN, WAIT_AFTER_ZOOM, SEARCH_SETTLE, SEARCH_CLICK_WAIT
+    global POPUP_POLL_TIMEOUT
+    if args.slow:               # relaxed pacing -- only if fast misses dots
+        WAIT_AFTER_PAN = 0.9
+        WAIT_AFTER_ZOOM = 0.9
+        SEARCH_SETTLE = 0.8
+        print("SLOW mode: relaxed pacing (more time for dots to load).")
+    else:                       # FAST is the default now -- speed is the priority
         WAIT_AFTER_PAN = 0.2
         WAIT_AFTER_ZOOM = 0.45
-        SEARCH_SETTLE = 0.25
+        SEARCH_SETTLE = 0.3
         SEARCH_CLICK_WAIT = 0.5
         POPUP_POLL_TIMEOUT = 1.3
-        print("FAST mode: tightened pacing.")
+        print("FAST pacing (default). Use --slow if leads come back 0.")
 
     os.makedirs(PROFILE_DIR, exist_ok=True)
 
@@ -2486,7 +2496,7 @@ def main():
                 if cap is None:
                     n = 0
                 else:                    # CONTINUOUS: grid (default) or spiral, until stopped
-                    _sweep = sweep_continuous if args.spiral else sweep_grid
+                    _sweep = sweep_grid if args.grid else sweep_continuous
                     n = _sweep(page, ws, seen, area_label, args.dry, cap)
                 if n:
                     print("  captured %d addresses OFF THE SERVER "
@@ -2536,7 +2546,7 @@ def main():
             print("Continuous sweep of %s (backend read)...\n" % (args.zip or "this area"))
             if cap is None:
                 return 0
-            _sweep = sweep_continuous if args.spiral else sweep_grid
+            _sweep = sweep_grid if args.grid else sweep_continuous
             return _sweep(page, ws, seen, args.zip or "manual", args.dry, cap)
 
         if not args.auto:
