@@ -134,8 +134,9 @@ SEARCH_CLICK_WAIT = 1.5       # wait after CLICKING the search control for the f
 PAN_PRESSES = 6
 # fiber_hunter's proven motion is a MOUSE DRAG across the canvas (the original
 # used pyautogui.dragRel). DRAG_FRAC = how far to drag, as a fraction of the
-# canvas, per cell (<1 so adjacent cells overlap a little and miss nothing).
-DRAG_FRAC = 0.45
+# canvas, per cell. Larger = each step jumps further so it sweeps more ground
+# per cell; kept under 1 so adjacent views still overlap a bit and miss nothing.
+DRAG_FRAC = 0.8
 
 # Map the internal dot status -> the on-map LEGEND COLOR, so the sheet says
 # GREEN / ORANGE / GREY at a glance (green = eligible lead, orange = copper
@@ -2313,9 +2314,9 @@ def main():
                     help="RESEARCH: log EVERY network response (url, type, size) "
                          "so we can find which endpoint carries the dot data. "
                          "Prints the biggest endpoints + writes net_responses.log.")
-    ap.add_argument("--grid", action="store_true",
-                    help="pan in a sequential GRID (lawnmower, row by row) instead of "
-                         "the default outward SPIRAL. Both run until you close the browser.")
+    ap.add_argument("--spiral", action="store_true",
+                    help="pan in an outward SPIRAL instead of the default sequential "
+                         "GRID (lawnmower, row by row). Both run until you close the browser.")
     ap.add_argument("--dry", action="store_true", help="don't write to the sheet, just print")
     ap.add_argument("--auto", action="store_true",
                     help="UNATTENDED: no 'press Enter' pauses, auto-close at the end. "
@@ -2452,7 +2453,7 @@ def main():
                 if cap is None:
                     n = 0
                 else:                    # CONTINUOUS: grid (default) or spiral, until stopped
-                    _sweep = sweep_grid if args.grid else sweep_continuous
+                    _sweep = sweep_continuous if args.spiral else sweep_grid
                     n = _sweep(page, ws, seen, area_label, args.dry, cap)
                 if n:
                     print("  captured %d addresses OFF THE SERVER "
@@ -2502,7 +2503,7 @@ def main():
             print("Continuous sweep of %s (backend read)...\n" % (args.zip or "this area"))
             if cap is None:
                 return 0
-            _sweep = sweep_grid if args.grid else sweep_continuous
+            _sweep = sweep_continuous if args.spiral else sweep_grid
             return _sweep(page, ws, seen, args.zip or "manual", args.dry, cap)
 
         if not args.auto:
