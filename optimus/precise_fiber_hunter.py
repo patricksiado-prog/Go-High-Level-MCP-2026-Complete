@@ -883,12 +883,15 @@ class NetCapture:
             match_leads_to_biz(new_records)
         except Exception as e:
             print("   (biz match skipped: %s)" % str(e)[:80])
-        # periodically reload the business list so a scrape running ALONGSIDE the
-        # hunter gets its new businesses matched live (was load-once at startup).
+        # REAL-TIME MATCH: periodically reload the business list so a scrape running
+        # ALONGSIDE the hunter gets matched live. If new businesses showed up, also
+        # re-scan ALL captured addresses so leads grabbed BEFORE their business was
+        # scraped get matched the moment it appears (true real-time, both directions).
         _BIZ_RELOAD[0] += 1
         if _BIZ_RELOAD[0] % 20 == 0:
             try:
-                reload_biz_index()
+                if reload_biz_index():
+                    _backlog_match()
             except Exception:
                 pass
         return len(new_rows)
@@ -2482,11 +2485,13 @@ def init_bizmatch(ws):
 def reload_biz_index():
     """Re-read the 'Maps Businesses' tab into the in-memory index so businesses the
     scraper adds DURING a hunt get matched live (the old code loaded once at start,
-    which is why a concurrent scrape's businesses were missed). Best-effort; cheap."""
+    which is why a concurrent scrape's businesses were missed). Returns True if the
+    business count GREW, so the caller can retroactively match earlier leads."""
     mb = _BIZ.get("maps_ws")
     if mb is None:
-        return
+        return False
     try:
+        before = len(_BIZ.get("index") or {})
         idx = {}
         for r in mb.get_all_values()[1:]:
             r = (list(r) + [""] * 5)[:5]
@@ -2495,8 +2500,10 @@ def reload_biz_index():
                 idx[key] = {"name": r[0], "phone": r[2], "website": r[3], "category": r[4]}
         if idx:
             _BIZ["index"] = idx
+            return len(idx) > before
     except Exception:
         pass
+    return False
 
 
 def _backlog_match():
