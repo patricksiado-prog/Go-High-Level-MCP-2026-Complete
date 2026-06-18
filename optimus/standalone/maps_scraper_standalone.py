@@ -12,7 +12,7 @@ Run by SCRAPER_SETUP.bat, or directly:  python maps_scraper_standalone.py
 
 import os, csv, re, time, json, urllib.parse
 
-VERSION = "1.7 (2026-06-18)"   # bump this when the scraper changes; printed on start
+VERSION = "1.8 (2026-06-18)"   # bump this when the scraper changes; printed on start
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_PATH = os.path.join(HERE, "businesses.csv")
@@ -293,10 +293,132 @@ def open_sheet():
         except Exception:
             pass
         print("  -> writing to the '%s' tab live, as it runs." % SHEET_TAB)
+        try:                       # load captured fiber leads for the cross-match
+            init_match(sh)
+        except Exception:
+            pass
         return ws, seen
     except Exception as e:
         print("\n  (Could not open the sheet: %s -- results go to the CSV.)" % str(e)[:80])
         return None, set()
+
+
+# ---------------------------------------------------------------------------
+# CROSS-MATCH (the scraper's side of the combo): as we scrape each business, if
+# its address already has a captured GREEN/ORANGE fiber dot we write the match to
+# the same 'Fiber Green Biz' / 'Upgrade Orange Biz' tabs the hunter uses -- so BOTH
+# programs build the combined list, from their own side, in real time.
+# ---------------------------------------------------------------------------
+GREEN_BIZ_TAB = "Fiber Green Biz"
+ORANGE_BIZ_TAB = "Upgrade Orange Biz"
+BIZ_HEADER = ["Business Name", "Phone", "Address", "Website", "Category"]
+_SUF = {"ST": "ST", "STREET": "ST", "AVE": "AVE", "AV": "AVE", "AVENUE": "AVE",
+        "RD": "RD", "ROAD": "RD", "DR": "DR", "DRIVE": "DR", "LN": "LN", "LANE": "LN",
+        "BLVD": "BLVD", "BOULEVARD": "BLVD", "CT": "CT", "COURT": "CT", "PL": "PL",
+        "PLACE": "PL", "WAY": "WAY", "CIR": "CIR", "CIRCLE": "CIR", "TER": "TER",
+        "TERRACE": "TER", "TRL": "TRL", "TRAIL": "TRL", "PKWY": "PKWY",
+        "PARKWAY": "PKWY", "HWY": "HWY", "HIGHWAY": "HWY"}
+_UNIT = re.compile(r"\b(APT|APARTMENT|UNIT|STE|SUITE|#|BLDG|BUILDING|FL|FLOOR|RM|"
+                   r"ROOM|OFC|OFFICE|TRLR|LOT|SPC)\b.*$", re.I)
+_MATCH = {"leads": None, "green_ws": None, "orange_ws": None,
+          "green_seen": set(), "orange_seen": set()}
+
+
+def _norm_addr(a):
+    if not a:
+        return ""
+    s = a.upper().strip().split(",")[0]
+    s = _UNIT.sub("", s)
+    s = re.sub(r"[^A-Z0-9 ]", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    m = re.match(r"^(\d+)\s+(.*)$", s)
+    if not m:
+        return ""
+    h, rest = m.group(1), m.group(2).split()
+    if not rest:
+        return ""
+    if rest[-1] in _SUF:
+        rest[-1] = _SUF[rest[-1]]
+    rest = ["N" if t == "NORTH" else "S" if t == "SOUTH" else "E" if t == "EAST"
+            else "W" if t == "WEST" else t for t in rest]
+    return "%s|%s" % (h, " ".join(rest))
+
+
+def _ensure_match_tab(sh, title):
+    try:
+        ws = sh.worksheet(title)
+    except Exception:
+        ws = sh.add_worksheet(title=title, rows="200", cols="5")
+    if not ws.get_all_values():
+        ws.append_row(BIZ_HEADER)
+    return ws
+
+
+def init_match(sh):
+    """Load captured fiber leads (Precise Fiber: Address, Dot Color) so each scraped
+    business can be flagged if it sits on a GREEN/ORANGE dot, and open the two match
+    tabs. No-op if there's no Precise Fiber tab yet."""
+    try:
+        pf = sh.worksheet("Precise Fiber").get_all_values()
+    except Exception:
+        _MATCH["leads"] = {}
+        return
+    leads = {}
+    for r in pf[1:]:
+        r = (list(r) + [""] * 5)[:5]
+        color = (r[1] or "").strip().upper()
+        if color not in ("GREEN", "ORANGE"):
+            continue
+        k = _norm_addr(r[0])
+        if k and k not in leads:
+            leads[k] = color
+    _MATCH["leads"] = leads
+    try:
+        _MATCH["green_ws"] = _ensure_match_tab(sh, GREEN_BIZ_TAB)
+        _MATCH["orange_ws"] = _ensure_match_tab(sh, ORANGE_BIZ_TAB)
+        for ws, key in ((_MATCH["green_ws"], "green_seen"),
+                        (_MATCH["orange_ws"], "orange_seen")):
+            try:
+                _MATCH[key] = set(r[2].strip().upper() for r in ws.get_all_values()[1:]
+                                  if len(r) > 2 and r[2].strip())
+            except Exception:
+                _MATCH[key] = set()
+    except Exception:
+        pass
+    print("  cross-match ON: %d captured fiber leads loaded -> a scraped business on "
+          "a green/orange dot also lands in the match tabs." % len(leads))
+
+
+def _match_new(new):
+    """new = list of [name,address,phone,website,category]. Write any that sit on a
+    captured green/orange dot to the matching tab (batched, deduped)."""
+    leads = _MATCH.get("leads")
+    if not leads:
+        return
+    g, o = [], []
+    for name, addr, phone, web, cat in new:
+        color = leads.get(_norm_addr(addr))
+        if not color:
+            continue
+        au = (addr or "").strip().upper()
+        row = [name, phone, addr, web, cat]
+        if color == "ORANGE":
+            if au in _MATCH["orange_seen"]:
+                continue
+            _MATCH["orange_seen"].add(au); o.append(row)
+        else:
+            if au in _MATCH["green_seen"]:
+                continue
+            _MATCH["green_seen"].add(au); g.append(row)
+    try:
+        if g and _MATCH.get("green_ws"):
+            _MATCH["green_ws"].append_rows(g, value_input_option="RAW")
+        if o and _MATCH.get("orange_ws"):
+            _MATCH["orange_ws"].append_rows(o, value_input_option="RAW")
+        if g or o:
+            print("    cross-match: +%d on a GREEN dot, +%d on an ORANGE dot" % (len(g), len(o)))
+    except Exception:
+        pass
 
 
 def append_sheet(ws, rows, sheet_seen):
@@ -318,10 +440,15 @@ def append_sheet(ws, rows, sheet_seen):
     try:
         for i in range(0, len(new), 500):
             ws.append_rows(new[i:i + 500], value_input_option="RAW")
-        return len(new)
     except Exception as e:
         print("  (sheet write hiccup, will retry next batch: %s)" % str(e)[:60])
         return 0
+    # cross-match these new businesses against the captured fiber dots
+    try:
+        _match_new(new)
+    except Exception:
+        pass
+    return len(new)
 
 
 def main():
