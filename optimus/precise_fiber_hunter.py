@@ -1080,6 +1080,18 @@ def clean_sheet():
                 print("  '%s' already tight (%d x %d)" % (title, ws.row_count, ws.col_count))
         except Exception as e:
             print("  couldn't trim '%s': %s" % (title, str(e)[:50]))
+    # put the kept tabs in a clear, logical order so there's no confusion about
+    # which is which: leads, then the two biz matches, enriched, businesses, status.
+    try:
+        order = [OUT_TAB, GREEN_BIZ_TAB, ORANGE_BIZ_TAB, "Enriched Leads",
+                 MAPS_TAB, STATUS_TAB]
+        cur = {w.title: w for w in sh.worksheets()}
+        ordered = [cur[t] for t in order if t in cur]
+        ordered += [w for w in sh.worksheets() if w not in ordered]
+        sh.reorder_worksheets(ordered)
+        print("  ordered tabs: %s" % " | ".join(w.title for w in ordered))
+    except Exception as e:
+        print("  (couldn't reorder tabs: %s)" % str(e)[:50])
     # drop any cached fresh-sheet redirect so we go back to using THIS cleaned sheet
     try:
         if os.path.exists(NEW_SHEET_ID_FILE):
