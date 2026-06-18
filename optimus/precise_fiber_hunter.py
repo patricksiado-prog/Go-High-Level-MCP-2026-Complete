@@ -993,9 +993,26 @@ def find_creds():
 NEW_SHEET_ID_FILE = os.path.join(os.path.expanduser("~"), "optimus", "optimus_sheet_id.txt")
 
 
+def _sheet_is_full(sh):
+    """Probe: can we add even a 1-cell tab? If that raises the cell-cap error, the
+    workbook is full and won't take any more writes."""
+    try:
+        tmp = sh.add_worksheet(title="_optimus_probe", rows="1", cols="1")
+        try:
+            sh.del_worksheet(tmp)
+        except Exception:
+            pass
+        return False
+    except Exception as e:
+        m = str(e).lower()
+        return ("cells in the workbook" in m or "10000000" in m
+                or "increase the number of cells" in m)
+
+
 def open_sheet():
     """Open the production sheet and the Precise Fiber tab. We do NOT create a new
-    sheet -- if it's full, run --clean-sheet to free space in THIS one."""
+    sheet -- if it's full, AUTO-CLEAN this one (delete junk tabs, trim) so it accepts
+    writes again, then keep going. Same sheet, same link everyone has."""
     import gspread
     from google.oauth2.service_account import Credentials
     creds_file = find_creds()
@@ -1009,6 +1026,13 @@ def open_sheet():
         client = gspread.authorize(
             Credentials.from_service_account_file(creds_file, scopes=SCOPES))
         sh = client.open_by_key(SHEET_ID)
+        if _sheet_is_full(sh):
+            print("The sheet is FULL -- auto-cleaning the garbage so leads can save...")
+            try:
+                clean_sheet()
+            except Exception as e:
+                print("  (auto-clean hiccup: %s)" % str(e)[:80])
+            sh = client.open_by_key(SHEET_ID)   # re-open after cleaning
         try:
             ws = sh.worksheet(OUT_TAB)
         except Exception:
