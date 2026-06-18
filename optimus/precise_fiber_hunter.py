@@ -135,9 +135,8 @@ SEARCH_CLICK_WAIT = 1.5       # wait after CLICKING the search control for the f
 PAN_PRESSES = 6
 # fiber_hunter's proven motion is a MOUSE DRAG across the canvas (the original
 # used pyautogui.dragRel). DRAG_FRAC = how far to drag, as a fraction of the
-# canvas, per cell. Larger = each step jumps further so the grid keeps moving
-# onto new ground; kept under 1 so adjacent views still overlap a bit, no gaps.
-DRAG_FRAC = 0.85
+# canvas, per cell (<1 so adjacent cells overlap a little and miss nothing).
+DRAG_FRAC = 0.45
 
 # Map the internal dot status -> the on-map LEGEND COLOR, so the sheet says
 # GREEN / ORANGE / GREY at a glance (green = eligible lead, orange = copper
