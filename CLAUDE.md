@@ -357,6 +357,23 @@
     Both are thin launchers that pull the latest code from the PUBLIC GitHub branch
     each run (recipients need NO GitHub/git account). UNVERIFIED: whether those two
     Drive files currently hold the newest launcher text — confirm before mass-sending.
+  - **DIALER LINK BUILT (done, pushed + uploaded).** `dialer_loader.py` (in optimus/,
+    not standalone — needs `ghl_loader`+`business_score`) reads the hunter's
+    **"Fiber Green Biz"** + **"Upgrade Orange Biz"** tabs, maps green→`STATUS_LEAD` /
+    orange→`STATUS_COPPER_UPGRADE`, scores with `business_score.rank_businesses`
+    (drops no-phone/DNC/customer), DNC-scrubs against `~/optimus/dnc.txt`, then calls
+    `ghl_loader.load_businesses(..., commit=True)` → upserts contacts + AT&T Commercial
+    opps + enrolls the Power Dialer Queue workflow (`DIALER_WORKFLOW_ID
+    41e00387-a766-4975-bbcd-627c684a3ee1`). DRY PREVIEW first, asks before any live
+    write. Token: env `GHL_PIT_TOKEN` else cached `~/optimus/ghl_token.txt` (prompts
+    once). Launcher `install/START DIALER.bat` = repo-clone pattern (like the hunter).
+    Drive link id = **`17RzE0ri5MZHj8YgGir8rVyKp_gqT4VX1`** ("START - GHL Power Dialer
+    (OPTIMUS).bat") — Patrick must share Anyone-with-link→Viewer. KEY: it does NOT
+    place calls — it STAGES + ORDERS the queue; dialing stays human-on-every-call in
+    GHL (TCPA). Prereqs in Command (set in GHL UI, not by script): power dialer / a
+    calling number enabled + the Power Dialer Queue workflow published (was published
+    2026-06-12). Phone landline/wireless type is unknown from Maps (phone_type=None →
+    mid phone score); a real landline/wireless classify would need skip-trace data.
 
 ## 7. Creds & accounts (Patrick's own — keep it simple)
 - These are Patrick's accounts and creds. Copying or downloading `google_creds.json` to the
