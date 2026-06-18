@@ -314,6 +314,50 @@
     scrub. (3) emails drafted in Gmail to `Js@frontlinedirectsales.com` (Jim): Google
     Cloud Places-API setup + installer — Patrick to review/send.
 
+- **SESSION 2026-06-18 — what got built/learned (read this; latest).**
+  - **COMBO LOGIC NOW LIVES IN THE HUNTER (done, pushed).** Per Patrick: the scraper
+    stays a SEPARATE standalone program that fills the **"Maps Businesses"** tab; the
+    cross-reference/combine piece runs INSIDE `precise_fiber_hunter.py`. As the hunter
+    captures each GREEN/GOLD address it matches it against the scraped businesses
+    (loaded once into an in-memory dict keyed by normalized address) and writes hits
+    **live** to **"Fiber Green Biz"** (green dot + biz) / **"Upgrade Orange Biz"**
+    (gold/orange dot + biz). Cols = Business Name · Phone · Address · Website · Category.
+    Implementation in the hunter: constants `MAPS_TAB/GREEN_BIZ_TAB/ORANGE_BIZ_TAB`,
+    `_norm_addr` (HOUSE|STREET CORE; strips unit/city/zip, standardizes suffix),
+    `init_bizmatch(ws)` (called once in main after `open_sheet()` — loads businesses +
+    opens the two tabs + dedupe seen-sets), `match_leads_to_biz(new_records)` (called
+    from `NetCapture.flush` after the Precise Fiber write — batched `append_rows`, one
+    call per tab), and `_backlog_match()` (one-time startup pass over
+    `precise_addresses.jsonl` so leads captured BEFORE the scraper ran still get a
+    business name+phone). Removed the old end-of-run `run_bizmatch()` + the
+    `commercial_split` import. `--no-match` disables it. The match itself is O(1) dict
+    lookups (instant at any scale); only real throttle is the shared Sheets write
+    quota, already handled by batching.
+  - **SCRAPER NOW HEADLESS BY DEFAULT (done, pushed; v1.6→v1.7).** The Google Maps
+    browser was launching VISIBLE (`headless=False`) and covering Patrick's screen.
+    Now `headless=not SCRAPER_SHOW` — runs hidden in the background, writes to the
+    sheet/CSV, PC stays usable. `SCRAPER_SHOW=1` forces the window back (occasionally
+    more block-resistant). Prints "Running in the background (no window)". Old runs
+    already open stay visible — the hidden default only applies to the NEXT launch
+    (the launcher git-pulls each run, so just re-run, no reinstall).
+  - **UI HELP given:** minimizing a Chromium/Command-Prompt window does NOT pause
+    Playwright — it keeps scraping. The scraper's Command Prompt (text log) and the
+    Chrome/Maps window are TWO separate windows; minimize both to clear the screen.
+    The scraper writes incrementally + resumes, so restart loses nothing.
+  - **HOW TO START THE HUNTER (Patrick asked):** day-to-day = double-click
+    **START OPTIMUS.bat** (`%USERPROFILE%\optimus\START OPTIMUS.bat`) — it git-pulls,
+    does the one-time AT&T login, then runs the hunter. Raw command (skips
+    auto-update): `cd /d "%USERPROFILE%\optimus\repo\optimus"` then
+    `python precise_fiber_hunter.py` — NO `--zip`, NO flags; you pan/zoom the map by
+    hand, press Enter, it sweeps that area continuously until you close it. (Patrick
+    explicitly dislikes the `--zip` arg — don't suggest it as the normal path.)
+  - **THE TWO DISTRIBUTION LINKS (Drive, share each → Anyone-with-link → Viewer):**
+    scraper = `1uuWqUMXAGElvBtUfAuqRraiEiiaRbLGJ` ("START - Maps Scraper (GitHub).bat");
+    hunter = `1pQRDC2Xh-YaZ3MLT5QurtKqQbajll77W` ("START - Fiber Hunter (OPTIMUS).bat").
+    Both are thin launchers that pull the latest code from the PUBLIC GitHub branch
+    each run (recipients need NO GitHub/git account). UNVERIFIED: whether those two
+    Drive files currently hold the newest launcher text — confirm before mass-sending.
+
 ## 7. Creds & accounts (Patrick's own — keep it simple)
 - These are Patrick's accounts and creds. Copying or downloading `google_creds.json` to the
   right path on his own device is **routine setup, not a high-stakes event** — just do it and
