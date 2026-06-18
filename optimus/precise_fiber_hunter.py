@@ -1362,12 +1362,12 @@ def search_this_area(page):
             if btn.count() > 0:
                 print("  -> pressing '%s' (fetching dots from server)..." % label)
                 try:
-                    # Cap the click at 2s. It's only a CAP -- a normal view's button
-                    # is clickable instantly, so we don't actually wait. The 2s only
-                    # applies on a slow/stuck view: enough room for it to come around,
-                    # but it bails fast (no 30s default hang) so the loop pans on. The
-                    # network capture is always listening, collecting dots either way.
-                    btn.first.click(timeout=2000)
+                    # Cap the click at 1s. It's only a CAP -- a normal view's button
+                    # is clickable instantly, so we don't actually wait. The 1s only
+                    # applies on a slow/stuck view, then it bails so the loop pans on
+                    # (no long pause). The network capture is always listening, so the
+                    # dots get collected off the pan whether or not this click landed.
+                    btn.first.click(timeout=1000)
                     return True
                 except Exception:
                     print("     (search didn't take -- moving on, panning next)")
