@@ -398,6 +398,28 @@
     calling number enabled + the Power Dialer Queue workflow published (was published
     2026-06-12). Phone landline/wireless type is unknown from Maps (phone_type=None →
     mid phone score); a real landline/wireless classify would need skip-trace data.
+  - **DIALER FIX 2026-06-18 (root cause of "queue empty / nothing happens").** GHL's
+    Manual Call / power-dialer queue surfaces a lead to the **CONTACT'S OWNER**, not the
+    opportunity owner. `ghl_loader` was only setting `assignedTo` on the opportunity, so
+    every lead defaulted to whoever happened to own the contact (the 29 all sat on Zack
+    `qOa2OVzPabolfU9xjVXM` — only HE saw them in Conversations > Manual Actions). FIXED:
+    `contact_payload(..., assigned_to=)` now stamps the CONTACT, and `dialer_loader` by
+    default round-robins across **ALL active Command users** (`fetch_all_agents` → GET
+    `/users/?locationId=`); `--agents <ids>` overrides. `--reassign` re-spreads
+    already-loaded leads (ignores the dedupe state; upsert re-owns by phone, no dupes) —
+    the one-time command to redistribute the existing 29: `python dialer_loader.py
+    --reassign`. Command users (2026-06-18): ARA `jBmInXreGR2oskVXax0h`, ED SALDANNA
+    `lQ7gVrSONTWMAv4ZsEdO`, joshua Bulter `7c9QLWsTDyTALTMj0ast`, Romeo `J3PkeoYp8TNXMNNcaN4l`,
+    Zack `qOa2OVzPabolfU9xjVXM`. **Sheika is NOT a Command user** — she must be added in
+    Settings > Team (needs her email + a seat) before she can dial / be in the round-robin.
+  - **POST-CALL = native "load next call" (Patrick's call 2026-06-18).** No auto-SMS after
+    dispositioning — the power dialer already advances to the next contact when the rep
+    removes the Manual Action task (GHL only progresses the workflow on task delete, not on
+    calling from elsewhere). The two draft "Post-Call — Follow-up Text" workflows
+    (`bd37d7e2…` has Wait+SMS but NO trigger; `685383f2…` is an empty shell) stay OFF. If
+    revisited: a post-call text needs a **Call Status** trigger (no-answer/VM/busy) or a
+    **Call Details + Custom Disposition** trigger; "only if cell" needs a paid line-type
+    lookup (Twilio Lookup ~1¢/#) — not native, and most Maps biz numbers are landline/VoIP.
 
 ## 7. Creds & accounts (Patrick's own — keep it simple)
 - These are Patrick's accounts and creds. Copying or downloading `google_creds.json` to the
