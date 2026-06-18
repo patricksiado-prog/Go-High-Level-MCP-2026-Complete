@@ -2069,7 +2069,10 @@ _drive_log_id = [None]
 def drive_screenshot(page):
     """Overwrite the shared Drive image file with a current browser screenshot so
     Claude can SEE the screen. Best-effort; needs the file shared (edit) with the
-    service account (or its folder shared)."""
+    service account. OFF by default (same Drive-stall reason as drive_log); set
+    OPTIMUS_DRIVE_LOG=1 to enable."""
+    if os.environ.get("OPTIMUS_DRIVE_LOG") != "1":
+        return
     sess = _drive_session()
     if not sess:
         return
@@ -2109,7 +2112,14 @@ def _ensure_log_file(sess):
 
 
 def drive_log(msg):
-    """Append a timestamped line to the shared Drive telemetry file. Best-effort."""
+    """Append a timestamped line to the shared Drive telemetry file. Best-effort.
+    OFF by default: this does a Drive download+reupload with a 20s timeout, and the
+    service account usually can't write to a personal-Gmail Drive, so the requests
+    HANG to the timeout -- it was stalling the sweep ~20s on every productive cell.
+    Status still lands in run_status.json + the 'Hunter Status' sheet tab. Set
+    OPTIMUS_DRIVE_LOG=1 to re-enable if you've shared the Drive folder."""
+    if os.environ.get("OPTIMUS_DRIVE_LOG") != "1":
+        return
     sess = _drive_session()
     if not sess:
         return
