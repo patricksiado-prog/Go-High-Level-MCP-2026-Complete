@@ -1642,6 +1642,39 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
         return total
 
 
+def safe_goto(page, url):
+    """Navigate to the AT&T map without crashing on net::ERR_ABORTED. The site
+    does an immediate client-side redirect (portal/login SPA), which aborts the
+    first navigation even though the page goes on to load fine. So: try a couple
+    of times, fall back to wait_until='commit', and if it still aborts, just
+    proceed -- the page is loading and the rest of the flow (login / open map /
+    backend capture) handles whatever state it lands in."""
+    last = None
+    for attempt, wait in enumerate(("domcontentloaded", "commit", "commit")):
+        try:
+            page.goto(url, wait_until=wait, timeout=60000)
+            return True
+        except Exception as e:
+            last = e
+            msg = str(e).lower()
+            if "err_aborted" in msg or "aborted" in msg or "timeout" in msg:
+                # redirect/abort is expected here -- give the SPA a moment and retry
+                try:
+                    page.wait_for_timeout(1500)
+                except Exception:
+                    pass
+                continue
+            break
+    print("  (navigation note: %s -- continuing; the page is loading.)"
+          % str(last)[:80])
+    try:                       # make sure we're at least pointed at the site
+        if "youachieve" not in (page.url or ""):
+            page.wait_for_timeout(1500)
+    except Exception:
+        pass
+    return False
+
+
 def search_zip(page, zip_code):
     """Type the ZIP into the AT&T map's search box and submit. Tries the
     Mapbox geocoder input, visible text inputs, then the textbox role."""
@@ -2280,9 +2313,9 @@ def main():
                     help="RESEARCH: log EVERY network response (url, type, size) "
                          "so we can find which endpoint carries the dot data. "
                          "Prints the biggest endpoints + writes net_responses.log.")
-    ap.add_argument("--spiral", action="store_true",
-                    help="pan in an outward SPIRAL instead of the default sequential "
-                         "GRID (lawnmower, row by row). Both run until you close the browser.")
+    ap.add_argument("--grid", action="store_true",
+                    help="pan in a sequential GRID (lawnmower, row by row) instead of "
+                         "the default outward SPIRAL. Both run until you close the browser.")
     ap.add_argument("--dry", action="store_true", help="don't write to the sheet, just print")
     ap.add_argument("--auto", action="store_true",
                     help="UNATTENDED: no 'press Enter' pauses, auto-close at the end. "
@@ -2346,7 +2379,7 @@ def main():
         page.on("response", capture.handle)   # grab dot data off the wire
         _NET_CAPTURE[0] = capture
 
-        page.goto(MAP_URL, wait_until="domcontentloaded", timeout=60000)
+        safe_goto(page, MAP_URL)
 
         if args.login:
             print("\nLOG IN in the browser, open the Fiber Map, then come back here.")
@@ -2419,7 +2452,7 @@ def main():
                 if cap is None:
                     n = 0
                 else:                    # CONTINUOUS: grid (default) or spiral, until stopped
-                    _sweep = sweep_continuous if args.spiral else sweep_grid
+                    _sweep = sweep_grid if args.grid else sweep_continuous
                     n = _sweep(page, ws, seen, area_label, args.dry, cap)
                 if n:
                     print("  captured %d addresses OFF THE SERVER "
@@ -2469,7 +2502,7 @@ def main():
             print("Continuous sweep of %s (backend read)...\n" % (args.zip or "this area"))
             if cap is None:
                 return 0
-            _sweep = sweep_continuous if args.spiral else sweep_grid
+            _sweep = sweep_grid if args.grid else sweep_continuous
             return _sweep(page, ws, seen, args.zip or "manual", args.dry, cap)
 
         if not args.auto:
