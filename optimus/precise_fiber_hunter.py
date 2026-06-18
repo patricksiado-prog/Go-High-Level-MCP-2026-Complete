@@ -849,9 +849,9 @@ class NetCapture:
             if dot_color(dot_status) == "GREY":
                 continue   # GREY = existing fiber customer -> leave out
             ts = time.strftime("%Y-%m-%d %H:%M:%S")
-            new_rows.append([addr, ld.get("status") or "", ld.get("ban") or "",
-                             "FIBER ELIGIBLE", ts, area_label,
-                             dot_color(dot_status), "WORKING"])
+            # clean columns: Address | Dot Color (GREEN/ORANGE) | Captured At.
+            # dropped the always-the-same junk (Eligible/ZIP/Zone) + the BAN hash.
+            new_rows.append([addr, dot_color(dot_status), ts])
             new_records.append({"address": addr, "dot_status": dot_status,
                                 "zone_label": "WORKING", "popup_status": ld.get("status"),
                                 "ban": ld.get("ban"), "area": area_label, "ts": ts,
@@ -1038,8 +1038,7 @@ def open_sheet():
         except Exception:
             ws = sh.add_worksheet(title=OUT_TAB, rows="5000", cols="8")
         if not ws.get_all_values():
-            ws.append_row(["Address", "Status", "Subscriber BAN", "Eligible",
-                           "Captured At", "ZIP/Area", "Dot Color", "Zone"])
+            ws.append_row(["Address", "Dot Color", "Captured At"])
         return ws
     except Exception as e:
         print("WARNING: couldn't open the Google Sheet (%s)." % str(e)[:100])
@@ -1161,10 +1160,7 @@ def backfill_jsonl(ws, seen):
                 if dot_color(ds) == "GREY":
                     continue
                 seen.add(addr.upper())
-                rows.append([addr, d.get("popup_status") or "", d.get("ban") or "",
-                             "FIBER ELIGIBLE", d.get("ts") or "",
-                             d.get("area") or "backfill", dot_color(ds),
-                             d.get("zone_label") or "WORKING"])
+                rows.append([addr, dot_color(ds), d.get("ts") or ""])
     except Exception as e:
         print("  (backfill read error: %s)" % str(e)[:60])
         return 0
