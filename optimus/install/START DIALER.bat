@@ -16,6 +16,10 @@ set "OPT=%REPO%\optimus"
 set "URL=https://github.com/patricksiado-prog/Go-High-Level-MCP-2026-Complete.git"
 set "BRANCH=claude/optimus-map-tools-setup-6dcl6o"
 set "CREDS_ID=1upYH4h2VsmOwO82v9CVjMpE6IzV-5dIs"
+REM TOKEN FROM THE BUSYBEE: callers never paste the GHL token. Fill in your Railway
+REM busybee URL + the DIALER_TOKEN_KEY you set in Railway, and the dialer pulls the
+REM token from there. Leave blank to fall back to a one-time prompt.
+set "GHL_TOKEN_URL=https://YOUR-BUSYBEE.up.railway.app/pit-token?key=YOUR_DIALER_TOKEN_KEY"
 
 title OPTIMUS Dialer Loader
 echo.

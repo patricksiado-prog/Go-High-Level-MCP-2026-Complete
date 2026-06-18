@@ -206,6 +206,21 @@ async function main() {
     }
   });
 
+  // Serve the GHL Private Integration token to the Optimus dialer so callers never
+  // paste/handle it. OFF by default: only responds when DIALER_TOKEN_KEY is set in
+  // the Railway env, and only to requests carrying that exact key. Rotate the token
+  // (or the key) in Railway and every dialer picks it up -- nobody touches it.
+  app.get('/pit-token', (req, res) => {
+    const key = process.env.DIALER_TOKEN_KEY || '';
+    const given = (req.query.key as string) || (req.headers['x-dialer-key'] as string) || '';
+    if (!key || given !== key) {
+      res.status(403).json({ error: 'forbidden' });
+      return;
+    }
+    const token = process.env.GHL_PIT_TOKEN || process.env.GHL_API_KEY || '';
+    res.json({ token });
+  });
+
   app.listen(port, '0.0.0.0', () => {
     console.log('GoHighLevel MCP Server v2.0');
     console.log(`Server: http://0.0.0.0:${port}`);

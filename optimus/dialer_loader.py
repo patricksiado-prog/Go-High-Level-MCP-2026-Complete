@@ -169,9 +169,28 @@ def gather_leads(sh):
 
 
 def get_token():
+    # 1) env var (e.g. set by the launcher)
     tok = os.environ.get("GHL_PIT_TOKEN")
     if tok:
         return tok.strip()
+    # 2) CENTRAL source: pull it from the busybee (Railway) so callers never paste or
+    #    handle the token. The operator sets GHL_TOKEN_URL to the busybee's
+    #    /pit-token?key=<secret> endpoint (and DIALER_TOKEN_KEY in Railway). Rotate it
+    #    in one place and every dialer picks it up.
+    url = os.environ.get("GHL_TOKEN_URL")
+    if url:
+        try:
+            import urllib.request
+            raw = urllib.request.urlopen(url, timeout=20).read().decode("utf-8", "ignore").strip()
+            if raw.startswith("{"):
+                import json as _json
+                raw = (_json.loads(raw).get("token") or "").strip()
+            if raw.startswith("pit-"):
+                return raw
+            print("  (token URL responded but no pit- token -- check DIALER_TOKEN_KEY)")
+        except Exception as e:
+            print("  (couldn't fetch token from the busybee: %s)" % str(e)[:60])
+    # 3) cached file on this PC
     try:
         with open(TOKEN_FILE) as f:
             return f.read().strip()
