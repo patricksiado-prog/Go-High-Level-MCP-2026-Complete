@@ -990,6 +990,72 @@ def find_creds():
     return fallback
 
 
+# When the production sheet hits Google's 10M-cell cap it stops accepting writes
+# (the 'increase the number of cells in the workbook' APIError). We then spin up a
+# fresh sheet (owned by the service account, auto-shared to the operator) and cache
+# its id so every later run reuses it -- no manual sharing, leads keep saving.
+USER_EMAIL = "patricksiado@gmail.com"
+NEW_SHEET_ID_FILE = os.path.join(os.path.expanduser("~"), "optimus", "optimus_sheet_id.txt")
+
+
+def _read_cached_sheet_id():
+    try:
+        with open(NEW_SHEET_ID_FILE) as f:
+            return f.read().strip() or None
+    except Exception:
+        return None
+
+
+def _cache_sheet_id(sid):
+    try:
+        os.makedirs(os.path.dirname(NEW_SHEET_ID_FILE), exist_ok=True)
+        with open(NEW_SHEET_ID_FILE, "w") as f:
+            f.write(sid)
+    except Exception:
+        pass
+
+
+def _sheet_is_full(sh):
+    """Probe: can we add even a 1-cell tab? If that raises the cell-cap error, the
+    workbook is full and won't take any more writes."""
+    try:
+        tmp = sh.add_worksheet(title="_optimus_probe", rows="1", cols="1")
+        try:
+            sh.del_worksheet(tmp)
+        except Exception:
+            pass
+        return False
+    except Exception as e:
+        m = str(e).lower()
+        return ("cells in the workbook" in m or "10000000" in m
+                or "increase the number of cells" in m)
+
+
+def _make_fresh_sheet(client, old_sh=None):
+    """Create a clean spreadsheet, share it with the operator, and copy the scraped
+    businesses over so the green/orange match still works. Caches the id."""
+    sh = client.create("Optimus Fiber Leads %s" % time.strftime("%Y-%m-%d"))
+    try:
+        sh.share(USER_EMAIL, perm_type="user", role="writer")
+    except Exception as e:
+        print("  (new sheet not auto-shared: %s)" % str(e)[:60])
+    if old_sh is not None:           # carry the businesses so matching still works
+        try:
+            data = old_sh.worksheet(MAPS_TAB).get_all_values()
+            if data:
+                nb = sh.add_worksheet(title=MAPS_TAB,
+                                      rows=str(max(100, len(data) + 10)), cols="5")
+                nb.append_rows(data, value_input_option="RAW")
+        except Exception as e:
+            print("  (couldn't copy '%s' over: %s)" % (MAPS_TAB, str(e)[:50]))
+    _cache_sheet_id(sh.id)
+    try:
+        print("  >>> NEW clean sheet (shared with %s):\n      %s" % (USER_EMAIL, sh.url))
+    except Exception:
+        print("  >>> NEW clean sheet created (id %s), shared with %s." % (sh.id, USER_EMAIL))
+    return sh
+
+
 def open_sheet():
     import gspread
     from google.oauth2.service_account import Credentials
@@ -1003,7 +1069,24 @@ def open_sheet():
     try:
         client = gspread.authorize(
             Credentials.from_service_account_file(creds_file, scopes=SCOPES))
-        sh = client.open_by_key(SHEET_ID)
+        # 1) reuse a clean sheet we already made
+        sh = None
+        cached = _read_cached_sheet_id()
+        if cached:
+            try:
+                sh = client.open_by_key(cached)
+                print("Using the clean Optimus sheet (%s)." % cached)
+            except Exception:
+                sh = None
+        # 2) otherwise the production sheet -- unless it's full, then make a fresh one
+        if sh is None:
+            main = client.open_by_key(SHEET_ID)
+            if _sheet_is_full(main):
+                print("  The production sheet is FULL (10M-cell cap) -- leads can't "
+                      "save there. Creating a fresh Optimus sheet so they keep writing...")
+                sh = _make_fresh_sheet(client, old_sh=main)
+            else:
+                sh = main
         try:
             ws = sh.worksheet(OUT_TAB)
         except Exception:
@@ -1027,6 +1110,48 @@ def already_seen(ws):
     except Exception:
         return set()
     return set(r[0].strip().upper() for r in rows[1:] if r and r[0].strip())
+
+
+def backfill_jsonl(ws, seen):
+    """Recover captures saved locally but never written to the sheet (e.g. while the
+    old sheet was full) -- write any precise_addresses.jsonl address not already in
+    the sheet into the Precise Fiber tab. Batched, best-effort. Returns count."""
+    if ws is None or not os.path.exists(JSONL_PATH):
+        return 0
+    rows = []
+    try:
+        with open(JSONL_PATH) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    d = json.loads(line)
+                except Exception:
+                    continue
+                addr = (d.get("address") or "").strip()
+                if not addr or addr.upper() in seen:
+                    continue
+                ds = d.get("dot_status")
+                if dot_color(ds) == "GREY":
+                    continue
+                seen.add(addr.upper())
+                rows.append([addr, d.get("popup_status") or "", d.get("ban") or "",
+                             "FIBER ELIGIBLE", d.get("ts") or "",
+                             d.get("area") or "backfill", dot_color(ds),
+                             d.get("zone_label") or "WORKING"])
+    except Exception as e:
+        print("  (backfill read error: %s)" % str(e)[:60])
+        return 0
+    if not rows:
+        return 0
+    print("  Backfilling %d locally-saved leads into the sheet..." % len(rows))
+    try:
+        for i in range(0, len(rows), 500):
+            ws.append_rows(rows[i:i + 500], value_input_option="RAW")
+    except Exception as e:
+        print("  (backfill stopped: %s)" % str(e)[:60])
+    return len(rows)
 
 
 # ----------------------------------------------------------------------------
@@ -2505,6 +2630,11 @@ def main():
         searched = [False]   # only search the ZIP on the first pass
         seen = already_seen(ws)            # resume set, persists across passes
         area_label = args.zip or "manual"
+
+        # Recover any locally-saved leads that never reached the sheet (e.g. the
+        # old sheet was full) -- write them into the active sheet now.
+        if not args.dry and ws is not None:
+            backfill_jsonl(ws, seen)
 
         # COMBO: load the scraped businesses ONCE so flush() can match captured
         # green/gold leads to a business name+phone live (no separate program).
