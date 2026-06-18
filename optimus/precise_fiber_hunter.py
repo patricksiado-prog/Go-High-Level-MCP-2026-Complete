@@ -134,8 +134,9 @@ SEARCH_CLICK_WAIT = 1.5       # wait after CLICKING the search control for the f
 PAN_PRESSES = 6
 # fiber_hunter's proven motion is a MOUSE DRAG across the canvas (the original
 # used pyautogui.dragRel). DRAG_FRAC = how far to drag, as a fraction of the
-# canvas, per cell (<1 so adjacent cells overlap a little and miss nothing).
-DRAG_FRAC = 0.45
+# canvas, per cell. Larger = each step jumps further so the grid keeps moving
+# onto new ground; kept under 1 so adjacent views still overlap a bit, no gaps.
+DRAG_FRAC = 0.85
 
 # Map the internal dot status -> the on-map LEGEND COLOR, so the sheet says
 # GREEN / ORANGE / GREY at a glance (green = eligible lead, orange = copper
@@ -1485,13 +1486,14 @@ def _viewport_map_box(page):
             "height": vp["height"] * (MAP_BOTTOM_FRAC - MAP_TOP_FRAC)}
 
 
-def mouse_drag(page, direction):
+def mouse_drag(page, direction, quiet=False):
     """PROVEN fiber_hunter motion: DRAG to pan (the original used
     pyautogui.dragRel, ~150px serpentine). A drag is a map gesture, so it pans
     the HIDDEN Mapbox map where arrow keys / panBy do nothing. We drag the map
     CANVAS if we can find it (even in a frame); otherwise we drag the map REGION
     of the screen -- either way page.mouse moves the map. Drag the content the
-    OPPOSITE way you want the viewport to move."""
+    OPPOSITE way you want the viewport to move. quiet=True is a fast, silent
+    pass-through pan (used to skate across cells already scanned)."""
     box = _map_canvas_box(page)
     src = "canvas"
     if not box:
@@ -1503,7 +1505,8 @@ def mouse_drag(page, direction):
               "down": (0, -1), "up": (0, 1)}[direction]
     dx = sx * box["width"] * DRAG_FRAC
     dy = sy * box["height"] * DRAG_FRAC
-    print("  -> PAN %s: drag %s from (%d,%d)" % (direction, src, int(cx), int(cy)))
+    if not quiet:
+        print("  -> PAN %s: drag %s from (%d,%d)" % (direction, src, int(cx), int(cy)))
     try:
         page.mouse.move(cx, cy)
         page.mouse.down()
@@ -1514,7 +1517,7 @@ def mouse_drag(page, direction):
     except Exception as e:
         print("     drag failed: %s" % str(e)[:70])
         return False
-    time.sleep(WAIT_AFTER_PAN)
+    time.sleep(0.05 if quiet else WAIT_AFTER_PAN)
     return True
 
 
@@ -1544,13 +1547,19 @@ def sweep_grid(page, ws, seen, area_label, dry, capture):
     """Sequential GRID (lawnmower) sweep: cover an EXPANDING SQUARE centered on
     where you start, row by row -- left-to-right, drop down, right-to-left, drop
     down -- growing outward ring by ring until you close the browser. This is the
-    methodical 'read it like a book' motion (vs the spiral). It re-crosses
-    already-seen cells as the square grows, which just re-pans -- addresses
-    dedupe, so no duplicate writes. Returns total captured."""
+    methodical 'read it like a book' motion (vs the spiral). As the square grows
+    it has to re-cross cells it already did; those are now a FAST PASS-THROUGH
+    (no 'Search this area', no settle, no re-print) so it never sits on ground
+    it just covered -- only NEW cells get the full capture. Returns total."""
     pos = [0, 0]                 # net cell offset from the start cell
     tally = {"total": 0, "cells": 0}
+    done = set()                 # cells already captured -> don't redo them
 
     def capture_here():
+        key = (pos[0], pos[1])
+        if key in done:
+            return               # already scanned -> just passing through, fast
+        done.add(key)
         if on_map(page):
             search_this_area(page)
         time.sleep(SEARCH_SETTLE)
@@ -1563,8 +1572,14 @@ def sweep_grid(page, ws, seen, area_label, dry, capture):
             report_status(ws, area_label, "watching", found=tally["total"],
                           note="grid: %d cells, %d leads" % (tally["cells"], tally["total"]))
 
+    def _next(direction):
+        return (pos[0] + (1 if direction == "right" else -1 if direction == "left" else 0),
+                pos[1] + (1 if direction == "down" else -1 if direction == "up" else 0))
+
     def step(direction):
-        if not mouse_drag(page, direction):
+        # skate fast + silent across cells we've already scanned; full pan onto new ones
+        quiet = _next(direction) in done
+        if not mouse_drag(page, direction, quiet=quiet):
             return False
         pos[0] += 1 if direction == "right" else -1 if direction == "left" else 0
         pos[1] += 1 if direction == "down" else -1 if direction == "up" else 0
@@ -2332,11 +2347,9 @@ def main():
                     help="RESEARCH: log EVERY network response (url, type, size) "
                          "so we can find which endpoint carries the dot data. "
                          "Prints the biggest endpoints + writes net_responses.log.")
-    ap.add_argument("--grid", action="store_true",
-                    help="pan in a sequential GRID (lawnmower, row by row) instead of "
-                         "the default outward SPIRAL. Grid is methodical but slower -- "
-                         "it re-crosses covered ground as it expands; the spiral only "
-                         "ever moves to fresh ground. Both run until you close the browser.")
+    ap.add_argument("--spiral", action="store_true",
+                    help="pan in an outward SPIRAL instead of the default sequential "
+                         "GRID (lawnmower, row by row). Both run until you close the browser.")
     ap.add_argument("--dry", action="store_true", help="don't write to the sheet, just print")
     ap.add_argument("--auto", action="store_true",
                     help="UNATTENDED: no 'press Enter' pauses, auto-close at the end. "
@@ -2473,7 +2486,7 @@ def main():
                 if cap is None:
                     n = 0
                 else:                    # CONTINUOUS: grid (default) or spiral, until stopped
-                    _sweep = sweep_grid if args.grid else sweep_continuous
+                    _sweep = sweep_continuous if args.spiral else sweep_grid
                     n = _sweep(page, ws, seen, area_label, args.dry, cap)
                 if n:
                     print("  captured %d addresses OFF THE SERVER "
@@ -2523,7 +2536,7 @@ def main():
             print("Continuous sweep of %s (backend read)...\n" % (args.zip or "this area"))
             if cap is None:
                 return 0
-            _sweep = sweep_grid if args.grid else sweep_continuous
+            _sweep = sweep_continuous if args.spiral else sweep_grid
             return _sweep(page, ws, seen, args.zip or "manual", args.dry, cap)
 
         if not args.auto:
