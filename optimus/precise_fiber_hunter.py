@@ -1362,15 +1362,15 @@ def search_this_area(page):
             if btn.count() > 0:
                 print("  -> pressing '%s' (fetching dots from server)..." % label)
                 try:
-                    # BOUNDED click: Playwright's default is a 30s wait, so when the
-                    # map is mid-reload and the button isn't actionable yet it HANGS
-                    # there. Cap it short -- if it doesn't take, return so the caller
-                    # PANS, which reliably unsticks it (the operator's own trick).
-                    btn.first.click(timeout=2500)
-                    time.sleep(SEARCH_CLICK_WAIT)
+                    # FIRE-AND-FORGET on an interval: don't WAIT for the map. Cap the
+                    # click at ~1s (Playwright's default is 30s, which is what made it
+                    # hang on a mid-reload map). If it doesn't take, just move on and
+                    # PAN -- the network capture is always listening, so panning on the
+                    # interval collects the dots whether or not this click landed.
+                    btn.first.click(timeout=1000)
                     return True
                 except Exception:
-                    print("     (search didn't take in time -- panning to unstick)")
+                    print("     (search didn't take -- moving on, panning next)")
                     return False
         except Exception:
             pass
