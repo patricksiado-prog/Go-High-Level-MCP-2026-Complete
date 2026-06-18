@@ -2169,6 +2169,10 @@ MAPS_TAB = "Maps Businesses"
 GREEN_BIZ_TAB = "Fiber Green Biz"
 ORANGE_BIZ_TAB = "Upgrade Orange Biz"
 BIZ_HEADER = ["Business Name", "Phone", "Address", "Website", "Category"]
+# local-CSV fallback when the Google Sheet is full (10M-cell cap) and can't take
+# the two result tabs -- matches still get saved, never lost.
+GREEN_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fiber_green_biz.csv")
+ORANGE_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "upgrade_orange_biz.csv")
 
 _BIZ_SUFFIX = {"ST": "ST", "STREET": "ST", "AVE": "AVE", "AV": "AVE",
                "AVENUE": "AVE", "RD": "RD", "ROAD": "RD", "DR": "DR",
@@ -2208,21 +2212,57 @@ def _norm_addr(addr):
 
 
 def _ensure_biz_tab(sh, title):
+    """Open the result tab, or create it with a TINY footprint (100x5 = 500 cells,
+    grows as rows append) so it fits even on a near-full sheet. Returns None if the
+    sheet is genuinely maxed out -- the caller then falls back to a local CSV."""
     try:
         ws = sh.worksheet(title)
+        if not ws.get_all_values():
+            ws.append_row(BIZ_HEADER)
+        return ws
     except Exception:
-        ws = sh.add_worksheet(title=title, rows="20000", cols="5")
-    if not ws.get_all_values():
+        pass
+    try:
+        ws = sh.add_worksheet(title=title, rows="100", cols="5")
         ws.append_row(BIZ_HEADER)
-    return ws
+        return ws
+    except Exception as e:
+        print("  (sheet full -- '%s' matches will go to a local CSV: %s)"
+              % (title, str(e)[:50]))
+        return None
 
 
 def _biz_seen(ws):
+    if ws is None:
+        return set()
     try:
         return set(r[2].strip().upper() for r in ws.get_all_values()[1:]
                    if len(r) > 2 and r[2].strip())
     except Exception:
         return set()
+
+
+def _csv_seen(path):
+    s = set()
+    try:
+        import csv as _csv
+        with open(path, newline="") as f:
+            for row in _csv.reader(f):
+                if len(row) > 2 and row[2].strip():
+                    s.add(row[2].strip().upper())
+    except Exception:
+        pass
+    return s
+
+
+def _append_biz_csv(path, rows):
+    import csv as _csv
+    new = not os.path.exists(path)
+    with open(path, "a", newline="", encoding="utf-8") as f:
+        w = _csv.writer(f)
+        if new:
+            w.writerow(BIZ_HEADER)
+        w.writerows(rows)
 
 
 def init_bizmatch(ws):
@@ -2247,19 +2287,24 @@ def init_bizmatch(ws):
             if key and key not in idx:
                 idx[key] = {"name": r[0], "phone": r[2], "website": r[3], "category": r[4]}
         _BIZ["index"] = idx
-        _BIZ["green_ws"] = _ensure_biz_tab(sh, GREEN_BIZ_TAB)
-        _BIZ["orange_ws"] = _ensure_biz_tab(sh, ORANGE_BIZ_TAB)
-        _BIZ["green_seen"] = _biz_seen(_BIZ["green_ws"])
-        _BIZ["orange_seen"] = _biz_seen(_BIZ["orange_ws"])
-        print("  business match ON: %d scraped businesses loaded -> matches go to "
-              "'%s' / '%s' live." % (len(idx), GREEN_BIZ_TAB, ORANGE_BIZ_TAB))
-        # BACKLOG: match every lead captured in prior runs (local jsonl, no quota)
-        # so leads grabbed before the scraper ran still get a business name+phone.
-        # The green/orange seen-sets above keep this from re-writing duplicates.
-        _backlog_match()
     except Exception as e:
         print("  (live business match off: %s)" % str(e)[:80])
         _BIZ["index"] = {}
+        return
+    # Open the result tabs SEPARATELY -- a failure here (full sheet) must NOT turn
+    # matching off; we fall back to a local CSV so matches are still saved.
+    _BIZ["green_ws"] = _ensure_biz_tab(sh, GREEN_BIZ_TAB)
+    _BIZ["orange_ws"] = _ensure_biz_tab(sh, ORANGE_BIZ_TAB)
+    _BIZ["green_seen"] = _biz_seen(_BIZ["green_ws"]) | _csv_seen(GREEN_CSV)
+    _BIZ["orange_seen"] = _biz_seen(_BIZ["orange_ws"]) | _csv_seen(ORANGE_CSV)
+    dst = ("the '%s'/'%s' tabs" % (GREEN_BIZ_TAB, ORANGE_BIZ_TAB)
+           if _BIZ["green_ws"] else "local CSV (sheet is full)")
+    print("  business match ON: %d businesses loaded -> matches go to %s, live."
+          % (len(idx), dst))
+    # BACKLOG: match every lead captured in prior runs (local jsonl, no quota) so
+    # leads grabbed before the scraper ran still get a business name+phone. The
+    # seen-sets above (sheet + CSV) keep this from re-writing duplicates.
+    _backlog_match()
 
 
 def _backlog_match():
@@ -2318,15 +2363,22 @@ def match_leads_to_biz(new_records):
             _BIZ["green_seen"].add(au)
             g_rows.append(row)
     try:
-        if g_rows and _BIZ["green_ws"]:
-            _BIZ["green_ws"].append_rows(g_rows, value_input_option="RAW")
-        if o_rows and _BIZ["orange_ws"]:
-            _BIZ["orange_ws"].append_rows(o_rows, value_input_option="RAW")
+        if g_rows:
+            if _BIZ["green_ws"]:
+                _BIZ["green_ws"].append_rows(g_rows, value_input_option="RAW")
+            else:
+                _append_biz_csv(GREEN_CSV, g_rows)
+        if o_rows:
+            if _BIZ["orange_ws"]:
+                _BIZ["orange_ws"].append_rows(o_rows, value_input_option="RAW")
+            else:
+                _append_biz_csv(ORANGE_CSV, o_rows)
         if g_rows or o_rows:
-            print("    business match: +%d Fiber Green Biz, +%d Upgrade Orange Biz"
-                  % (len(g_rows), len(o_rows)))
+            where = "sheet" if _BIZ["green_ws"] else "CSV"
+            print("    business match: +%d Fiber Green Biz, +%d Upgrade Orange Biz (-> %s)"
+                  % (len(g_rows), len(o_rows), where))
     except Exception as e:
-        print("    (biz tab write hiccup: %s)" % str(e)[:60])
+        print("    (biz write hiccup: %s)" % str(e)[:60])
 
 
 def main():
