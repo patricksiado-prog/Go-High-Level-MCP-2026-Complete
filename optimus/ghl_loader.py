@@ -194,13 +194,17 @@ def save_state_keys(path, keys):
 
 
 def load_businesses(ranked_businesses, agents, week_tag, token=None,
-                    commit=False, state_path=None, dial_queue_path=DIAL_QUEUE_PATH):
+                    commit=False, state_path=None, dial_queue_path=DIAL_QUEUE_PATH,
+                    ignore_state=False):
     """ranked_businesses: list of dicts (already scored+ordered best-first),
-    each with 'score' set. Returns a summary dict."""
+    each with 'score' set. Returns a summary dict.
+    ignore_state=True reprocesses leads already loaded in prior runs (used by the
+    dialer's --reassign to re-spread existing contacts round-robin across users);
+    the upsert re-owns the existing contact by phone, it does not duplicate it."""
     state_path = state_path or os.path.join(os.path.expanduser("~"), "Optimus",
                                             "ghl_loaded_keys.json")
     prior = load_state_keys(state_path)
-    fresh = filter_new(ranked_businesses, prior)
+    fresh = filter_new(ranked_businesses, [] if ignore_state else prior)
     assigned = round_robin(fresh, agents)
 
     client = GHLClient(token) if (commit and token) else None

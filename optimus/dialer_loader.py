@@ -271,6 +271,9 @@ def main():
                     help="load to GHL for real (default: preview, then ask)")
     ap.add_argument("--agents", default="",
                     help="comma-separated GHL user ids to round-robin assign the calls")
+    ap.add_argument("--reassign", action="store_true",
+                    help="also re-spread leads already loaded before (re-owns existing "
+                         "contacts round-robin across all users; no duplicates)")
     args = ap.parse_args()
 
     print("\n  ============================================================")
@@ -303,7 +306,8 @@ def main():
 
     # DRY PREVIEW first -- always show what would load
     print("  --- PREVIEW (top 10, nothing written yet) ---")
-    ghl_loader.load_businesses(leads, agents, _week_tag(), token=None, commit=False)
+    ghl_loader.load_businesses(leads, agents, _week_tag(), token=None, commit=False,
+                               ignore_state=args.reassign)
     print("  ---------------------------------------------\n")
 
     if not token:
@@ -335,7 +339,8 @@ def main():
         print("  OK -- nothing loaded. (Preview only.)")
         return
 
-    summary = ghl_loader.load_businesses(leads, agents, _week_tag(), token=token, commit=True)
+    summary = ghl_loader.load_businesses(leads, agents, _week_tag(), token=token,
+                                         commit=True, ignore_state=args.reassign)
     print("\n  LOADED %d into GHL (AT&T Commercial pipeline) and enrolled them in the "
           "Power Dialer Queue.\n  Dupes skipped (already loaded before): %d"
           % (summary["loaded"], summary["skipped_dupes"]))
