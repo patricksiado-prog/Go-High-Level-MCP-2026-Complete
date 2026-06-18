@@ -306,9 +306,11 @@
     the **guts** each run from Drive id **`1jRFrgO-2kkqCWrwF0MN1uUFv81vDMEEy`**
     ("SCRAPER GUTS (update this one)") → auto-update with nothing for the user but the
     link. People need NO GitHub/git. To update without changing the link: Drive Manage-
-    versions on the guts file. (Couldn't do pure-GitHub auto-update: the repo is PRIVATE,
-    so a GitHub pull would force every recipient to have repo access — breaks "just the
-    link.") Both files must be shared Anyone-with-link → Viewer (Patrick does this).
+    versions on the guts file. **CORRECTION 2026-06-18: the repo is PUBLIC** (the old
+    "repo is PRIVATE" claim here was wrong — verified raw GitHub serves the files with
+    no auth). So the Drive-guts indirection is no longer needed: distribute purely from
+    GitHub raw (see "DISTRIBUTION = PURE GITHUB" below). This Drive-guts path still works
+    but is legacy; prefer the GitHub launcher commands.
     Old duplicate launcher/guts uploads litter the "OPTIMUS SETUP" folder — delete by hand.
   - **GitHub scope:** this session can only touch `go-high-level-mcp-2026-complete`. The
     `optimus-map-tools` repo (the ORIGINAL fiber_hunter + MapMan) is DENIED — can't read
@@ -360,12 +362,25 @@
     `python precise_fiber_hunter.py` — NO `--zip`, NO flags; you pan/zoom the map by
     hand, press Enter, it sweeps that area continuously until you close it. (Patrick
     explicitly dislikes the `--zip` arg — don't suggest it as the normal path.)
-  - **THE TWO DISTRIBUTION LINKS (Drive, share each → Anyone-with-link → Viewer):**
-    scraper = `1uuWqUMXAGElvBtUfAuqRraiEiiaRbLGJ` ("START - Maps Scraper (GitHub).bat");
-    hunter = `1pQRDC2Xh-YaZ3MLT5QurtKqQbajll77W` ("START - Fiber Hunter (OPTIMUS).bat").
-    Both are thin launchers that pull the latest code from the PUBLIC GitHub branch
-    each run (recipients need NO GitHub/git account). UNVERIFIED: whether those two
-    Drive files currently hold the newest launcher text — confirm before mass-sending.
+  - **DISTRIBUTION = PURE GITHUB, NO DRIVE LAUNCHER SHARING (decided 2026-06-18,
+    verified live).** The repo IS PUBLIC (confirmed: raw.githubusercontent.com serves
+    files with no auth; `git clone https://github.com/...` works for anyone with no
+    GitHub account). So drop the Drive-hosted launcher copies entirely — the launchers
+    already live in the repo and are downloaded straight from GitHub raw. The three
+    Drive launcher files (`1pQRDC2Xh-YaZ3MLT5QurtKqQbajll77W` hunter /
+    `1uuWqUMXAGElvBtUfAuqRraiEiiaRbLGJ` scraper / `17RzE0ri5MZHj8YgGir8rVyKp_gqT4VX1`
+    dialer) were all still **Restricted (owner-only)** and are now unnecessary —
+    don't bother sharing them. Recipients get a one-line `curl` command (or the raw
+    link) that downloads the launcher `.bat` and runs it; the launcher then pulls the
+    rest of the code from the public repo every run. Raw launcher paths on branch
+    `claude/optimus-map-tools-setup-6dcl6o`: hunter = `optimus/install/START OPTIMUS.bat`,
+    scraper = `optimus/standalone/SCRAPER_SETUP.bat`, dialer = `optimus/install/START DIALER.bat`.
+  - **THE ONLY DRIVE DEPENDENCIES LEFT (both already shared correctly, verified
+    2026-06-18):** the Google service-account key (`1upYH4h2VsmOwO82v9CVjMpE6IzV-5dIs`,
+    shared Anyone-with-link → **Viewer**) which the launchers download so the programs
+    can write the sheet; and the leads SHEET (`1FhO2BTM…`, shared Anyone-with-link →
+    **Editor**) which is how the programs write and how Claude reads it. Code never needs
+    Drive again.
   - **DIALER LINK BUILT (done, pushed + uploaded).** `dialer_loader.py` (in optimus/,
     not standalone — needs `ghl_loader`+`business_score`) reads the hunter's
     **"Fiber Green Biz"** + **"Upgrade Orange Biz"** tabs, maps green→`STATUS_LEAD` /
