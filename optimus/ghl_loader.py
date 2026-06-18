@@ -53,8 +53,12 @@ def now_str():
 # -------------------------------------------------------------------------
 # pure payload + assignment logic (unit-tested; no network)
 # -------------------------------------------------------------------------
-def contact_payload(biz, week_tag):
-    """Build the GHL upsert-contact body from an enriched+scored business."""
+def contact_payload(biz, week_tag, assigned_to=None):
+    """Build the GHL upsert-contact body from an enriched+scored business.
+    assigned_to = the round-robin caller (GHL user id). It MUST be set on the
+    CONTACT (not just the opportunity): GHL's Manual Call / power-dialer queue
+    surfaces a call to the CONTACT'S OWNER, so assigning the contact is what
+    makes the lead show up in that rep's Conversations > Manual Actions."""
     tags = [SOURCE_TAG, week_tag]
     if biz.get("zone_label"):
         tags.append("zone-%s" % biz["zone_label"].lower())
@@ -71,6 +75,7 @@ def contact_payload(biz, week_tag):
         "state": biz.get("state"),
         "postalCode": str(biz.get("zip") or ""),
         "source": SOURCE_TAG,
+        "assignedTo": assigned_to,
         "tags": tags,
         "customFields": _custom_fields(biz),
     }
@@ -203,7 +208,7 @@ def load_businesses(ranked_businesses, agents, week_tag, token=None,
     loaded = 0
     new_keys = list(prior)
     for biz, agent in assigned:
-        cbody = contact_payload(biz, week_tag)
+        cbody = contact_payload(biz, week_tag, assigned_to=agent)
         if client:
             try:
                 cid = client.upsert_contact(cbody)

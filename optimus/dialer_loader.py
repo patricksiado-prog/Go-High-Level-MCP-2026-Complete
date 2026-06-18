@@ -168,6 +168,27 @@ def gather_leads(sh):
     return leads, len(raw)
 
 
+def fetch_all_agents(token):
+    """Every active GHL user in the Command location -> the round-robin dial team.
+    Patrick's rule: all leads spread across ALL users, so each rep gets a share
+    of the queue (GHL gives each lead one owner so two reps never call the same
+    business). Returns a list of user ids; --agents overrides this."""
+    if not token:
+        return []
+    try:
+        import requests
+        r = requests.get("%s/users/" % ghl_loader.API_BASE,
+                         headers={"Authorization": "Bearer %s" % token,
+                                  "Version": ghl_loader.API_VERSION},
+                         params={"locationId": ghl_loader.LOCATION_ID}, timeout=30)
+        r.raise_for_status()
+        users = r.json().get("users", [])
+        return [u["id"] for u in users if u.get("id") and not u.get("deleted")]
+    except Exception as e:
+        print("  (couldn't auto-list users for round-robin: %s)" % str(e)[:80])
+        return []
+
+
 def get_token():
     # 1) env var (e.g. set by the launcher)
     tok = os.environ.get("GHL_PIT_TOKEN")
@@ -267,13 +288,24 @@ def main():
               "Businesses') so the green/orange business tabs fill up first.")
         return
 
-    # DRY PREVIEW first -- always show what would load
+    token = get_token()
+
+    # Round-robin the leads across the dial team. Default = ALL active GHL users
+    # (so every rep gets a share of the queue); --agents <ids> overrides.
     agents = [a.strip() for a in args.agents.split(",") if a.strip()]
+    if not agents:
+        agents = fetch_all_agents(token)
+        if agents:
+            print("  Spreading leads round-robin across all %d GHL users.\n" % len(agents))
+        else:
+            print("  (no user list yet -- leads keep their current owner until a "
+                  "token is available.)\n")
+
+    # DRY PREVIEW first -- always show what would load
     print("  --- PREVIEW (top 10, nothing written yet) ---")
     ghl_loader.load_businesses(leads, agents, _week_tag(), token=None, commit=False)
     print("  ---------------------------------------------\n")
 
-    token = get_token()
     if not token:
         print("  To load for real I need your GHL Private Integration token (pit-...).")
         try:
