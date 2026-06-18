@@ -849,9 +849,12 @@ class NetCapture:
             if dot_color(dot_status) == "GREY":
                 continue   # GREY = existing fiber customer -> leave out
             ts = time.strftime("%Y-%m-%d %H:%M:%S")
-            # clean columns: Address | Dot Color (GREEN/ORANGE) | Captured At.
-            # dropped the always-the-same junk (Eligible/ZIP/Zone) + the BAN hash.
-            new_rows.append([addr, dot_color(dot_status), ts])
+            # clean columns + the business merged inline when the address matches a
+            # scraped business: Address | Dot Color | Captured At | Business | Phone.
+            _bidx = _BIZ.get("index") or {}
+            _b = _bidx.get(_norm_addr(addr)) if _bidx else None
+            new_rows.append([addr, dot_color(dot_status), ts,
+                             (_b or {}).get("name", ""), (_b or {}).get("phone", "")])
             new_records.append({"address": addr, "dot_status": dot_status,
                                 "zone_label": "WORKING", "popup_status": ld.get("status"),
                                 "ban": ld.get("ban"), "area": area_label, "ts": ts,
@@ -867,7 +870,7 @@ class NetCapture:
             pass
         if dry or ws is None:
             for r in new_rows[:20]:
-                print("   + %s | %s" % (r[0], r[6]))
+                print("   + %s | %s" % (r[0], r[1]))
         else:
             try:
                 for i in range(0, len(new_rows), 500):   # ONE call per 500 rows
@@ -880,6 +883,14 @@ class NetCapture:
             match_leads_to_biz(new_records)
         except Exception as e:
             print("   (biz match skipped: %s)" % str(e)[:80])
+        # periodically reload the business list so a scrape running ALONGSIDE the
+        # hunter gets its new businesses matched live (was load-once at startup).
+        _BIZ_RELOAD[0] += 1
+        if _BIZ_RELOAD[0] % 20 == 0:
+            try:
+                reload_biz_index()
+            except Exception:
+                pass
         return len(new_rows)
 
 # --- popup parsing (canonical regexes from optimus_dot_detect) ---
@@ -1038,7 +1049,7 @@ def open_sheet():
         except Exception:
             ws = sh.add_worksheet(title=OUT_TAB, rows="5000", cols="8")
         if not ws.get_all_values():
-            ws.append_row(["Address", "Dot Color", "Captured At"])
+            ws.append_row(["Address", "Dot Color", "Captured At", "Business", "Phone"])
         return ws
     except Exception as e:
         print("WARNING: couldn't open the Google Sheet (%s)." % str(e)[:100])
@@ -1160,7 +1171,10 @@ def backfill_jsonl(ws, seen):
                 if dot_color(ds) == "GREY":
                     continue
                 seen.add(addr.upper())
-                rows.append([addr, dot_color(ds), d.get("ts") or ""])
+                _bidx = _BIZ.get("index") or {}
+                _b = _bidx.get(_norm_addr(addr)) if _bidx else None
+                rows.append([addr, dot_color(ds), d.get("ts") or "",
+                             (_b or {}).get("name", ""), (_b or {}).get("phone", "")])
     except Exception as e:
         print("  (backfill read error: %s)" % str(e)[:60])
         return 0
@@ -2340,9 +2354,10 @@ _BIZ_SUFFIX = {"ST": "ST", "STREET": "ST", "AVE": "AVE", "AV": "AVE",
 _BIZ_UNIT_RE = re.compile(r"\b(APT|APARTMENT|UNIT|STE|SUITE|#|BLDG|BUILDING|FL|"
                           r"FLOOR|RM|ROOM|OFC|OFFICE|TRLR|LOT|SPC)\b.*$", re.I)
 
-# live state: business index + the two output tabs, loaded once at start
-_BIZ = {"index": None, "green_ws": None, "orange_ws": None,
+# live state: business index + the two output tabs + the Maps Businesses worksheet
+_BIZ = {"index": None, "green_ws": None, "orange_ws": None, "maps_ws": None,
         "green_seen": set(), "orange_seen": set()}
+_BIZ_RELOAD = [0]   # flush counter -> reload the business index every 20 flushes
 
 
 def _norm_addr(addr):
@@ -2436,6 +2451,7 @@ def init_bizmatch(ws):
                   "business match.)" % MAPS_TAB)
             _BIZ["index"] = {}
             return
+        _BIZ["maps_ws"] = mb          # kept so the index can be RELOADED live
         idx = {}
         for r in mb.get_all_values()[1:]:        # Name,Address,Phone,Website,Category
             r = (list(r) + [""] * 5)[:5]
@@ -2461,6 +2477,26 @@ def init_bizmatch(ws):
     # leads grabbed before the scraper ran still get a business name+phone. The
     # seen-sets above (sheet + CSV) keep this from re-writing duplicates.
     _backlog_match()
+
+
+def reload_biz_index():
+    """Re-read the 'Maps Businesses' tab into the in-memory index so businesses the
+    scraper adds DURING a hunt get matched live (the old code loaded once at start,
+    which is why a concurrent scrape's businesses were missed). Best-effort; cheap."""
+    mb = _BIZ.get("maps_ws")
+    if mb is None:
+        return
+    try:
+        idx = {}
+        for r in mb.get_all_values()[1:]:
+            r = (list(r) + [""] * 5)[:5]
+            key = _norm_addr(r[1])
+            if key and key not in idx:
+                idx[key] = {"name": r[0], "phone": r[2], "website": r[3], "category": r[4]}
+        if idx:
+            _BIZ["index"] = idx
+    except Exception:
+        pass
 
 
 def _backlog_match():
@@ -2660,15 +2696,15 @@ def main():
         seen = already_seen(ws)            # resume set, persists across passes
         area_label = args.zip or "manual"
 
-        # Recover any locally-saved leads that never reached the sheet (e.g. the
-        # old sheet was full) -- write them into the active sheet now.
-        if not args.dry and ws is not None:
-            backfill_jsonl(ws, seen)
-
-        # COMBO: load the scraped businesses ONCE so flush() can match captured
-        # green/gold leads to a business name+phone live (no separate program).
+        # COMBO: load the scraped businesses FIRST so flush() and the backfill can
+        # merge the business name+phone inline as each lead is written.
         if not args.dry and not args.no_match:
             init_bizmatch(ws)
+
+        # Recover any locally-saved leads that never reached the sheet (e.g. the
+        # old sheet was full) -- write them into the active sheet now (with biz merge).
+        if not args.dry and ws is not None:
+            backfill_jsonl(ws, seen)
 
         if args.net_debug:
             # RESEARCH short-circuit: load the map, trigger a few data loads by
