@@ -278,17 +278,7 @@ def open_sheet():
         scopes = ["https://www.googleapis.com/auth/spreadsheets",
                   "https://www.googleapis.com/auth/drive"]
         client = gspread.authorize(Credentials.from_service_account_file(creds, scopes=scopes))
-        # If the hunter switched the pipeline to a fresh sheet (old one full), write
-        # the businesses to that SAME sheet so the match still works. Falls back to
-        # the production sheet if there's no cached id.
-        sheet_id = SHEET_ID
-        try:
-            with open(os.path.join(os.path.expanduser("~"), "optimus",
-                                   "optimus_sheet_id.txt")) as _f:
-                sheet_id = _f.read().strip() or SHEET_ID
-        except Exception:
-            pass
-        sh = client.open_by_key(sheet_id)
+        sh = client.open_by_key(SHEET_ID)
         try:
             ws = sh.worksheet(SHEET_TAB)
         except Exception:

@@ -990,73 +990,12 @@ def find_creds():
     return fallback
 
 
-# When the production sheet hits Google's 10M-cell cap it stops accepting writes
-# (the 'increase the number of cells in the workbook' APIError). We then spin up a
-# fresh sheet (owned by the service account, auto-shared to the operator) and cache
-# its id so every later run reuses it -- no manual sharing, leads keep saving.
-USER_EMAIL = "patricksiado@gmail.com"
 NEW_SHEET_ID_FILE = os.path.join(os.path.expanduser("~"), "optimus", "optimus_sheet_id.txt")
 
 
-def _read_cached_sheet_id():
-    try:
-        with open(NEW_SHEET_ID_FILE) as f:
-            return f.read().strip() or None
-    except Exception:
-        return None
-
-
-def _cache_sheet_id(sid):
-    try:
-        os.makedirs(os.path.dirname(NEW_SHEET_ID_FILE), exist_ok=True)
-        with open(NEW_SHEET_ID_FILE, "w") as f:
-            f.write(sid)
-    except Exception:
-        pass
-
-
-def _sheet_is_full(sh):
-    """Probe: can we add even a 1-cell tab? If that raises the cell-cap error, the
-    workbook is full and won't take any more writes."""
-    try:
-        tmp = sh.add_worksheet(title="_optimus_probe", rows="1", cols="1")
-        try:
-            sh.del_worksheet(tmp)
-        except Exception:
-            pass
-        return False
-    except Exception as e:
-        m = str(e).lower()
-        return ("cells in the workbook" in m or "10000000" in m
-                or "increase the number of cells" in m)
-
-
-def _make_fresh_sheet(client, old_sh=None):
-    """Create a clean spreadsheet, share it with the operator, and copy the scraped
-    businesses over so the green/orange match still works. Caches the id."""
-    sh = client.create("Optimus Fiber Leads %s" % time.strftime("%Y-%m-%d"))
-    try:
-        sh.share(USER_EMAIL, perm_type="user", role="writer")
-    except Exception as e:
-        print("  (new sheet not auto-shared: %s)" % str(e)[:60])
-    if old_sh is not None:           # carry the businesses so matching still works
-        try:
-            data = old_sh.worksheet(MAPS_TAB).get_all_values()
-            if data:
-                nb = sh.add_worksheet(title=MAPS_TAB,
-                                      rows=str(max(100, len(data) + 10)), cols="5")
-                nb.append_rows(data, value_input_option="RAW")
-        except Exception as e:
-            print("  (couldn't copy '%s' over: %s)" % (MAPS_TAB, str(e)[:50]))
-    _cache_sheet_id(sh.id)
-    try:
-        print("  >>> NEW clean sheet (shared with %s):\n      %s" % (USER_EMAIL, sh.url))
-    except Exception:
-        print("  >>> NEW clean sheet created (id %s), shared with %s." % (sh.id, USER_EMAIL))
-    return sh
-
-
 def open_sheet():
+    """Open the production sheet and the Precise Fiber tab. We do NOT create a new
+    sheet -- if it's full, run --clean-sheet to free space in THIS one."""
     import gspread
     from google.oauth2.service_account import Credentials
     creds_file = find_creds()
@@ -1069,24 +1008,7 @@ def open_sheet():
     try:
         client = gspread.authorize(
             Credentials.from_service_account_file(creds_file, scopes=SCOPES))
-        # 1) reuse a clean sheet we already made
-        sh = None
-        cached = _read_cached_sheet_id()
-        if cached:
-            try:
-                sh = client.open_by_key(cached)
-                print("Using the clean Optimus sheet (%s)." % cached)
-            except Exception:
-                sh = None
-        # 2) otherwise the production sheet -- unless it's full, then make a fresh one
-        if sh is None:
-            main = client.open_by_key(SHEET_ID)
-            if _sheet_is_full(main):
-                print("  The production sheet is FULL (10M-cell cap) -- leads can't "
-                      "save there. Creating a fresh Optimus sheet so they keep writing...")
-                sh = _make_fresh_sheet(client, old_sh=main)
-            else:
-                sh = main
+        sh = client.open_by_key(SHEET_ID)
         try:
             ws = sh.worksheet(OUT_TAB)
         except Exception:
@@ -1097,8 +1019,75 @@ def open_sheet():
         return ws
     except Exception as e:
         print("WARNING: couldn't open the Google Sheet (%s)." % str(e)[:100])
+        if "cells in the workbook" in str(e).lower() or "increase the number" in str(e).lower():
+            print("         The sheet is FULL -- run:  python precise_fiber_hunter.py --clean-sheet")
         print("         Running WITHOUT the sheet -- captures print only.")
         return None
+
+
+def clean_sheet():
+    """Free space in the production sheet so it accepts writes again, WITHOUT making
+    a new one: delete junk tabs (anything not part of the pipeline), trim the Hunter
+    Status heartbeat log to the last 100 lines, and resize every kept tab down to its
+    real data so empty allocated cells are released. Never deletes lead/business data.
+    Run with --clean-sheet."""
+    import gspread
+    from google.oauth2.service_account import Credentials
+    # The Optimus pipeline tabs -- everything ELSE is junk (old MapMan run, test
+    # rows) and is safe to delete to reclaim cells.
+    pipeline_tabs = {OUT_TAB, MAPS_TAB, GREEN_BIZ_TAB, ORANGE_BIZ_TAB,
+                     "Enriched Leads", STATUS_TAB}
+    creds = find_creds()
+    if not creds:
+        print("No google_creds.json found -- can't clean the sheet."); return
+    client = gspread.authorize(
+        Credentials.from_service_account_file(creds, scopes=SCOPES))
+    sh = client.open_by_key(SHEET_ID)
+    keep = {t.lower() for t in pipeline_tabs}
+    wss = sh.worksheets()
+    print("Cleaning sheet -- %d tabs. Keeping: %s\n"
+          % (len(wss), ", ".join(sorted(pipeline_tabs))))
+    for ws in wss:
+        title = ws.title
+        cells = ws.row_count * ws.col_count
+        if title.lower() not in keep:
+            try:
+                if len(sh.worksheets()) > 1:
+                    sh.del_worksheet(ws)
+                    print("  DELETED junk tab '%s' (%d cells freed)" % (title, cells))
+                else:
+                    print("  kept '%s' (last remaining tab)" % title)
+            except Exception as e:
+                print("  couldn't delete '%s': %s" % (title, str(e)[:50]))
+            continue
+        # kept tab -> trim to fit its data
+        try:
+            vals = ws.get_all_values()
+            if title.lower() == STATUS_TAB.lower() and len(vals) > 120:
+                tail = ([vals[0]] if vals else []) + vals[-100:]
+                ws.clear()
+                if tail:
+                    ws.append_rows(tail, value_input_option="RAW")
+                vals = tail
+                print("  trimmed '%s' to last 100 heartbeats" % title)
+            used_rows = max(len(vals) + 5, 10)
+            used_cols = max((max((len(r) for r in vals), default=1)), 1)
+            if used_rows < ws.row_count or used_cols < ws.col_count:
+                ws.resize(rows=used_rows, cols=used_cols)
+                print("  trimmed '%s' -> %d x %d (was %d cells)"
+                      % (title, used_rows, used_cols, cells))
+            else:
+                print("  '%s' already tight (%d x %d)" % (title, ws.row_count, ws.col_count))
+        except Exception as e:
+            print("  couldn't trim '%s': %s" % (title, str(e)[:50]))
+    # drop any cached fresh-sheet redirect so we go back to using THIS cleaned sheet
+    try:
+        if os.path.exists(NEW_SHEET_ID_FILE):
+            os.remove(NEW_SHEET_ID_FILE)
+            print("  (cleared the fresh-sheet redirect -- back to the production sheet)")
+    except Exception:
+        pass
+    print("\nDone. The sheet should accept writes again -- run the hunter normally.")
 
 
 def already_seen(ws):
@@ -2561,6 +2550,10 @@ def main():
     ap.add_argument("--slow", action="store_true",
                     help="restore the relaxed wait times -- use only if leads come "
                          "back 0 because dots aren't loading in time on a slow link")
+    ap.add_argument("--clean-sheet", action="store_true",
+                    help="free space in the production sheet: delete junk tabs, trim "
+                         "the status log, shrink tabs to their data. Keeps all leads/"
+                         "businesses. Run this when the sheet is full, then exits.")
     ap.add_argument("--probe", action="store_true",
                     help="DIAGNOSTIC: after you position the map and press Enter, "
                          "dump what the Mapbox map exposes (layers + dot feature "
@@ -2578,6 +2571,10 @@ def main():
                     help="let the background enricher use paid Google Places on "
                          "OSM misses (needs GOOGLE_PLACES_API_KEY). Default is FREE.")
     args = ap.parse_args()
+
+    if args.clean_sheet:
+        clean_sheet()
+        return
 
     if args.allow_click:
         global ALLOW_CLICK
