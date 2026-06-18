@@ -1361,9 +1361,17 @@ def search_this_area(page):
             btn = page.get_by_text(label, exact=False)
             if btn.count() > 0:
                 print("  -> pressing '%s' (fetching dots from server)..." % label)
-                btn.first.click()
-                time.sleep(SEARCH_CLICK_WAIT)
-                return True
+                try:
+                    # BOUNDED click: Playwright's default is a 30s wait, so when the
+                    # map is mid-reload and the button isn't actionable yet it HANGS
+                    # there. Cap it short -- if it doesn't take, return so the caller
+                    # PANS, which reliably unsticks it (the operator's own trick).
+                    btn.first.click(timeout=2500)
+                    time.sleep(SEARCH_CLICK_WAIT)
+                    return True
+                except Exception:
+                    print("     (search didn't take in time -- panning to unstick)")
+                    return False
         except Exception:
             pass
     print("  -> (no 'search this area' control found this view)")
