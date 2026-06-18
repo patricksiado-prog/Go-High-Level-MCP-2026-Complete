@@ -1914,6 +1914,23 @@ def scan_net(page, ws, area_label, cols, rows, dry, capture):
 # ----------------------------------------------------------------------------
 # self-update (pull latest code from GitHub on each start)
 # ----------------------------------------------------------------------------
+def _find_git():
+    """Return a usable git command. Plain 'git' if it's on PATH, else the
+    standard Windows install locations -- so the raw `python precise_fiber_hunter.py`
+    command still auto-updates even in a Command Prompt that never got git on PATH
+    (the usual reason a launch keeps running stale code)."""
+    import shutil
+    g = shutil.which("git")
+    if g:
+        return g
+    for cand in (r"C:\Program Files\Git\cmd\git.exe",
+                 r"C:\Program Files (x86)\Git\cmd\git.exe",
+                 os.path.expandvars(r"%LOCALAPPDATA%\Programs\Git\cmd\git.exe")):
+        if os.path.exists(cand):
+            return cand
+    return "git"   # last resort -- subprocess will raise, caught upstream
+
+
 def self_update():
     """On launch, pull the newest code from GitHub so a restart always runs the
     latest version. If THIS file actually changed, relaunch once with the new
@@ -1926,18 +1943,20 @@ def self_update():
     here = os.path.abspath(__file__)
     repo_root = os.path.dirname(os.path.dirname(here))
     env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
+    git = _find_git()           # works even when git isn't on this shell's PATH
     try:
         before = open(here, "rb").read()
         # fetch + hard reset to origin so a local edit / conflict / divergence
         # can NEVER leave us stuck on old code (a plain pull silently fails then).
-        subprocess.run(["git", "-C", repo_root, "fetch", "origin", REPO_BRANCH],
+        subprocess.run([git, "-C", repo_root, "fetch", "origin", REPO_BRANCH],
                        env=env, timeout=90, capture_output=True, text=True)
-        subprocess.run(["git", "-C", repo_root, "reset", "--hard",
+        subprocess.run([git, "-C", repo_root, "reset", "--hard",
                         "origin/" + REPO_BRANCH],
                        env=env, timeout=60, capture_output=True, text=True)
         after = open(here, "rb").read()
     except Exception as e:
-        print("(auto-update skipped: %s)" % str(e)[:80])
+        print("(auto-update skipped: %s -- run START OPTIMUS.bat to force the "
+              "update, or: git pull)" % str(e)[:80])
         return
     if after != before:
         print("Pulled newer code from GitHub -- relaunching once with it...\n")
