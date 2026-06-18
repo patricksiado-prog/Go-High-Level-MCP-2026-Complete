@@ -2332,9 +2332,11 @@ def main():
                     help="RESEARCH: log EVERY network response (url, type, size) "
                          "so we can find which endpoint carries the dot data. "
                          "Prints the biggest endpoints + writes net_responses.log.")
-    ap.add_argument("--spiral", action="store_true",
-                    help="pan in an outward SPIRAL instead of the default sequential "
-                         "GRID (lawnmower, row by row). Both run until you close the browser.")
+    ap.add_argument("--grid", action="store_true",
+                    help="pan in a sequential GRID (lawnmower, row by row) instead of "
+                         "the default outward SPIRAL. Grid is methodical but slower -- "
+                         "it re-crosses covered ground as it expands; the spiral only "
+                         "ever moves to fresh ground. Both run until you close the browser.")
     ap.add_argument("--dry", action="store_true", help="don't write to the sheet, just print")
     ap.add_argument("--auto", action="store_true",
                     help="UNATTENDED: no 'press Enter' pauses, auto-close at the end. "
@@ -2471,7 +2473,7 @@ def main():
                 if cap is None:
                     n = 0
                 else:                    # CONTINUOUS: grid (default) or spiral, until stopped
-                    _sweep = sweep_continuous if args.spiral else sweep_grid
+                    _sweep = sweep_grid if args.grid else sweep_continuous
                     n = _sweep(page, ws, seen, area_label, args.dry, cap)
                 if n:
                     print("  captured %d addresses OFF THE SERVER "
@@ -2521,7 +2523,7 @@ def main():
             print("Continuous sweep of %s (backend read)...\n" % (args.zip or "this area"))
             if cap is None:
                 return 0
-            _sweep = sweep_continuous if args.spiral else sweep_grid
+            _sweep = sweep_grid if args.grid else sweep_continuous
             return _sweep(page, ws, seen, args.zip or "manual", args.dry, cap)
 
         if not args.auto:
