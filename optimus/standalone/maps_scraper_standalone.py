@@ -12,12 +12,13 @@ Run by SCRAPER_SETUP.bat, or directly:  python maps_scraper_standalone.py
 
 import os, csv, re, time, json, urllib.parse
 
-VERSION = "1.8 (2026-06-18)"   # bump this when the scraper changes; printed on start
+VERSION = "1.9 (2026-06-18)"   # bump this when the scraper changes; printed on start
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_PATH = os.path.join(HERE, "businesses.csv")
 PROFILE_DIR = os.path.join(HERE, "maps_profile")
 PROGRESS_PATH = os.path.join(HERE, "maps_progress.json")   # resume: done searches
+ZIPS_DONE_PATH = os.path.join(HERE, "maps_zips_done.json")  # ZIPs fully covered
 FIELDS = ["name", "address", "phone", "website", "category"]
 
 # Google Sheet destination (option 2). Results go to this sheet's tab below.
@@ -255,6 +256,31 @@ def clear_progress():
         pass
 
 
+# After the ZIPs you enter, the scraper AUTO-ADVANCES through these nearby Houston
+# fiber ZIPs (inner-loop first), skipping any already finished, until you close it.
+NEXT_ZIPS = ["77027", "77098", "77006", "77019", "77005", "77025", "77002", "77004",
+             "77003", "77007", "77008", "77009", "77030", "77023", "77046", "77056",
+             "77057", "77081", "77401", "77055", "77024", "77018", "77020", "77026",
+             "77087", "77021", "77033", "77074", "77036", "77063", "77042", "77077",
+             "77079", "77080", "77043", "77092", "77017", "77011", "77012", "77051"]
+
+
+def load_zips_done():
+    try:
+        with open(ZIPS_DONE_PATH) as f:
+            return set(json.load(f))
+    except Exception:
+        return set()
+
+
+def save_zips_done(z):
+    try:
+        with open(ZIPS_DONE_PATH, "w") as f:
+            json.dump(sorted(z), f)
+    except Exception:
+        pass
+
+
 def _find_creds():
     for p in (os.path.join(os.path.expanduser("~"), "maps_scraper", "google_creds.json"),
               os.path.join(os.path.expanduser("~"), "optimus", "google_creds.json"),
@@ -470,26 +496,24 @@ def main():
     print("  [2] Heavy  (~47 categories)")
     print("  [3] Deep   (~155 categories - most thorough, slowest)")
     cats = categories_for(input("Choose 1, 2, or 3 (press Enter for 2): ").strip() or "2")
-    queries = [("%s in %s" % (c, z), c) for z in zips for c in cats]
-
-    # RESUME: skip searches finished in a prior run that stopped early
-    done = load_progress()
-    pending = [(q, cat) for (q, cat) in queries if q not in done]
-    resuming = bool(done) and len(pending) < len(queries)
-    if resuming:
-        print("\nResuming -- %d of %d searches already done; %d left."
-              % (len(queries) - len(pending), len(queries), len(pending)))
-    print("\nSearching %d categories x %d ZIPs = %d searches (%d to do) -> %s\n"
-          % (len(cats), len(zips), len(queries), len(pending), OUT_PATH))
-    if not pending:
-        print("Nothing left to do (already complete). Starting over next time.")
-        clear_progress()
+    # ZIP PLAN: the ZIPs you entered come first, then the scraper AUTO-ADVANCES
+    # through nearby Houston fiber ZIPs (skipping any already finished) until you
+    # close the window -- so it keeps covering the next needed ZIP on its own.
+    zips_done = load_zips_done()
+    extra = [z for z in NEXT_ZIPS if z not in zips]
+    zip_plan = [z for z in zips if z not in zips_done] + [z for z in extra if z not in zips_done]
+    if not zip_plan:                          # everything known is covered -> start fresh
+        zips_done = set(); save_zips_done(zips_done)
+        zip_plan = list(dict.fromkeys(zips + extra))
+    qdone = load_progress()                    # per-search resume within a ZIP
+    shown = ", ".join(zip_plan[:10]) + (" +%d more" % (len(zip_plan) - 10) if len(zip_plan) > 10 else "")
+    print("\nZIP plan (auto-advances to the next ZIP after each; close the window to stop):\n  %s\n" % shown)
 
     from playwright.sync_api import sync_playwright
     os.makedirs(PROFILE_DIR, exist_ok=True)
     sheet_ws, sheet_seen = (open_sheet() if to_sheet else (None, set()))
     seen, total, sheet_added, stopped = set(), 0, 0, False
-    csv_mode = "a" if (resuming and os.path.exists(OUT_PATH)) else "w"
+    csv_mode = "a" if (os.path.exists(OUT_PATH) and (qdone or zips_done)) else "w"
     with sync_playwright() as p:
         # Run hidden (headless) by default so the browser doesn't take over the
         # screen -- it scrapes in the background and just writes to the sheet/CSV.
@@ -506,42 +530,51 @@ def main():
         writer = csv.DictWriter(out_f, fieldnames=FIELDS)
         if csv_mode == "w":
             writer.writeheader()
-        for i, (q, cat) in enumerate(pending, 1):
-            try:
-                rows = scrape_query(page, q, cat)
-            except Exception as e:
-                print("  [%d/%d] %-30s ERROR %s" % (i, len(pending), q, str(e)[:40]))
-                continue
-            if rows is None:
-                print("  Google blocked the search -- stopping. Run again to RESUME here.")
-                stopped = True
+        for z in zip_plan:
+            if stopped:
                 break
-            new, q_new = 0, []
-            for r in rows:
-                key = (r["name"] or "") + "|" + (r["address"] or "")
-                if key in seen:
+            qs = [("%s in %s" % (c, z), c) for c in cats if ("%s in %s" % (c, z)) not in qdone]
+            print("\n=== ZIP %s : %d category searches ===" % (z, len(qs)))
+            for i, (q, cat) in enumerate(qs, 1):
+                try:
+                    rows = scrape_query(page, q, cat)
+                except Exception as e:
+                    print("  [%d/%d] %-30s ERROR %s" % (i, len(qs), q, str(e)[:40]))
                     continue
-                seen.add(key)
-                writer.writerow(r)
-                q_new.append(r)
-                new += 1
-            out_f.flush()
-            if sheet_ws is not None and q_new:      # add to the sheet as we go
-                sheet_added += append_sheet(sheet_ws, q_new, sheet_seen)
-            total += new
-            done.add(q)                              # mark this search complete
-            save_progress(done)
-            withp = sum(1 for r in rows if r.get("phone"))
-            print("  [%d/%d] %-32s +%d (%d w/phone)" % (i, len(pending), q[:32], new, withp))
+                if rows is None:
+                    print("  Google blocked the search -- stopping. Run again to RESUME here.")
+                    stopped = True
+                    break
+                new, q_new = 0, []
+                for r in rows:
+                    key = (r["name"] or "") + "|" + (r["address"] or "")
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    writer.writerow(r)
+                    q_new.append(r)
+                    new += 1
+                out_f.flush()
+                if sheet_ws is not None and q_new:      # add to the sheet as we go
+                    sheet_added += append_sheet(sheet_ws, q_new, sheet_seen)
+                total += new
+                qdone.add(q)                             # mark this search complete
+                save_progress(qdone)
+                withp = sum(1 for r in rows if r.get("phone"))
+                print("  [%d/%d] %-32s +%d (%d w/phone)" % (i, len(qs), q[:32], new, withp))
+            if not stopped:
+                zips_done.add(z)                         # whole ZIP covered
+                save_zips_done(zips_done)
+                print("=== ZIP %s done -> moving to the next needed ZIP ===" % z)
         out_f.close()
         ctx.close()
-    if not stopped:
-        clear_progress()                             # finished -> fresh next time
-    print("\nDONE: %d businesses saved to CSV:\n  %s" % (total, OUT_PATH))
+    print("\nDONE this session: %d businesses (CSV: %s)." % (total, OUT_PATH))
     if to_sheet:
-        print("  %d added to the '%s' tab (written live as it ran)." % (sheet_added, SHEET_TAB))
+        print("  %d added to the '%s' tab (live as it ran)." % (sheet_added, SHEET_TAB))
     if stopped:
-        print("\n  Stopped early -- just run this again and it picks up where it left off.")
+        print("\n  Stopped early -- run again to pick up where it left off.")
+    else:
+        print("\n  Covered every planned ZIP. Run again anytime to refresh/extend.")
     try:
         input("\nPress Enter to close...")
     except EOFError:
