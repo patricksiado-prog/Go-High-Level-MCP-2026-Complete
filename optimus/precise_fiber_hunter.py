@@ -1540,6 +1540,73 @@ def sweep_backend(page, ws, seen, area_label, dry, cols, rows, capture):
     return total
 
 
+def sweep_grid(page, ws, seen, area_label, dry, capture):
+    """Sequential GRID (lawnmower) sweep: cover an EXPANDING SQUARE centered on
+    where you start, row by row -- left-to-right, drop down, right-to-left, drop
+    down -- growing outward ring by ring until you close the browser. This is the
+    methodical 'read it like a book' motion (vs the spiral). It re-crosses
+    already-seen cells as the square grows, which just re-pans -- addresses
+    dedupe, so no duplicate writes. Returns total captured."""
+    pos = [0, 0]                 # net cell offset from the start cell
+    tally = {"total": 0, "cells": 0}
+
+    def capture_here():
+        if on_map(page):
+            search_this_area(page)
+        time.sleep(SEARCH_SETTLE)
+        n = capture.flush(ws, seen, area_label, dry)
+        tally["total"] += n
+        tally["cells"] += 1
+        print("  [cell %d @ %d,%d] +%d  (total %d)"
+              % (tally["cells"], pos[0], pos[1], n, tally["total"]))
+        if tally["cells"] % 15 == 0:
+            report_status(ws, area_label, "watching", found=tally["total"],
+                          note="grid: %d cells, %d leads" % (tally["cells"], tally["total"]))
+
+    def step(direction):
+        if not mouse_drag(page, direction):
+            return False
+        pos[0] += 1 if direction == "right" else -1 if direction == "left" else 0
+        pos[1] += 1 if direction == "down" else -1 if direction == "up" else 0
+        return True
+
+    def go_to(tx, ty):
+        # walk one cell at a time, capturing each landed cell. Drop to the row
+        # (y) FIRST, then sweep across (x) -- so each row is swept at its own y
+        # (proper lawnmower, full coverage even when a new ring starts).
+        while pos[1] != ty:
+            if not step("down" if ty > pos[1] else "up"):
+                return False
+            capture_here()
+        while pos[0] != tx:
+            if not step("right" if tx > pos[0] else "left"):
+                return False
+            capture_here()
+        return True
+
+    print("Sequential grid sweep -- row by row, expanding outward until you "
+          "close the browser.\n")
+    try:
+        capture_here()                       # the starting cell
+        R, rows_down = 1, True
+        while True:
+            ys = list(range(-R, R + 1)) if rows_down else list(range(R, -R - 1, -1))
+            for i, ty in enumerate(ys):
+                target_x = R if (i % 2 == 0) else -R   # serpentine: sweep to the far edge
+                if not go_to(target_x, ty):
+                    return tally["total"]
+            R += 1
+            rows_down = not rows_down          # flow into the next ring, less backtrack
+    except Exception as e:
+        msg = str(e).lower()
+        if "closed" in msg or "target" in msg:
+            print("\nBrowser closed -- stopping the grid sweep. (%d leads this run.)"
+                  % tally["total"])
+        else:
+            print("\nGrid sweep stopped: %s" % str(e)[:100])
+        return tally["total"]
+
+
 def sweep_continuous(page, ws, seen, area_label, dry, capture):
     """Keep sweeping OUTWARD in a spiral, capturing each viewport off the
     backend, until the browser is closed -- no fixed grid. Set it on a spot/ZIP
@@ -2213,6 +2280,9 @@ def main():
                     help="RESEARCH: log EVERY network response (url, type, size) "
                          "so we can find which endpoint carries the dot data. "
                          "Prints the biggest endpoints + writes net_responses.log.")
+    ap.add_argument("--spiral", action="store_true",
+                    help="pan in an outward SPIRAL instead of the default sequential "
+                         "GRID (lawnmower, row by row). Both run until you close the browser.")
     ap.add_argument("--dry", action="store_true", help="don't write to the sheet, just print")
     ap.add_argument("--auto", action="store_true",
                     help="UNATTENDED: no 'press Enter' pauses, auto-close at the end. "
@@ -2348,8 +2418,9 @@ def main():
                 cap = _NET_CAPTURE[0]
                 if cap is None:
                     n = 0
-                else:                    # CONTINUOUS: sweep outward until stopped
-                    n = sweep_continuous(page, ws, seen, area_label, args.dry, cap)
+                else:                    # CONTINUOUS: grid (default) or spiral, until stopped
+                    _sweep = sweep_continuous if args.spiral else sweep_grid
+                    n = _sweep(page, ws, seen, area_label, args.dry, cap)
                 if n:
                     print("  captured %d addresses OFF THE SERVER "
                           "(backend read, no dot-clicking)" % n)
@@ -2398,8 +2469,8 @@ def main():
             print("Continuous sweep of %s (backend read)...\n" % (args.zip or "this area"))
             if cap is None:
                 return 0
-            return sweep_continuous(page, ws, seen, args.zip or "manual",
-                                    args.dry, cap)
+            _sweep = sweep_continuous if args.spiral else sweep_grid
+            return _sweep(page, ws, seen, args.zip or "manual", args.dry, cap)
 
         if not args.auto:
             # MANUAL mode: let the user get the map where they want it, then
