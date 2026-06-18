@@ -12,7 +12,7 @@ Run by SCRAPER_SETUP.bat, or directly:  python maps_scraper_standalone.py
 
 import os, csv, re, time, json, urllib.parse
 
-VERSION = "1.9 (2026-06-18)"   # bump this when the scraper changes; printed on start
+VERSION = "2.0 (2026-06-18)"   # bump this when the scraper changes; printed on start
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_PATH = os.path.join(HERE, "businesses.csv")
@@ -477,7 +477,56 @@ def append_sheet(ws, rows, sheet_seen):
     return len(new)
 
 
+REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
+
+
+def _find_git():
+    import shutil
+    g = shutil.which("git")
+    if g:
+        return g
+    for c in (r"C:\Program Files\Git\cmd\git.exe",
+              r"C:\Program Files (x86)\Git\cmd\git.exe",
+              os.path.expandvars(r"%LOCALAPPDATA%\Programs\Git\cmd\git.exe")):
+        if os.path.exists(c):
+            return c
+    return "git"
+
+
+def self_update():
+    """If run from inside the git repo, pull the latest scraper from GitHub and
+    relaunch once -- so `python maps_scraper_standalone.py` is always current
+    (the launcher .bat handles the non-repo case)."""
+    import subprocess, sys
+    if os.environ.get("SCRAPER_NO_UPDATE") == "1":
+        return
+    here = os.path.abspath(__file__)
+    repo = os.path.dirname(os.path.dirname(os.path.dirname(here)))  # .../optimus/standalone/x -> repo
+    if not os.path.isdir(os.path.join(repo, ".git")):
+        return                                    # launcher copy (not a repo) -> skip
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
+    git = _find_git()
+    try:
+        before = open(here, "rb").read()
+        subprocess.run([git, "-C", repo, "fetch", "origin", REPO_BRANCH],
+                       env=env, timeout=90, capture_output=True, text=True)
+        subprocess.run([git, "-C", repo, "reset", "--hard", "origin/" + REPO_BRANCH],
+                       env=env, timeout=60, capture_output=True, text=True)
+        after = open(here, "rb").read()
+    except Exception:
+        return
+    if after != before:
+        print("Updated the scraper from GitHub -- relaunching with the new version...\n")
+        try:
+            r = subprocess.run([sys.executable] + sys.argv,
+                               env=dict(os.environ, SCRAPER_NO_UPDATE="1"))
+            sys.exit(r.returncode)
+        except Exception:
+            pass
+
+
 def main():
+    self_update()
     print("=" * 56)
     print("  GOOGLE MAPS BUSINESS SCRAPER   v%s" % VERSION)
     print("=" * 56)
