@@ -12,7 +12,7 @@ Run by SCRAPER_SETUP.bat, or directly:  python maps_scraper_standalone.py
 
 import os, csv, re, time, json, urllib.parse
 
-VERSION = "1.6 (2026-06-17)"   # bump this when the scraper changes; printed on start
+VERSION = "1.7 (2026-06-18)"   # bump this when the scraper changes; printed on start
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_PATH = os.path.join(HERE, "businesses.csv")
@@ -364,8 +364,16 @@ def main():
     seen, total, sheet_added, stopped = set(), 0, 0, False
     csv_mode = "a" if (resuming and os.path.exists(OUT_PATH)) else "w"
     with sync_playwright() as p:
+        # Run hidden (headless) by default so the browser doesn't take over the
+        # screen -- it scrapes in the background and just writes to the sheet/CSV.
+        # Set SCRAPER_SHOW=1 to watch the window (occasionally more block-resistant).
+        show = os.environ.get("SCRAPER_SHOW", "").strip().lower() in ("1", "true", "yes", "y")
+        if show:
+            print("  (window VISIBLE -- SCRAPER_SHOW is set)")
+        else:
+            print("  Running in the background (no window). You can keep using your PC.")
         ctx = p.chromium.launch_persistent_context(
-            PROFILE_DIR, headless=False, viewport={"width": 1280, "height": 900})
+            PROFILE_DIR, headless=not show, viewport={"width": 1280, "height": 900})
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         out_f = open(OUT_PATH, csv_mode, newline="", encoding="utf-8")
         writer = csv.DictWriter(out_f, fieldnames=FIELDS)
