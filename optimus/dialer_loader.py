@@ -142,7 +142,53 @@ def get_token():
         return None
 
 
+def _find_git():
+    import shutil
+    g = shutil.which("git")
+    if g:
+        return g
+    for c in (r"C:\Program Files\Git\cmd\git.exe",
+              r"C:\Program Files (x86)\Git\cmd\git.exe",
+              os.path.expandvars(r"%LOCALAPPDATA%\Programs\Git\cmd\git.exe")):
+        if os.path.exists(c):
+            return c
+    return "git"
+
+
+def self_update():
+    """Pull the latest code from GitHub on launch and relaunch once, so the dialer
+    is always current (runs from the cloned repo). Guard: DIALER_NO_UPDATE=1."""
+    import subprocess, sys
+    if os.environ.get("DIALER_NO_UPDATE") == "1":
+        return
+    here = os.path.abspath(__file__)
+    repo = os.path.dirname(os.path.dirname(here))            # .../optimus/x -> repo
+    if not os.path.isdir(os.path.join(repo, ".git")):
+        return
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
+    git = _find_git()
+    branch = "claude/optimus-map-tools-setup-6dcl6o"
+    try:
+        before = open(here, "rb").read()
+        subprocess.run([git, "-C", repo, "fetch", "origin", branch],
+                       env=env, timeout=90, capture_output=True, text=True)
+        subprocess.run([git, "-C", repo, "reset", "--hard", "origin/" + branch],
+                       env=env, timeout=60, capture_output=True, text=True)
+        after = open(here, "rb").read()
+    except Exception:
+        return
+    if after != before:
+        print("Updated the dialer from GitHub -- relaunching...\n")
+        try:
+            r = subprocess.run([sys.executable] + sys.argv,
+                               env=dict(os.environ, DIALER_NO_UPDATE="1"))
+            sys.exit(r.returncode)
+        except Exception:
+            pass
+
+
 def main():
+    self_update()
     ap = argparse.ArgumentParser()
     ap.add_argument("--commit", action="store_true",
                     help="load to GHL for real (default: preview, then ask)")

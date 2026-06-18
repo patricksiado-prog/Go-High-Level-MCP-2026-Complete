@@ -1,5 +1,14 @@
 # AT&T Fiber Outreach — GHL Busybee Brain (CLAUDE.md)
 
+> **RULE — EVERY distributed program MUST auto-update from GitHub on launch.** No
+> recipient should ever run stale code. Each program calls `self_update()` as the
+> first line of `main()`: from inside the repo it does `git fetch` + `reset --hard
+> origin/<branch>` (via `_find_git()` so it works even when git isn't on PATH); a
+> standalone single-file copy re-downloads itself from the GitHub raw URL; then it
+> re-execs once (guarded by a `*_NO_UPDATE=1` env var). Launchers also pull each run.
+> Covered: precise_fiber_hunter.py, maps_scraper_standalone.py, dialer_loader.py.
+> When you add ANY new runnable program, wire in self_update the same way.
+
 > Operator: Patrick William Siado (AT&T Fiber dealer).
 > This repo IS the "busybee" — the GoHighLevel MCP server (834 tools) deployed on Railway.
 > Companion brain: Google Drive doc "AT&T Outreach Bot — Master Handoff & GHL Brain"

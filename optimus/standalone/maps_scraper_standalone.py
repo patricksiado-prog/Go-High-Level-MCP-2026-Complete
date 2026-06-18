@@ -12,7 +12,7 @@ Run by SCRAPER_SETUP.bat, or directly:  python maps_scraper_standalone.py
 
 import os, csv, re, time, json, urllib.parse
 
-VERSION = "2.0 (2026-06-18)"   # bump this when the scraper changes; printed on start
+VERSION = "2.1 (2026-06-18)"   # bump this when the scraper changes; printed on start
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_PATH = os.path.join(HERE, "businesses.csv")
@@ -478,6 +478,9 @@ def append_sheet(ws, rows, sheet_seen):
 
 
 REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
+SCRAPER_RAW = ("https://raw.githubusercontent.com/patricksiado-prog/"
+               "Go-High-Level-MCP-2026-Complete/claude/optimus-map-tools-setup-6dcl6o/"
+               "optimus/standalone/maps_scraper_standalone.py")
 
 
 def _find_git():
@@ -494,28 +497,41 @@ def _find_git():
 
 
 def self_update():
-    """If run from inside the git repo, pull the latest scraper from GitHub and
-    relaunch once -- so `python maps_scraper_standalone.py` is always current
-    (the launcher .bat handles the non-repo case)."""
+    """Always run the latest code, HOWEVER this file is launched:
+      - inside the git repo  -> git fetch + hard-reset to the branch
+      - standalone single file -> re-download itself from GitHub (no git needed)
+    Then relaunch once with the new version. Guard: SCRAPER_NO_UPDATE=1."""
     import subprocess, sys
     if os.environ.get("SCRAPER_NO_UPDATE") == "1":
         return
     here = os.path.abspath(__file__)
-    repo = os.path.dirname(os.path.dirname(os.path.dirname(here)))  # .../optimus/standalone/x -> repo
-    if not os.path.isdir(os.path.join(repo, ".git")):
-        return                                    # launcher copy (not a repo) -> skip
-    env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
-    git = _find_git()
     try:
         before = open(here, "rb").read()
-        subprocess.run([git, "-C", repo, "fetch", "origin", REPO_BRANCH],
-                       env=env, timeout=90, capture_output=True, text=True)
-        subprocess.run([git, "-C", repo, "reset", "--hard", "origin/" + REPO_BRANCH],
-                       env=env, timeout=60, capture_output=True, text=True)
-        after = open(here, "rb").read()
     except Exception:
         return
-    if after != before:
+    after = None
+    repo = os.path.dirname(os.path.dirname(os.path.dirname(here)))
+    if os.path.isdir(os.path.join(repo, ".git")):
+        env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
+        git = _find_git()
+        try:
+            subprocess.run([git, "-C", repo, "fetch", "origin", REPO_BRANCH],
+                           env=env, timeout=90, capture_output=True, text=True)
+            subprocess.run([git, "-C", repo, "reset", "--hard", "origin/" + REPO_BRANCH],
+                           env=env, timeout=60, capture_output=True, text=True)
+            after = open(here, "rb").read()
+        except Exception:
+            return
+    else:                                   # standalone copy -> pull the file itself
+        try:
+            import urllib.request
+            data = urllib.request.urlopen(SCRAPER_RAW, timeout=30).read()
+            if b"def main" in data and data != before:    # sanity: real code, changed
+                open(here, "wb").write(data)
+                after = data
+        except Exception:
+            return
+    if after is not None and after != before:
         print("Updated the scraper from GitHub -- relaunching with the new version...\n")
         try:
             r = subprocess.run([sys.executable] + sys.argv,
