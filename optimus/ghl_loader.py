@@ -32,11 +32,19 @@ Railway env GHL_PIT_TOKEN (never hardcode it here).
 import os, sys, json, time, argparse
 from datetime import datetime
 
-LOCATION_ID = "xZj500PjsflIQg2j9f9D"            # Command (Patrick's)
-PIPELINE_ID = "trc5dwodtc1LBYHikmiK"            # AT&T Commercial
-DIALER_WORKFLOW_ID = "41e00387-a766-4975-bbcd-627c684a3ee1"  # "Optimus Fiber Biz — Power
-# Dialer Queue" (published 2026-06-12): one Manual Call action that drops the
-# contact into Conversations > Manual Actions so GHL's power dialer serves it.
+# Which GHL account (and its pipeline/dialer workflow) the leads load into. The
+# round-robin "callers" are simply that account's active users -- so to make a
+# different team the callers (e.g. the Frontline call center), point these at
+# Frontline by setting the env vars below; defaults are Command (Patrick's).
+#   GHL_LOCATION_ID         - sub-account the contacts/opps are created in
+#   GHL_PIPELINE_ID         - pipeline for the opportunity
+#   GHL_DIALER_WORKFLOW_ID  - the Manual Call / power-dialer workflow to enroll into
+LOCATION_ID = os.environ.get("GHL_LOCATION_ID", "xZj500PjsflIQg2j9f9D")   # Command (Patrick's)
+PIPELINE_ID = os.environ.get("GHL_PIPELINE_ID", "trc5dwodtc1LBYHikmiK")   # AT&T Commercial
+DIALER_WORKFLOW_ID = os.environ.get("GHL_DIALER_WORKFLOW_ID",
+                                    "41e00387-a766-4975-bbcd-627c684a3ee1")  # "Optimus Fiber
+# Biz -- Power Dialer Queue" (Command, published 2026-06-12): one Manual Call action that drops
+# the contact into Conversations > Manual Actions so GHL's power dialer serves it.
 # We enroll via API (below) because GHL's internal API rejected saving a
 # contact-tag trigger; API enrollment is also more deterministic.
 STAGE_LEAD = "Lead"                              # first stage name
