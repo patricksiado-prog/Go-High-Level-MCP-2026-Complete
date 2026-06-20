@@ -12,6 +12,7 @@ Use placeholders like `{{locationId}}`, `{{contactId}}`, and `{{startDate}}` as 
 - `customer-follow-up.json` - Work the conversation inbox: find customers needing a reply, draft messages, and schedule follow-ups.
 - `att-fiber-consented-drip.json` - AT&T fiber SMS drip to consented opt-ins only (single registered number, throttled, book + one follow-up). Never cold/DNC.
 - `att-post-call-interested-sms.json` - Single recap text fired on hang-up of an answered call (Call Status = Completed, Duration > 0), with the current promos ($500 Visa, lines from $15/mo, iPhone 17 ~$4/mo). Consent = the live call; never no-answer/voicemail.
+- `att-no-answer-callback-task.json` - No-answer dials (Call Status = No Answer, Duration 0) create a callback/door-knock task for the rep — never an SMS. Keeps non-pickups worked hard while staying off the cold-text/TCPA path.
 - `lost-opportunity-recovery.json` - Find lost opportunities and enroll selected contacts in a recovery workflow.
 - `weekly-ads-report.json` - Pull ad, attribution, funnel, and conversion data for a weekly summary.
 - `form-submission-triage.json` - Review recent form submissions and surface uncontacted leads.

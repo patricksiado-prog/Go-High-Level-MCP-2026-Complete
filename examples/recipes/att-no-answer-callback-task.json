@@ -1,0 +1,47 @@
+{
+  "id": "att-no-answer-callback-task",
+  "title": "No-answer -> callback + door-knock task (no SMS)",
+  "goal": "When an outbound dial gets NO ANSWER (no live conversation, so no consent), create a callback/door-knock task for the rep instead of texting. Keeps non-pickups worked hard while staying off the cold-text path.",
+  "why": "A no-answer = no conversation = no consent. The Command list is a scraped Wichita auto-shop CSV with no opt-in trail and some landlines, so texting non-pickups is a cold SMS blast: $500-$1,500/msg TCPA exposure, a 10DLC violation, and carrier/A2P review risk that can reach the AT&T dealership. Non-pickups route to CALL/DOOR, never SMS.",
+  "deployment": {
+    "account": "Command / Optimus",
+    "locationId": "xZj500PjsflIQg2j9f9D",
+    "pipeline": "AT&T Commercial (trc5dwodtc1LBYHikmiK)",
+    "dialer": "Wavv power dialer",
+    "workflowId": "d38779f3-fc90-4367-bb4d-156b10ee89db",
+    "workflowName": "No-Answer — Callback + Door Task",
+    "status": "draft — NOT published. Add the trigger in the UI (see triggerSetup), confirm the assignee, then publish.",
+    "lastBuilt": "2026-06-20"
+  },
+  "triggerSetup": {
+    "note": "The connector writes workflow ACTIONS but does NOT persist workflow TRIGGERS. Add the trigger manually in the GHL UI.",
+    "uiSteps": [
+      "Open Automation > No-Answer — Callback + Door Task.",
+      "Add Trigger > 'Call Status'. Set Status = No Answer (optionally add Busy and Failed), Direction = Outgoing.",
+      "Alternative: if Wavv stamps a disposition tag, use Trigger = 'Contact Tag' with tag added = wavv-no-answer. Pick whichever the dialer actually fires.",
+      "Confirm the 'Callback + door task' action's Assign To points to the rep working the list (default is contact owner).",
+      "Optional: add 'Add Tag' = needs-callback, and 'Move Opportunity' to a Call Back stage.",
+      "Save, then Publish."
+    ]
+  },
+  "steps": [
+    {
+      "id": "callback-task",
+      "description": "Create a re-dial / door-knock task on the contact. Note explicitly says do NOT text.",
+      "action": "create_task",
+      "attributes": {
+        "title": "Call back / door-knock — no answer",
+        "body": "No answer on the dial. Re-dial {{contact.phone}} and, if clean & non-DNC, route to door-knock. {{contact.first_name}} — {{contact.address1}}. Do NOT text (no consent).",
+        "dueInDays": 1,
+        "assignTo": "owner"
+      }
+    }
+  ],
+  "repWorkflow": "Non-pickups land in the Tasks list (and the needs-callback smart list if the tag is added). Reps re-dial; the clean, non-DNC ones go to door-knock. No SMS at any point.",
+  "compliance": {
+    "noSms": "This branch never sends SMS. Texting is reserved for contacts the team spoke to live (answered call) or who opted in.",
+    "consentUnlock": "To make non-pickups textable the right way, stand up an opt-in (text-keyword e.g. FIBER to 832-247-4060, or a QR/short link on the flyer). Opt-ins are consented and textable going forward.",
+    "dnc": "Door/call only on clean, non-DNC numbers. Honor DNC flags."
+  },
+  "output": "Every outbound no-answer becomes a callback/door task for a rep — non-pickups worked aggressively with zero cold-text exposure."
+}
