@@ -67,6 +67,12 @@
 - **No number randomization / sender rotation to evade carrier filters (snowshoeing).** It is a
   10DLC + carrier-policy violation and detection evasion, and risks the AT&T dealership. Drips
   send from a single A2P-registered number to consented contacts only. Owning a list ≠ consent.
+- **Operator knows the rules — keep compliance notes to ONE line; don't re-explain.** Patrick is
+  fluent in TCPA/10DLC. Do NOT lecture, re-derive the basics, or tack a warning onto clearly-
+  compliant actions (answered-call texts, opt-ins, consented drips, call/door routes) — just build
+  them. Only when an action would actually cross the line — texting no-answers / non-consented /
+  DNC, or sender rotation — give a single-line flag and proceed per his call. The hard stop on those
+  stays (it has caught real cold-texts); this cuts the repetition, it does not lower the bar.
 
 ## 6. Code / deploy
 - Curated lead-finder bug fixed on branch `claude/integration-command-control-opts-ULUBC`:
