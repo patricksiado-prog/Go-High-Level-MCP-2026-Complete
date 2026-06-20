@@ -421,6 +421,63 @@
     **Call Details + Custom Disposition** trigger; "only if cell" needs a paid line-type
     lookup (Twilio Lookup ~1¢/#) — not native, and most Maps biz numbers are landline/VoIP.
 
+- **SESSION 2026-06-19 — what got built/learned (latest; read this).**
+  - **GREEN LEADS LOADED TO BOTH ACCOUNTS (live, via MCP).** The "Fiber Green Biz" tab
+    has many repeat rows (the hunter re-matches the same biz every sweep + backlog re-match)
+    but dedups by phone to the real count: grew **65 → 111 → 122 unique** this session.
+    Loaded into **Command/Optimus**: all 122 upserted (round-robin across the 5 Command
+    users `jBmIn…/lQ7gV…/7c9QL…/J3Pke…/qOa2O…`), enrolled in the Power Dialer Queue
+    workflow `41e00387…`, **AND a pitch note added to each** (the AT&T fiber call script).
+    Loaded into **Frontline**: **121/122** upserted (round-robin across the 14 Frontline
+    users), tagged `green-houston` (one, The Goddard School +17138046550, kept getting
+    "Denied by user" — skipped). Upsert merges by phone = no dupes; re-run loads only new.
+  - **FRONTLINE AUTODIALER IS BLOCKED ON ONE THING: no Manual Call workflow, and I can't
+    create it via API.** Frontline (loc `TXw28sw0Z2rI6tcCDhJY`) HAS an "AT&T Commercial"
+    pipeline (`BZb6jl8rDDeaurYHGZoh`) and 14 users, and **official-API writes work**
+    (upsert_contact/opp succeed — proven). But `ghl_create_workflow` fails with **Firebase
+    `INVALID_REFRESH_TOKEN`** (the internal-API token on that connector is stale), so the
+    power-dialer (Manual Call) workflow must be **built in the Frontline UI** (Automation →
+    Workflows → Manual Call action + a Contact-Tag trigger on `green-houston`), or reconnect
+    the Frontline connector and Claude can create it. Until then Frontline leads are worked
+    from **Contacts → filter `green-houston`** (assigned per-user), not the Manual Actions
+    autodialer. Frontline 14 user ids captured in this session's transcript.
+  - **MCP CONNECTOR NAMES CHURN ACROSS RECONNECTS.** Command busybee has appeared as
+    `mcp__40b566b8…`, `mcp__cmndconevtor…`; Frontline as `mcp__6cf38bf0…`,
+    `mcp__ghl-frontline-connector…`. Verify which is which by a read (Command = loc
+    `xZj500…`, Frontline = `TXw28sw0…`) before writing. They also drop/reconnect mid-session.
+  - **ROBUST INSTALLERS (dodge the #1 Windows trap).** New `optimus/install/INSTALL_HUNTER.bat`
+    and `INSTALL_SCRAPER.bat`: install Python from **python.org with PrependPath=1** (kills
+    the Microsoft-Store "Python not found / App execution alias" trap that blocked the team),
+    pull latest code (hunter = repo zip, scraper = raw .py), install deps + chromium + the
+    Google key, then launch. Use `py` (lands in C:\Windows, always on PATH). One-paste:
+    `curl -L -o "%USERPROFILE%\Desktop\INSTALL_HUNTER.bat" "<raw .../optimus/install/INSTALL_HUNTER.bat>" && "%USERPROFILE%\Desktop\INSTALL_HUNTER.bat"` (same for SCRAPER). Also uploaded to the
+    "OPTIMUS SETUP" Drive folder: INSTALL HUNTER.bat=`1VUj_lzUrmnTcYH1UZ6JnNNJK2xzRYVUd`,
+    INSTALL SCRAPER.bat=`1IuKrdY40deAo-WCg2-T-R3Gp_1DBsgUk`.
+  - **TEAM "REQUEST ACCESS" FLOOD = restricted Drive .bats.** Inbox is full of Google
+    "Share an item? … requesting access to Google Maps Scraper SETUP.bat" (Romeo, Zack,
+    Edward, Ara, Rodelio, Dave, Lalitha) — the Drive launcher copies are owner-only. FIX:
+    send the team the **GitHub install command** (needs zero Drive access) instead of the
+    Drive link, or share those Drive files Anyone-with-link→Viewer. Gmail draft to
+    `budonk3y@gmail.com` with the GitHub installer was created (Gmail MCP only drafts).
+  - **"No google_creds.json" scraper error** = the key didn't download → scraper writes CSV
+    only, not the sheet. The robust installer fetches the key; manual fallback = download key
+    `1upYH4h2…` and drop it as `google_creds.json` in `%USERPROFILE%\maps_scraper\`.
+  - **HUNTER FINDS 0 / ALL-GREY = mature area, not a bug.** Green count stalls when the hunter
+    sits in built-out (all-grey) inner-loop ZIPs (77002/77027/77098/77005/77046 = worked out).
+    To grow matches: run hunter on **fresh fiber** (La Porte 77571 confirmed fresh; growth
+    suburbs 77449 Katy/77433 Cypress/77386 Spring/77584 Pearland) AND run the **scraper on the
+    same ZIP** (a green-BIZ match needs both the dot captured AND the business scraped).
+  - **SMS PROMO UPDATE (use these in the post-call/Random-Split texts).** Added to the offer
+    set: **$500 Visa reward card**, **cell service from $15/mo**, **iPhone 17 for $4/mo** —
+    on top of the brain's fiber promos (1 Gig in the $40s, 2-Gig $150, 5-Gig $250, $200/$500
+    Visa, 2 mo free, free install, no contract, WiFi 6, +$20/mo with AT&T wireless). 10
+    randomized variants drafted. COMPLIANCE: these are scraped biz numbers → texting them
+    conflicts with the "call/door only, never cold-text" hard rule; recommended firing the
+    text only on an **"Interested" disposition (cell-checked)** = consented, not after every call.
+  - **dialer_loader now account-switchable** (env `GHL_LOCATION_ID`/`GHL_PIPELINE_ID`/
+    `GHL_DIALER_WORKFLOW_ID`, defaults Command) so the same loader can target Frontline; and
+    `--reassign` re-spreads already-loaded leads round-robin. (Pushed earlier 2026-06-18/19.)
+
 ## 7. Creds & accounts (Patrick's own — keep it simple)
 - These are Patrick's accounts and creds. Copying or downloading `google_creds.json` to the
   right path on his own device is **routine setup, not a high-stakes event** — just do it and
