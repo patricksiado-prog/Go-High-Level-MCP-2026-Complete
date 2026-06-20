@@ -1,0 +1,69 @@
+{
+  "id": "att-post-call-interested-sms",
+  "title": "AT&T post-call 'Interested' recap SMS",
+  "goal": "After a live power-dialer call where the caller dispositions a commercial lead as INTERESTED, send exactly ONE follow-up recap text from the registered number with the current AT&T promos. Consent boundary = the human conversation that just happened; never fires on cold/uncalled contacts.",
+  "deployment": {
+    "account": "Command / Optimus",
+    "locationId": "xZj500PjsflIQg2j9f9D",
+    "pipeline": "AT&T Commercial (trc5dwodtc1LBYHikmiK)",
+    "dialer": "Wavv power dialer (human on every call)",
+    "workflowId": "bd37d7e2-f9ce-4a5a-b93e-1bf84f613a68",
+    "workflowName": "Post-Call — Follow-up Text",
+    "status": "draft — NOT published. Trigger must be added in the GHL UI (see triggerSetup), then publish.",
+    "lastBuilt": "2026-06-20"
+  },
+  "triggerSetup": {
+    "note": "The connector can write workflow ACTIONS but does NOT persist workflow TRIGGERS (PUT is accepted but triggers stay empty). Add the trigger manually in the GHL UI.",
+    "uiSteps": [
+      "Open the workflow: Automation > Post-Call — Follow-up Text.",
+      "Add Trigger > 'Contact Tag' (Contact Tag Updated).",
+      "Set: tag IS 'wavv-interested' (the tag the Wavv dialer applies on the Interested disposition).",
+      "Save, then Publish the workflow.",
+      "Optional: restrict to a re-entry window so a contact dispositioned Interested twice doesn't get double-texted."
+    ],
+    "triggerTag": "wavv-interested",
+    "alternateTags": ["interested", "commercial-warm", "client is interested"]
+  },
+  "compliance": {
+    "audience": "Commercial leads the team just spoke to live and marked Interested. The call is the consent boundary.",
+    "exclude": "Never wire this to a cold tag, an upload tag, or a stage move that isn't a live-call Interested disposition. Map/scraped numbers are call/door only — this fires AFTER the call, not before.",
+    "sender": "One A2P-registered number. No sender rotation / snowshoeing.",
+    "optOut": "GHL auto-appends the opt-out line. Do not add or strip STOP. Honor STOP via the existing STOP workflow.",
+    "frequency": "Single text only (Wait 10 min -> one SMS). Longer nurture is the separate 'Fiber + Phone Promo Drip' workflow.",
+    "a2p": "A2P 10DLC on Command is UNCONFIRMED (bundleSid: null as of last check). Verify the Trust Center shows Approved before turning this live, or carriers will filter outbound.",
+    "tcpa": "Texting non-consented/DNC = $500-$1,500 per message. Interested-disposition only."
+  },
+  "steps": [
+    {
+      "id": "wait",
+      "description": "Wait 10 minutes after the Interested disposition so the caller can finish wrapping up the call.",
+      "action": "wait",
+      "attributes": { "value": 10, "unit": "minutes" }
+    },
+    {
+      "id": "recap-sms",
+      "description": "Send the single recap text with the current promos. GHL appends the opt-out line.",
+      "action": "sms",
+      "attributes": {
+        "body": "Hi {{contact.first_name}}, Patrick w/ AT&T — great talking today! Recap: AT&T Fiber 1 Gig in the $40s, free install, no contract + a $500 Visa reward card. On wireless, add a line from $15/mo & iPhone 17 as low as $4/mo w/ trade-in. Want me to check what you qualify for? Reply YES or call 832-247-4060."
+      }
+    }
+  ],
+  "promos": {
+    "fiber": "AT&T Fiber 1 Gig in the $40s, free install, no contract, + $500 Visa reward card",
+    "wireless": "Add a line from $15/mo",
+    "device": "iPhone 17 as low as $4/mo with trade-in",
+    "bookingLine": "832-247-4060"
+  },
+  "replyRouting": {
+    "yes": "Continue booking; hand live calls to 832-247-4060; move opp forward and tag accordingly.",
+    "stop": "Existing STOP workflow scrubs the contact; never re-text.",
+    "noReply": "Stop texting; the lead stays in the call/dialer cadence."
+  },
+  "confirmationPoints": [
+    "Confirm A2P 10DLC is Approved before publishing.",
+    "Confirm the trigger is the live-call Interested disposition tag, not a cold/upload tag.",
+    "Publish only after the trigger is attached in the UI."
+  ],
+  "output": "A single recap SMS to each lead marked Interested on a live call, sent from the registered number 10 minutes after disposition, with replies routed to booking."
+}
