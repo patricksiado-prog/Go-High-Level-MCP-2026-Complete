@@ -458,6 +458,31 @@
     (`AMf-vBx2m4c2P_iAMQLsa…`, Patrick's login — verified matching); only `GHL_LOCATION_ID`
     + `GHL_API_KEY` differ. Connectors load at SESSION START, so after fixing the connector
     URL, open a FRESH chat for it to take effect.
+  - **FRONTLINE INVALID_REFRESH_TOKEN — DEFINITIVELY DIAGNOSED 2026-06-25 (supersedes the
+    "wrong URL" theory above).** Tested both busybees live in one session with the connectors
+    loaded (Optimus = `40b566b8…` loc `xZj500…`; Frontline = `6cf38bf0…` loc `TXw28sw0…`):
+    - Frontline `ghl_list_workflows` → **200, reads fine** (so the 46d1 URL is correct, the box
+      is live + bound to the right location, and the PIT/read auth is healthy). The URL was NEVER
+      the problem — that earlier note is WRONG.
+    - Frontline `ghl_create_workflow` → **still 400 `INVALID_REFRESH_TOKEN`**.
+    - Optimus `ghl_create_workflow` → **SUCCEEDS** (created + deleted a throwaway, live token
+      refresh).
+    READS and CREATES use DIFFERENT auth paths in the busybee: reads = PIT token (works on both);
+    creates = the Firebase refresh flow (`securetoken.googleapis.com/v1/token?key=API_KEY` +
+    `refresh_token`). That endpoint is STATELESS — same key + same refresh-token value returns the
+    same result no matter which Railway box calls it. So: the identical token works from Optimus
+    but is rejected from Frontline ⇒ **the value actually running on the 46d1 box is NOT the same
+    bytes as Optimus's**, even though Patrick's notes Doc shows them matching. Cause is a corrupted/
+    stale copy in the loving-heart `GHL_FIREBASE_REFRESH_TOKEN` var: a hidden typo/truncation/
+    trailing-newline, the old "L"-bleed value, OR the running deploy predates Patrick's correction
+    (Railway loads env only on redeploy). NOT a shared-token conflict, NOT the URL.
+    **BULLETPROOF FIX (don't hand-compare 200 chars):** in Railway, COPY the *working* value from
+    fulfilling-growth/Optimus `GHL_FIREBASE_REFRESH_TOKEN` (copy icon, not manual-select) and PASTE
+    it over loving-heart/Frontline's `GHL_FIREBASE_REFRESH_TOKEN` (also re-paste `GHL_FIREBASE_API_KEY`
+    to be safe); ensure no trailing space/newline; REDEPLOY loving-heart and wait for a fresh green
+    deploy stamped AFTER the save. The token lives server-side (read per-request from the box env, not
+    a chat-session header), so once 46d1 redeploys with the good value, the SAME connector's next
+    `ghl_create_workflow` works — no need to reopen the chat to test the create fix.
   - **ROBUST INSTALLERS (dodge the #1 Windows trap).** New `optimus/install/INSTALL_HUNTER.bat`
     and `INSTALL_SCRAPER.bat`: install Python from **python.org with PrependPath=1** (kills
     the Microsoft-Store "Python not found / App execution alias" trap that blocked the team),
