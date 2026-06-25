@@ -58,3 +58,8 @@ temp/
 !tests/**/*.csv
 *-doorcall.csv
 *.xlsx
+
+# Lead route/door-knock sheets (PII — names+addresses; never commit)
+*doorknock*
+*-route-sheet.pdf
+docs/laporte-*.pdf
