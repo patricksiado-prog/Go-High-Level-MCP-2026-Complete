@@ -178,12 +178,44 @@ and pipelines. Has `conversations: send-a-new-message`, contacts create/update/u
 opportunities update — enough for a basic sales agent, but only ~22 tools (no full automation
 set). One connector per URL (Claude de-dupes), so it can't cover both accounts at once.
 
-## 7. Writing AUTOMATIONS to BOTH sub-accounts — NO Railway changes needed (2026-06-07)
+## 7. Writing AUTOMATIONS — TWO DIFFERENT AUTH PATHS (CORRECTED 2026-06-07)
 
-Both Railway boxes are now permanently configured with their own account's fully-scoped token.
-Setup is done, so writing automations needs **no token swaps, no env edits, no redeploys** — you
-just call the matching connector. Both verified live (each `get_location` -> 200) with the full
-834 tools, including `ghl_create_workflow`.
+⚠️ CORRECTION of an earlier wrong claim ("both can write automations, no Railway changes").
+`get_location` working on a box proves ONLY that the PIT (`GHL_API_KEY`) is valid. It does
+NOT mean `ghl_create_workflow` works — that's a completely different code path and auth.
+
+Confirmed live this session:
+- Command → `ghl_create_workflow` → ✅ draft created (id `72e7bdbc…`, "AI — New Lead Intro").
+- Frontline → `ghl_create_workflow` → ❌ "Firebase token refresh failed (400): INVALID_REFRESH_TOKEN".
+
+WHY: `ghl_create_workflow` (and update/delete/publish/clone) use the hidden internal workflow
+API `backend.leadconnectorhq.com/workflow`, authed by refreshing a Firebase / v2-JWT token —
+NOT the PIT. From `src/clients/workflow-builder-client.ts` `fromEnv()`:
+- `GHL_REFRESH_TOKEN` (or `GHL_AUTH_REFRESH_TOKEN`) — v2 JWT, preferred
+- `GHL_FIREBASE_REFRESH_TOKEN` + `GHL_FIREBASE_API_KEY` — Firebase fallback
+- `GHL_USER_ID`, `GHL_COMPANY_ID`
+- `locationId` comes from **`GHL_LOCATION_ID` (env), NOT the `x-ghl-location-id` header**.
+
+So:
+- Command's box HAS a valid refresh token → workflow-create works.
+- Frontline's box LACKS one (or it's expired) → INVALID_REFRESH_TOKEN.
+- **Fix for Frontline workflows = put a valid Frontline-account refresh token (`GHL_REFRESH_TOKEN`)
+  + `GHL_USER_ID` on the 46d1 box.** This IS a Railway change. (PIT-only tools — contacts,
+  conversations, opportunities, send_sms, etc. — already work on both with no change.)
+
+🚨 SILENT-WRONG-ACCOUNT TRAP: because the workflow client uses env `GHL_LOCATION_ID` (ignores the
+header), a `ghl_create_workflow` "success" lands in whatever account that BOX is configured for.
+If the Frontline connector is ever pointed at Command's 711a box, the workflow silently builds in
+Command (`xZj500…`), not Frontline. ALWAYS read the created workflow back and verify its
+`locationId` before trusting it.
+
+VERIFY checklist before claiming "automations work" on an account:
+1. Actually call `ghl_create_workflow` (NOT `get_location`).
+2. If it succeeds, read it back and confirm `locationId` matches the intended account.
+
+---
+
+PIT-token path (these DO work on both boxes, no Railway change — verified `get_location` 200 each):
 
 | Sub-account | Connector | Railway box | Location ID |
 |---|---|---|---|
