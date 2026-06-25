@@ -140,6 +140,23 @@ export class WorkflowBuilderClient {
     return new WorkflowBuilderClient(config);
   }
 
+  /**
+   * Override the target location at runtime. Used for per-request header
+   * routing (x-ghl-location-id): the box keeps its own working auth token,
+   * but the workflow is created/read against whichever location the calling
+   * connector asked for. No-op if locationId is empty or unchanged.
+   */
+  setLocation(locationId?: string): void {
+    if (locationId && locationId !== this.config.locationId) {
+      this.config.locationId = locationId;
+    }
+  }
+
+  /** The location this client currently targets. */
+  get targetLocationId(): string {
+    return this.config.locationId;
+  }
+
   // ─── Auth ───────────────────────────────────────────────
 
   /**

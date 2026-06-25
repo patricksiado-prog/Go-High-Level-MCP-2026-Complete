@@ -91,8 +91,14 @@ async function main() {
 
   app.all('/mcp', async (req, res) => {
     try {
-      const reqAccessToken = req.headers['x-ghl-access-token'] as string | undefined;
-      const reqLocationId = req.headers['x-ghl-location-id'] as string | undefined;
+      // Per-connector routing. Token may arrive as x-ghl-access-token OR as a
+      // standard Authorization: Bearer header (the client-config-generator doc
+      // documents the Authorization form), so accept either.
+      const authBearer = (req.headers['authorization'] as string | undefined)
+        ?.match(/^Bearer\s+(.+)$/i)?.[1];
+      const reqAccessToken = (req.headers['x-ghl-access-token'] as string | undefined) || authBearer;
+      const reqLocationId = (req.headers['x-ghl-location-id'] as string | undefined)
+        || (req.headers['x-ghl-locationid'] as string | undefined);
       const client = reqAccessToken && reqLocationId
         ? new EnhancedGHLClient({ ...config, accessToken: reqAccessToken, locationId: reqLocationId })
         : ghlClient;

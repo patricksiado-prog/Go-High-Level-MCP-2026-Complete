@@ -483,6 +483,34 @@
     deploy stamped AFTER the save. The token lives server-side (read per-request from the box env, not
     a chat-session header), so once 46d1 redeploys with the good value, the SAME connector's next
     `ghl_create_workflow` works — no need to reopen the chat to test the create fix.
+  - **HEADER-ROUTING FIX (the real one Patrick remembered — "it's headers / how you communicate
+    to each one"; shipped 2026-06-25, branch `claude/optimus-map-tools-setup-6dcl6o`).** The
+    documented per-account pattern lives in `docs/tooling/client-config-generator.md`: ONE MCP
+    server entry per location, each carrying its own `Authorization`/`X-GHL-Location-ID` headers.
+    The busybee already honored `x-ghl-location-id` + `x-ghl-access-token` for every PIT tool
+    (`main.ts` `/mcp`) — but the **workflow builder was frozen to ENV at startup**
+    (`WorkflowBuilderTools` ctor called `fromEnv()` once), so workflow CREATE ignored the headers
+    and always used the box's env Firebase/JWT token + env location. That blind spot = the whole
+    "Frontline can't create workflows" bug. FIX (4 small edits, build green):
+    1. `workflow-builder-client.ts` — added `setLocation(locationId)` + `targetLocationId` getter
+       (retarget the create/read location at runtime without touching auth).
+    2. `workflow-builder-tools.ts` — ctor now takes `locationOverride?` and applies it via
+       `setLocation` after `fromEnv()`.
+    3. `tool-registry.ts` — reads `ghl.getConfig().locationId` (the per-request client's location)
+       and passes it into `new WorkflowBuilderTools(loc)`. No header → equals env location → no
+       behavior change.
+    4. `main.ts` `/mcp` — token now accepted from `x-ghl-access-token` **OR** `Authorization:
+       Bearer` (the doc shows the Authorization form, the server previously only read
+       `x-ghl-access-token` → silent mismatch); also accept `x-ghl-locationid` alias.
+    NET EFFECT: point the **Frontline connector at the WORKING Optimus box** (`…711a…/mcp`) and
+    keep its `x-ghl-location-id: TXw28sw0…` + `x-ghl-access-token: <Frontline PIT>` headers →
+    PIT tools act on Frontline (per-request token), and workflow CREATE runs on **Optimus's good
+    Firebase/JWT token but targets Frontline's location**. No fresh Frontline token, no Railway
+    env surgery on 46d1. DEPLOY: redeploy the fulfilling-growth/Optimus box with this code, then
+    repoint the Frontline connector URL 46d1→711a (keep its headers). DEPENDENCY: Patrick's login
+    (the token the Optimus box runs on) must have automation rights in the Frontline location; if
+    not, create fails with a PERMISSION error (not INVALID_REFRESH_TOKEN) and Frontline needs its
+    own valid token instead.
   - **ROBUST INSTALLERS (dodge the #1 Windows trap).** New `optimus/install/INSTALL_HUNTER.bat`
     and `INSTALL_SCRAPER.bat`: install Python from **python.org with PrependPath=1** (kills
     the Microsoft-Store "Python not found / App execution alias" trap that blocked the team),

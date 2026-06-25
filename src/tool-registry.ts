@@ -345,8 +345,12 @@ export class ToolRegistry {
     this.addModule('workflowInsights', workflowInsightsTools, 'getToolDefinitions', 'handleToolCall');
     this.addModule('agentWorkspace', agentWorkspaceTools, 'getToolDefinitions', 'handleToolCall');
 
-    // Workflow Builder — internal API with Firebase auth (no GHL API client dependency)
-    const workflowBuilderTools = new WorkflowBuilderTools();
+    // Workflow Builder — internal API with Firebase auth (no GHL API client dependency).
+    // Pass the calling client's location so per-request header routing
+    // (x-ghl-location-id) reaches workflow create/read too, not just env.
+    let requestLocationId: string | undefined;
+    try { requestLocationId = ghl.getConfig().locationId; } catch { /* default to env */ }
+    const workflowBuilderTools = new WorkflowBuilderTools(requestLocationId);
     this.addModule('workflowBuilder', workflowBuilderTools, 'getTools', 'executeWorkflowBuilderTool');
   }
 

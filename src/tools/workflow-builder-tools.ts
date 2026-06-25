@@ -50,9 +50,15 @@ export class WorkflowBuilderTools {
   private client: WorkflowBuilderClient | null = null;
   private initError: string | null = null;
 
-  constructor() {
+  constructor(locationOverride?: string) {
     try {
       this.client = WorkflowBuilderClient.fromEnv();
+      // Per-request header routing: when a connector targets a different
+      // sub-account via x-ghl-location-id, build/read workflows against that
+      // location while still using this box's working auth token.
+      if (locationOverride) {
+        this.client.setLocation(locationOverride);
+      }
     } catch (err: any) {
       this.initError = err.message;
       process.stderr.write(`[WorkflowBuilderTools] Init warning: ${err.message}\n`);
