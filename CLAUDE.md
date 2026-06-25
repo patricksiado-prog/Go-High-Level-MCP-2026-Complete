@@ -557,3 +557,42 @@ This is non-negotiable regardless of who's running the account.
   ONLY if Patrick explicitly asks** — they are not a mandate for the assistant to police the operator.
 - Reinforces §21: execute, give the data/answer, move on. Editorializing about compliance is exactly the
   unwanted behavior he's called out twice. Don't do it again.
+
+## 24. Two-account busybee writes + the token reality (tested 2026-06-24)
+**Both busybees are live in one session and writable — they are SEPARATE Railway deployments, each pinned
+to one location with its OWN PIT and OWN Firebase env.** To act on an account, call THAT account's connector:
+- **Optimus / Command** → "fulfilling-growth" Railway → connector `cmndconevtor` (a.k.a. the `40b566b8…` /
+  `6cf38bf0…` ones) → location `xZj500PjsflIQg2j9f9D`.
+- **Frontline** → "loving-heart" Railway → connector `ghl-frontline-connector` → location `TXw28sw0Z2rI6tcCDhJY`.
+Same 834-tool set on both. Pointing at the right connector = writing to the right account; no cross-wiring.
+
+### 24.1 TWO different "tokens" — don't conflate them
+1. **PIT (the GHL Private-Integration token baked into each Railway URL).** Powers contacts, tags, SMS/email,
+   conversations, opportunities, enroll, reports. **Works on BOTH accounts** — verified 2026-06-24:
+   `get_location` on Optimus → 200; `create_location_tag` on Frontline → 200 (tag `busybee-write-test`).
+   The Railway URL has **no OAuth**, so it CANNOT throw an "expired token." If a chat shows "expired token,"
+   it's NOT the PIT — it's either the **official GHL OAuth connector** (`services.leadconnectorhq.com/mcp`,
+   which does expire) or a stale connector session. Fix: remove it, re-add the **busybee Railway URL**, restart
+   the chat. Do NOT rotate the PIT over an "expired token" error — it's valid.
+2. **Firebase refresh token (separate, per-Railway env: `GHL_FIREBASE_API_KEY` + `GHL_FIREBASE_REFRESH_TOKEN`).**
+   Needed ONLY for **workflow-builder writes** (`ghl_update_workflow_actions`, `ghl_create_workflow`) — these
+   use GHL's internal API, not the PIT.
+
+### 24.2 Workflow-automation writes: Optimus YES, Frontline currently NO (corrects §18/§22.3)
+- **Optimus/Command: workflow edits WORK** — Firebase is valid there (edited the "La Porte Fiber Drip" actions
+  many times this session; supersedes the old §18 "Firebase NOT set" note — it IS set + working on Command).
+- **Frontline: workflow edits FAIL** — `ghl_update_workflow_actions` on Frontline returns
+  **`Firebase token refresh failed (400): INVALID_REFRESH_TOKEN`**. Frontline's Railway `GHL_FIREBASE_REFRESH_TOKEN`
+  is **expired/invalid** and must be refreshed in that Railway env before any Frontline workflow build/edit works.
+  (Everything else on Frontline — contacts, tags, messaging, enroll — works fine via its PIT.)
+- **Also still true:** triggers can't be saved via API on EITHER account (UI builder only); the action-update +
+  clone path is how Claude writes automations once Firebase is valid.
+
+### 24.3 How to actually write an automation to a given account (the method)
+1. Load that account's connector tool (`ToolSearch select:mcp__<connector>__ghl_update_workflow_actions`).
+2. `ghl_get_workflow_full` to read current structure (and re-send all SMS bodies — update REPLACES all actions).
+3. `ghl_update_workflow_actions` with the new action array (interleave `wait` steps for drips). Requires a valid
+   Firebase token on that Railway (Optimus ✓ / Frontline ✗ until refreshed).
+4. Add/confirm the **trigger in the GHL UI** (API can't save triggers). Publish in the UI.
+- For pure contact/list/dialer-prep work, no Firebase needed — `upsert_contact` + `add_contact_tags` on either
+  account's PIT is all it takes (this is how the OKC + Kat call lists were loaded into Optimus, §ops).
