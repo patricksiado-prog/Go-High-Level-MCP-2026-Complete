@@ -76,3 +76,27 @@ This repo IS the "busybee" — a GoHighLevel MCP Server (834 tools) deployed on 
 ## Tools & misc
 - Texting done outside Claude via **Sales Mate**. CRM = GoHighLevel. Hosting = Railway.
 - Sending numbers have a history of carrier spam blocks (Twilio 30006) from cold blasting.
+
+## Automation architecture (Make.com "Optimus" + GHL workflows) — discovered 2026-06-25
+- Make.com: org `7574693` "My Organization" (us2.make.com), team `2262502` "My Team",
+  user patricksiado@gmail.com. The automation suite is named "Optimus —".
+- Active Make scenarios:
+  - **Optimus — Claude Push to GitHub** (`5084486`) — ACTIVE, ~871 execs, every 15 min.
+    Pushes Claude's output to GitHub (BasicTrigger → HTTP → HTTP).
+  - **Optimus — Creds Server** (`5093172`) — ACTIVE webhook (hook 2319605); serves creds.
+  - **Optimus — Append to BRAIN** (`5073448`) + **BRAIN Append v2** (`5244371`) —
+    on-demand; append to the BRAIN Google Doc = the "write to brain" mechanism.
+- Command-related Make scenarios exist but are INVALID/inactive:
+  **Command Extractor** (`5125452`), **Command Hunter** (`5125454`),
+  **Command MapMan** (`5050354`) — Google Sheets updaters, need reconnection.
+- GHL workflow writing (via the busybee connectors):
+  - **Frontline** (`ghl-frontline-connector`) ✅ — can list/create/clone workflows + triggers.
+    20 workflows exist: "01-03 (LM) Replied YES/STOP/Contacted — Pipeline Change",
+    "Customer replied STOP", "Updated - SMS Workflow", "Commercial lead drip",
+    "Commercial Lead Call Prioritization", "Phone Checker via API" / "Check number validity",
+    "Call Center Form Submitted For Closer Assignment", plus hiring/employee workflows.
+    Tools: `ghl_create_workflow`, `ghl_clone_workflow`, `create_trigger`, `ghl_update_workflow_actions`.
+  - **Command** (`cmndconevtor`) ❌ — connector loads but every call 403s:
+    "token does not have access to this location" (`xZj500PjsfllQq2j9i9D`). So automations
+    pointed at Command CANNOT run until Command's GHL token/scope is fixed. This is the
+    open blocker for "automation to Command + Frontline" — Frontline works, Command doesn't.
