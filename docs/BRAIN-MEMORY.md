@@ -118,6 +118,34 @@ Full 834-tool control is live on Command. The fix was a freshly-created, fully-s
   putting a `TXw28…` ("Optimus Houston") token in the Command box — that is BACKWARDS and would
   point Command at Frontline. Command's token must be made inside `xZj500…` (T-OPTIMUS).
 
+## 5c. ROOT CAUSE of the workflow-token drift (DEFINITIVE, code-grounded 2026-06-07)
+
+The workflow refresh token (Firebase `GHL_FIREBASE_REFRESH_TOKEN` AND the v2 JWT `GHL_REFRESH_TOKEN`)
+**ROTATES on every refresh.** Each refresh issues a NEW token and INVALIDATES the old one
+(`src/clients/workflow-builder-client.ts`: Firebase lines 238-242, v2 JWT lines 203-205). The code
+saves the rotated token only to a **local `.env` file** via `persistToken()` — which on Railway is
+**ephemeral (discarded on redeploy) and is NEVER written back to the Railway env var.**
+
+Therefore:
+1. **Two boxes CANNOT share one refresh token.** The first box to refresh (e.g. Command) rotates it
+   and kills the copy on the other box -> the other box gets `INVALID_REFRESH_TOKEN`. Confirmed live:
+   identical `GHL_FIREBASE_REFRESH_TOKEN` on both boxes, Command works, Frontline -> INVALID_REFRESH_TOKEN.
+   "The tokens are the same" is exactly WHY Frontline fails, not a fix.
+2. **Even ONE box drifts stale.** After it refreshes once and rotates, the Railway env still holds the
+   OLD token. Survives in memory ~55 min (TOKEN_TTL), but the next redeploy/cold-start reads the dead
+   env token -> `INVALID_REFRESH_TOKEN`. This is the entire recurring "tokens keep dying" saga.
+
+DURABLE FIX (required, or it WILL drift again):
+- Each box needs its OWN fresh refresh token, extracted from a login on THAT box's account
+  (Command from T-OPTIMUS/xZj500, Frontline from Frontline Direct/TXw28). Never copy one to the other.
+- AND the rotated token must be persisted back to Railway after each rotation — write it to the Railway
+  env var via the Railway API, OR store the token in an external store (Supabase — see
+  `BRAIN_API_supabase_schema`) that the box reads+writes each call. The Make "Creds Server" scenario
+  (serves a Drive file) and the `token-autoupdate-installer` delta were primitive attempts at this; if
+  that automation is broken/paused, the token goes stale. THAT is the thing to actually fix.
+- PIT-based tools (contacts, conversations, opportunities, send_sms, get_location) do NOT use this
+  refresh token and are unaffected — they keep working on both boxes.
+
 ## 6. Multi-account control via per-request HEADERS (the clean fix, 2026-06-07)
 
 THE KEY MECHANISM. The Railway MCP server (`src/main.ts`, the `/mcp` Streamable-HTTP
