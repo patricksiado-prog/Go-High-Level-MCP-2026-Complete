@@ -1,0 +1,41 @@
+name: Publish Installer Release
+
+on:
+  push:
+    paths:
+      - 'optimus/install/INSTALL_OPTIMUS.bat'
+      - '.github/workflows/make-installer-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish release with the installer attached
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: installer
+          name: Optimus Installer
+          body: |
+            # Optimus Fiber Tools — Installer
+
+            **Download `INSTALL_OPTIMUS.bat` below, then double-click it.**
+
+            It installs Python and everything needed, pulls the **Fiber Hunter**
+            and **Maps Scraper** straight from this GitHub repo, and puts two
+            icons on your Desktop. No Google Drive access required.
+
+            ## How to use
+            1. Click **INSTALL_OPTIMUS.bat** under *Assets* to download it.
+            2. Double-click the downloaded file. First run installs everything
+               (~5–10 min, one time); after that just double-click an icon.
+            3. **Fiber Hunter** — log into AT&T once, pan the map, press Enter.
+               **Maps Scraper** — type ZIP codes when asked (no login needed).
+
+            Everything auto-updates from GitHub on each launch.
+          files: optimus/install/INSTALL_OPTIMUS.bat
