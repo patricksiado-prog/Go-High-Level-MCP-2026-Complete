@@ -511,6 +511,28 @@
     (the token the Optimus box runs on) must have automation rights in the Frontline location; if
     not, create fails with a PERMISSION error (not INVALID_REFRESH_TOKEN) and Frontline needs its
     own valid token instead.
+  - **LIVE TEST 2026-06-25 (after header fix pushed) — two findings.** Created the starter draft
+    "AI — New Lead Intro (DRAFT)" (trigger `ai-test` tag → SMS → tag `ai-contacted`) in both via
+    the now-loaded connectors (`cmndconevtor`=Command/xZj500, `ghl-frontline-connector`=Frontline/
+    TXw28sw0):
+    1. **Frontline STILL `INVALID_REFRESH_TOKEN`.** The header fix is pushed to GitHub but the
+       LIVE Railway box that connector hits is still running OLD code / dead token. Tools listing
+       in the connector ≠ fix deployed. Frontline workflow-create stays blocked until the
+       fulfilling-growth/Optimus box is REDEPLOYED with the header-routing code AND the Frontline
+       connector points at that box (…711a…/mcp) with its TXw28sw0 location header.
+    2. **WORKFLOW-BUILDER TRIGGER BUG (affects BOTH accounts, not auth).** Command authenticated
+       fine and created the workflow + both actions (`ghl_update_workflow_actions` with actions
+       only = 200), but ANY call carrying a trigger 500s: `WORKFLOW_SAVE_FAILED / 5 NOT_FOUND: No
+       document to update: .../triggers/<id>`. Root cause in `workflow-builder-client.updateWorkflow`:
+       it puts the new trigger in `newTriggers` with a fresh `randomUUID()` id + `triggersChanged:
+       true`, but the GHL backend tries to UPDATE (firestore) that trigger doc instead of creating
+       it — there's a `createdSteps` array for new ACTIONS but no equivalent "created triggers"
+       signal, so triggers default to update→404. Actions have no such problem. WORKAROUND until
+       fixed: build the workflow + actions via the busybee, then add the trigger by hand in the GHL
+       UI (Workflow → Add Trigger → Contact Tag → the tag) — 5-second dropdown. REAL FIX (deferred):
+       capture the GHL UI's actual workflow-save payload from the browser network tab to see how it
+       signals a NEW trigger, then mirror that (likely a created-triggers list or a per-trigger
+       "isNew"/no-id-means-create convention) instead of the blind `newTriggers` PUT.
   - **ROBUST INSTALLERS (dodge the #1 Windows trap).** New `optimus/install/INSTALL_HUNTER.bat`
     and `INSTALL_SCRAPER.bat`: install Python from **python.org with PrependPath=1** (kills
     the Microsoft-Store "Python not found / App execution alias" trap that blocked the team),
