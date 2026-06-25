@@ -177,3 +177,29 @@ Reliable fallback for READS: the official GHL MCP connector (`https://services.l
 and pipelines. Has `conversations: send-a-new-message`, contacts create/update/upsert,
 opportunities update — enough for a basic sales agent, but only ~22 tools (no full automation
 set). One connector per URL (Claude de-dupes), so it can't cover both accounts at once.
+
+## 7. Writing AUTOMATIONS to BOTH sub-accounts — NO Railway changes needed (2026-06-07)
+
+Both Railway boxes are now permanently configured with their own account's fully-scoped token.
+Setup is done, so writing automations needs **no token swaps, no env edits, no redeploys** — you
+just call the matching connector. Both verified live (each `get_location` -> 200) with the full
+834 tools, including `ghl_create_workflow`.
+
+| Sub-account | Connector | Railway box | Location ID |
+|---|---|---|---|
+| Command = T-OPTIMUS (Optimus Fiber) | `cmndconevtor` | `…-711a.up.railway.app/mcp` | `xZj500PjsflIQg2j9f9D` |
+| Frontline = Frontline Direct (ATT Fiber Houston) | `ghl-frontline-connector` | `…-46d1.up.railway.app/mcp` | `TXw28sw0Z2rI6tcCDhJY` |
+
+To create an automation, call `ghl_create_workflow` on the matching connector:
+- `name` (required)
+- `trigger`: `{ type, name, data }` — types: `contact_tag` (data `{tagName, tagEvent}`),
+  `contact_created`, `form_submission`, `customer_reply`, `appointment`, `inbound_webhook`,
+  `payment_received`
+- `actions`: `[{ type, name, attributes }]` — types: `sms`, `email`, `add_contact_tag`, `wait`,
+  `if_else`, `webhook`, `create_opportunity`, `custom_code`
+- `publish`: `false` -> creates a DRAFT (nothing fires until published)
+
+Same call, twice — once per connector. Each box is bound to its own account's token + location,
+so it writes to the right sub-account automatically. (The server also supports per-request headers
+`x-ghl-access-token` + `x-ghl-location-id` for one-box-both-accounts; matched pair required —
+see Section 6.)
