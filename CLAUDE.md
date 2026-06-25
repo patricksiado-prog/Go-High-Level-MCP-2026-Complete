@@ -80,20 +80,22 @@
 - Rotate the exposed `pit-` token in GHL (was shown in screenshots/docs). Keep it in Railway
   env only. The public busybee URL has NO auth — URL = full account access. Keep it private.
 
-## 8. Operator context & account custody (added 2026-06-07)
-- **Command & Construct is Patrick's** account to run. **Frontline is a separate team's.**
-  Patrick will NOT take Frontline work done in the last few months — the recent Frontline leads,
-  form opt-ins, and CSV imports belong to that team. **Do not migrate, pull, or text Frontline's
-  recent work into or out of Command.** Treat the Frontline 45,579 / recent opt-ins as off-limits.
-- Patrick's legitimate audience = his **own** contacts (his prior data) plus anyone who opts in to
-  **his** outreach going forward. Recent bulk/CSV/AI-test writes (Wichita auto shops, jeweler/
-  realtor B2B scrape, call-tracking junk) are not consented opt-ins regardless of who loaded them.
-- **La Porte upload `5181c4eb-6.6.xlsx` (319 rows): SKIP-TRACED, not opt-in.** 184/319 carry a
-  DO NOT CALL flag; 135 are clean wireless / non-DNC; every row has at least one wireless line.
-  Route = DOOR-KNOCK + manual CALL on the clean non-DNC subset. **Never an SMS drip.**
-- Textable audience = **Patrick's own** opt-ins/customers (his prior relationship or people who
-  opt in to his own outreach) — from one registered number, throttled, opt-out intact. NOT
-  Frontline's recent form opt-ins (that team's work).
+## 8. Operator context & account ownership (corrected 2026-06-25)
+- **Patrick owns BOTH accounts — Command & Construct AND Frontline Direct.** The sales team
+  (Claire's crew, Zack, Chris, etc.) works for him. Both accounts, all their contacts, pipelines,
+  numbers, and data are **his to manage, export, migrate, or delete as he sees fit.** This
+  supersedes the prior "Frontline is a separate team / off-limits" note, which was wrong — there is
+  **no custody restriction** on either account. Do not tell Patrick he can't act on his own data.
+- The only remaining caveat is **not a permission gate, it's recipient-side law:** TCPA/DNC
+  consent attaches to the **person being contacted**, not to who owns the CRM. Owning the list and
+  the software is full authority to store, export, and dial/text — but DNC-flagged, landline, and
+  never-consented numbers still carry per-contact liability if hit by an **autodialer or SMS
+  blast**. Route those to **manual call / door-knock** (a human dialing, not auto), which is always
+  fine. Consented/opted-in/inbound numbers can go to automated drips. This protects the AT&T
+  dealership, not Patrick's rights to his own accounts.
+- **La Porte upload `5181c4eb-6.6.xlsx` (319 rows): SKIP-TRACED.** 184/319 carry a DO NOT CALL
+  flag; 135 are clean wireless / non-DNC; every row has ≥1 wireless line. Clean non-DNC subset →
+  fine to dial/door. DNC subset → manual call/door, not autodialer/SMS blast.
 
 ## 9. AT&T fiber SMS templates (consent-based)
 Source: Patrick's "GHL SMS Outreach Templates" doc
