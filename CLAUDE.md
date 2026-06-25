@@ -445,6 +445,19 @@
     `mcp__40b566b8…`, `mcp__cmndconevtor…`; Frontline as `mcp__6cf38bf0…`,
     `mcp__ghl-frontline-connector…`. Verify which is which by a read (Command = loc
     `xZj500…`, Frontline = `TXw28sw0…`) before writing. They also drop/reconnect mid-session.
+  - **BUSYBEE RAILWAY URLs (record these — the Frontline one was missing the whole time
+    and caused a multi-hour wild-goose chase 2026-06-25).** Two SEPARATE Railway deploys,
+    each pinned to one location, DIFFERENT URLs:
+    - **Optimus/Command** (Railway project `fulfilling-growth`): `https://go-high-level-mcp-2026-complete-production-711a.up.railway.app/mcp`
+    - **Frontline** (Railway project `loving-heart`): `https://go-high-level-mcp-2026-complete-production-46d1.up.railway.app/mcp`
+    The Claude **Frontline connector MUST point at the `46d1` URL** (loving-heart). If it's
+    pointed at `711a` or an old box, contacts/reads still work (per-request header override)
+    but **workflow creation fails with `INVALID_REFRESH_TOKEN`** — that exact symptom = wrong
+    URL, not bad creds. Both deploys share IDENTICAL `GHL_FIREBASE_API_KEY`
+    (`AIzaSyB_w3vXmsI7WeQtrIOkjR6xTRVN5uOieiE`) + `GHL_FIREBASE_REFRESH_TOKEN`
+    (`AMf-vBx2m4c2P_iAMQLsa…`, Patrick's login — verified matching); only `GHL_LOCATION_ID`
+    + `GHL_API_KEY` differ. Connectors load at SESSION START, so after fixing the connector
+    URL, open a FRESH chat for it to take effect.
   - **ROBUST INSTALLERS (dodge the #1 Windows trap).** New `optimus/install/INSTALL_HUNTER.bat`
     and `INSTALL_SCRAPER.bat`: install Python from **python.org with PrependPath=1** (kills
     the Microsoft-Store "Python not found / App execution alias" trap that blocked the team),
