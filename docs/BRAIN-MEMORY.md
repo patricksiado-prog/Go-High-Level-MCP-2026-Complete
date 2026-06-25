@@ -102,3 +102,63 @@ For the Railway busybees specifically, hit `GET /readyz` on each service URL —
 3. Re-run the health check on the Command connector -> expect `get_location` 200 + count.
 4. Diagnose the Frontline busybee 401 so SEND works again (regenerate Frontline PIT).
 5. Build/send the consented outreach — opt-ins + inbound + open opps, scrubbed.
+
+## 6. Multi-account control via per-request HEADERS (the clean fix, 2026-06-07)
+
+THE KEY MECHANISM. The Railway MCP server (`src/main.ts`, the `/mcp` Streamable-HTTP
+handler) accepts **per-request credential headers** that OVERRIDE the baked-in env token
+and location:
+
+- `x-ghl-access-token` — the GHL Private Integration Token to use for this request
+- `x-ghl-location-id`  — the location (sub-account) to act on
+
+CORS already allows both headers. Logic: if BOTH headers are present, the server builds a
+client from them; if absent, it falls back to env `GHL_API_KEY` / `GHL_LOCATION_ID`.
+
+```js
+const reqAccessToken = req.headers['x-ghl-access-token'];
+const reqLocationId  = req.headers['x-ghl-location-id'];
+const client = reqAccessToken && reqLocationId
+  ? new EnhancedGHLClient({ ...config, accessToken: reqAccessToken, locationId: reqLocationId })
+  : ghlClient; // env fallback
+```
+
+IMPLICATION: **ONE Railway box serves BOTH accounts.** Each connector hits the same `/mcp`
+URL but sends its OWN token+location headers. The env token no longer has to match the
+target account — the headers decide. This is the fix that was remembered as "connect each
+one with different headers."
+
+Exact header pairs (token + location MUST be a matched pair from the SAME sub-account):
+
+- Command:
+  - `x-ghl-access-token: pit-896044c7-5384-4abf-965b-2721598706b2`  (token "883", all 146 scopes, created 2026-06-07)
+  - `x-ghl-location-id:  xZj500PjsflIQg2j9f9D`
+- Frontline / Optimus Houston:
+  - `x-ghl-access-token: <a Frontline PIT generated inside TXw28sw0Z2rI6tcCDhJY>`
+  - `x-ghl-location-id:  TXw28sw0Z2rI6tcCDhJY`
+
+RULE that fixes the **"403 token does not have access to this location"**: the
+`x-ghl-access-token` and `x-ghl-location-id` MUST belong to the SAME sub-account. That 403
+= a crossed pair (token from account A used with account B's location). Do not mix
+`xZj500…` and `TXw28…`.
+
+Account IDs (ground truth):
+- Command sub-account:           `xZj500PjsflIQg2j9f9D`
+- Frontline / Optimus Houston:   `TXw28sw0Z2rI6tcCDhJY` ("Frontline Direct", ATT Fiber Houston)
+  (NOTE: "Optimus Houston" = Frontline = TXw28…; it is NOT Command. Don't put a Frontline
+  token in the Command box.)
+
+Railway boxes (both deploy from `main`, run `npm start` = `node dist/main.js`, serve `/mcp`):
+- Command box:   `https://go-high-level-mcp-2026-complete-production-711a.up.railway.app/mcp`
+- Frontline box: `https://go-high-level-mcp-2026-complete-production-46d1.up.railway.app/mcp`
+
+Caveat: sending these headers requires an MCP client that supports custom headers (the
+connector's Advanced/Headers config — NOT OAuth). Claude's basic custom-connector dialog
+shows only URL + OAuth Client ID/Secret; set the headers wherever the connector config
+allows them.
+
+Reliable fallback for READS: the official GHL MCP connector (`https://services.leadconnectorhq.com/mcp/`,
+22 tools, OAuth login, one location per connector) — verified live returning Frontline data
+and pipelines. Has `conversations: send-a-new-message`, contacts create/update/upsert,
+opportunities update — enough for a basic sales agent, but only ~22 tools (no full automation
+set). One connector per URL (Claude de-dupes), so it can't cover both accounts at once.
