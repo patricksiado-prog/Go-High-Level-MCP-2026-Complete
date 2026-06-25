@@ -224,6 +224,20 @@ up to **$800 Visa**; tiered device offers $0–$99.99/mo; Next Up daily upgrade 
   Connectors load **at session start** → open a fresh chat after adding/swapping. Each connector
   is pinned to ONE account; pick the right one for the account you mean to touch.
 
+**How to talk to each one (connector routing):** each busybee is a separate MCP connector,
+hard-wired to ONE account — you don't pass a `locationId`, you **pick the connector**, and that
+chooses the account. Like two walkie-talkie channels: same voice, different account.
+- **Command** → connector **`cmndconevtor`** (tools `mcp__cmndconevtor__*`) → account `xZj500PjsflIQg2j9f9D`.
+- **Frontline** → connector **`ghl-frontline-connector`** (tools `mcp__ghl-frontline-connector__*`) → account `TXw28sw0Z2rI6tcCDhJY`.
+- Send the **same** request down each connector and each answers for **its own** account
+  (e.g. `get_pipelines` → Command returns 2 pipelines, Frontline returns 3 incl. Recruiting).
+- **Match the connector to the account you mean** — a "Command" action sent on the Frontline
+  connector lands in the wrong account. When unsure which is which, call `get_pipelines` and check
+  the returned `locationId` (xZj…=Command, TXw…=Frontline). Connector display names can change when
+  re-added, so verify by locationId, not by the name.
+- Don't confuse these with: **`ghl_connect`** = GHL's official read-heavy connector (Frontline),
+  and **`apibusybee`** = the unrelated BusyBee tasks/productivity app (not GHL at all).
+
 **What works via the busybee (834 tools):**
 - **Reads:** pipelines, contacts (`search_contacts` by name/phone/email), phone numbers
   (`list_active_numbers_by_location`), conversations (`get_conversation`), opportunities.
