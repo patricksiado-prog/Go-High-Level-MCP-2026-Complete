@@ -103,6 +103,21 @@ For the Railway busybees specifically, hit `GET /readyz` on each service URL —
 4. Diagnose the Frontline busybee 401 so SEND works again (regenerate Frontline PIT).
 5. Build/send the consented outreach — opt-ins + inbound + open opps, scrubbed.
 
+## 5b. CONFIRMED WORKING — Command connector live (2026-06-07 ~07:25)
+
+Command Railway box (`…711a…/mcp`, connector `cmndconevtor`) + new token `pit-896044c7-5384-4abf-965b-2721598706b2`
+(all 146 scopes) → tested live:
+- `get_location(xZj500PjsflIQg2j9f9D)` -> 200, name **"T-OPTIMUS"** (Optimus Fiber, optimus-fiber.com, Houston TX)
+- `search_contacts(limit 1)` -> 200, **total 13,173 contacts**
+Full 834-tool control is live on Command. The fix was a freshly-created, fully-scoped token.
+
+### NAMING CORRECTION (this caused the whole 403 saga — pin it)
+- **Command** = **"T-OPTIMUS"** (Optimus Fiber) = `xZj500PjsflIQg2j9f9D`
+- **Frontline** = **"Frontline Direct"** (ATT Fiber Houston) = `TXw28sw0Z2rI6tcCDhJY`
+- The name **"Optimus" belongs to COMMAND (`xZj500…`), NOT Frontline.** A prior agent advised
+  putting a `TXw28…` ("Optimus Houston") token in the Command box — that is BACKWARDS and would
+  point Command at Frontline. Command's token must be made inside `xZj500…` (T-OPTIMUS).
+
 ## 6. Multi-account control via per-request HEADERS (the clean fix, 2026-06-07)
 
 THE KEY MECHANISM. The Railway MCP server (`src/main.ts`, the `/mcp` Streamable-HTTP
