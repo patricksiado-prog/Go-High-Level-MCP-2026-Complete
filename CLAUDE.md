@@ -88,20 +88,24 @@
 - Rotate the exposed `pit-` token in GHL (was shown in screenshots/docs). Keep it in Railway
   env only. The public busybee URL has NO auth — URL = full account access. Keep it private.
 
-## 8. Operator context & account custody (added 2026-06-07)
-- **Command & Construct is Patrick's** account to run. **Frontline is a separate team's.**
-  Patrick will NOT take Frontline work done in the last few months — the recent Frontline leads,
-  form opt-ins, and CSV imports belong to that team. **Do not migrate, pull, or text Frontline's
-  recent work into or out of Command.** Treat the Frontline 45,579 / recent opt-ins as off-limits.
-- Patrick's legitimate audience = his **own** contacts (his prior data) plus anyone who opts in to
-  **his** outreach going forward. Recent bulk/CSV/AI-test writes (Wichita auto shops, jeweler/
-  realtor B2B scrape, call-tracking junk) are not consented opt-ins regardless of who loaded them.
+## 8. Operator context & accounts (updated 2026-06-13)
+- **Both accounts are Patrick's.** Command & Construct AND Frontline Direct are his own
+  company / sales teams — he has full authority over both and may move, work, export, or erase
+  data in either. (This SUPERSEDES the earlier "Frontline is a separate team's / off-limits"
+  note from 2026-06-07, which was an error.)
+- Leads can move **between** Command and Frontline (e.g. export Frontline's 45,579 fiber leads
+  into Command, or run the dialer on either), preserving DND/DNC/invalid flags; work the
+  consented subset first.
+- **Compliance still applies to ALL of it regardless of ownership — owning a list ≠ consent.**
+  Cold / non-consented / DNC / skip-traced contacts route to **door-knock + DNC-scrubbed calls**,
+  never a cold SMS blast (TCPA $500–$1,500 per text). SMS only to consented/opted-in/inbound.
+- Recent bulk/CSV/AI-test writes (Wichita auto shops, jeweler/realtor B2B scrape, call-tracking
+  junk) are **not** consented opt-ins regardless of who loaded them — door/call, not SMS.
 - **La Porte upload `5181c4eb-6.6.xlsx` (319 rows): SKIP-TRACED, not opt-in.** 184/319 carry a
   DO NOT CALL flag; 135 are clean wireless / non-DNC; every row has at least one wireless line.
   Route = DOOR-KNOCK + manual CALL on the clean non-DNC subset. **Never an SMS drip.**
-- Textable audience = **Patrick's own** opt-ins/customers (his prior relationship or people who
-  opt in to his own outreach) — from one registered number, throttled, opt-out intact. NOT
-  Frontline's recent form opt-ins (that team's work).
+- Textable audience = consented/opted-in/inbound contacts on **either** account — from one
+  registered number, throttled, opt-out intact.
 
 ## 9. AT&T fiber SMS templates (consent-based)
 Source: Patrick's "GHL SMS Outreach Templates" doc

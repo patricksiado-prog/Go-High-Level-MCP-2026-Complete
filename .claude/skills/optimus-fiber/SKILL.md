@@ -43,7 +43,9 @@ be broken, and how to leave the repo so the next session can pick up cleanly.
   registered number, throttled, opt-out intact. No sender rotation/snowshoeing.
 - Calling = **power dialer with a human on every call**. No predictive
   auto-blast, no recorded calls to skip-traced numbers.
-- Don't migrate or text Frontline's recent work into/out of Command.
+- Command and Frontline are BOTH Patrick's accounts — data may move between them
+  freely. Consent/TCPA still applies to all of it (owning a list ≠ consent):
+  cold/non-consented/DNC/skip-traced = door/call, never a cold text.
 
 ## Working style on this repo (do this every time)
 - **Pure logic is unit-tested in the container; Playwright/live-GHL runs on the
