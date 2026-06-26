@@ -3,45 +3,45 @@
 Operator: Patrick William Siado (AT&T Fiber dealer). This repo IS the "busybee" —
 the GoHighLevel MCP Server (834 tools) deployed on Railway.
 
-## Connection status (verified 2026-06-06)
+## Connection status (Frontline verified 2026-06-06; Command verified live 2026-06-26)
 
 ### Frontline Direct — ✅ WORKING
 - Location ID: `TXw28sw0Z2rI6tcCDhJY`
 - Company ID: `pPN38xtDcG1oUzlklvvv`
 - Website: ATTFIBERHOUSTON.COM
-- Confirmed live: `get-location` → 200; `search_contacts` → 45,579 contacts; test SMS delivered.
+- Confirmed live: `get-location` → 200; `search_contacts` → 45,579 contacts (2026-06-06),
+  grown to **50,191** contacts (re-verified 2026-06-26); test SMS delivered.
 - Reachable via the GHL connectors wired into the session (official GHL + Frontline busybee).
 - Read AND write both confirmed.
 
-### Command & Construct — 🟡 CONNECTED, BUT TOKEN SCOPE BROKEN (token fix needed)
-- Location ID: `xZj500PjsfllQq2j9i9D` (confirm spelling against GHL)
+### Command & Construct ("Connect & Comm" / Optimus) — ✅ WORKING (verified live 2026-06-26)
+- **Location ID: `xZj500PjsflIQg2j9f9D`** ← capital-`I`, `g`, `f`. This is the REAL id
+  (matches the Drive doc "COMMAND - GHL credentials"). The earlier `xZj500PjsfllQq2j9i9D`
+  in this brain was a MIS-TRANSCRIPTION (confusable chars `I`↔`l`, `g`↔`q`, `f`↔`i`) and
+  always 401/403'd. Confirmed correct because the live read returns this id verbatim.
 - Busybee deployed on Railway (project `fulfilling-growth` / production), service Online.
 - Public domain: `go-high-level-mcp-2026-complete-production-711a.up.railway.app`
 - MCP endpoint: `/mcp` (Streamable HTTP; `/sse` legacy). Default start = `node dist/main.js`.
-- 2026-06-06: custom connector named `command` added in Claude and HANDSHOOK successfully
-  — 444 tools loaded. Transport/connection CONFIRMED.
-- 2026-06-06 LIVE READ RESULT: the confirmation read was run via the `command` connector.
-  `search_contacts` returned **`403 — The token does not have access to this location`**,
-  both when targeting `xZj500PjsfllQq2j9i9D` and with no location filter at all. So the
-  connection is fine; the `pit-` token configured in Command's Railway service is NOT
-  authorized for the Command sub-account (or any location). This is the "fix token scopes"
-  branch, not a connection problem.
-- FIX (do alongside the required rotation): in GHL **inside the Command & Construct
-  sub-account** (not agency, not Frontline) → Settings → Private Integrations → create a
-  fresh `pit-` token with at least `contacts.readonly` (add write scopes as needed) →
-  update `GHL_API_KEY`/token env var in Command's Railway service → redeploy → re-run the
-  test line below. A number back = Command is fully live.
-- TEST LINE (run in a NEW session where `command` is loaded): "use the command connector,
-  read location `xZj500PjsfllQq2j9i9D` and give the contact count."
-- Connectors load at SESSION START only: `command` will NOT appear in a chat where it was
-  added mid-session — open a fresh chat to use it.
-- This sandbox blocks direct `railway.app` egress ("Host not in allowlist"), so Command is
-  reachable only via the wired `command` MCP connector, not curl.
+- 2026-06-26 LIVE READ RESULT: `cmndconevtor` (Command busybee) `search_contacts` → 200,
+  **`total: 16,574` contacts**, locationId `xZj500PjsflIQg2j9f9D`. Read CONFIRMED.
+- History: 2026-06-06 → 2026-06-26 this returned 401/403 ("token does not have access to
+  this location") on every tool. Root cause was the token↔location pair in Command's
+  Railway env. Fixed by setting the correct token + correct location id and redeploying.
+  Lesson: "Online" on Railway and "99+ tools" on the connector both mean CONNECTED, not
+  AUTHORIZED — only a live read returning data proves it works.
+- Token resolution (src/main.ts:92-98): request headers `x-ghl-access-token` +
+  `x-ghl-location-id` (BOTH together) override; else Railway env `GHL_API_KEY` +
+  `GHL_LOCATION_ID`. The server does NOT read `Authorization: Bearer` for GHL auth.
+- TEST LINE: "use the command connector, search_contacts and give the contact count."
+  A number back (16,574-ish) = live. 401/403 = token/location pair broke again.
+- Connectors load at SESSION START only: a connector added mid-session won't appear until
+  a fresh chat.
 
-### Connector name map (per Claude session)
-- `command` = Command busybee (Railway, location `xZj500PjsfllQq2j9i9D`)
-- `ghl-full` = Frontline busybee (Railway, location `TXw28sw0Z2rI6tcCDhJY`)
-- `GH;` = official GHL MCP (`services.leadconnectorhq.com/mcp`, Frontline)
+### Connector name map (per Claude session — names rotate; current 2026-06-26)
+- `cmndconevtor` (aka `command`) = Command/Optimus busybee (Railway, loc `xZj500PjsflIQg2j9f9D`) ✅
+- `ghl-frontline-connector` (aka `ghl-full`) = Frontline busybee (Railway, loc `TXw28sw0Z2rI6tcCDhJY`) ✅
+- `ghl_connect` (aka `GH;`) = official GHL MCP (`services.leadconnectorhq.com/mcp`, Frontline) ✅
+- NOTE: `apibusybee` is a DIFFERENT product (BusyBee task/project manager) — NOT a GHL busybee.
 
 ## Important notes
 - Connectors are per-session. A connector added mid-session does not appear until a new chat.
