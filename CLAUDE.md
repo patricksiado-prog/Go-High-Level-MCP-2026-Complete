@@ -637,3 +637,97 @@ Team/ops (structure only — payroll figures, full roster, and WhatsApp threads 
 Claire's crew works leads (e.g. Mr. Kassow); split into closers + setters; payroll ≈ closer
 commission sheet × setter chat activity; tooling includes Sales Mate. Keep PII/financials in a
 private doc, not this repo.
+
+## 11. HOW THE PROGRAMS ARE BUILT (architecture) + SESSION 2026-06-25 LOG
+
+### 11a. How the two programs work (the whole pipeline in plain terms)
+The Optimus toolkit was written by Claude across sessions; it lives in `optimus/`. The loop:
+**Hunter captures fiber dots + Scraper captures businesses (SAME ZIP) → cross-match → "Fiber
+Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (round-robin 5 reps).**
+
+- **precise_fiber_hunter.py (the Fiber Hunter).** Playwright drives the AT&T dealer map
+  (`youachieve.att.com/yourefer/fiber`) in a saved-login Chromium profile (`att_profile/`,
+  logged in once via `--login`). It does NOT read the map object (fully hidden — no
+  mapboxgl global); instead **`NetCapture` (`page.on("response")`) grabs AT&T's `serviceability`
+  JSON off the wire** and decodes it with `optimus_api_capture.extract_features` (address/lat/
+  lng/status; address must match `\d+\s+\S+`); it also decodes non-basemap Mapbox vector tiles.
+  Manual run: position the map, press Enter → **`sweep_backend()` drags the map canvas cell-to-
+  cell** across a grid (`mouse_drag()` = the proven motion; arrow-keys/panBy do nothing on this
+  site; the canvas can be in a frame, so `_map_canvas_box` searches page+frames and falls back
+  to dragging the viewport region). Each cell triggers the serviceability fetch → captures
+  GREEN (lead) + GOLD (copper upgrade) addresses → writes the **"Precise Fiber"** tab (Address,
+  Dot Color, Captured At, Business, Phone); GREY (existing customer) is skipped. Batched
+  `append_rows` (chunk 500) to dodge the Sheets 429 quota. Heartbeats → **"Hunter Status"** tab.
+  `self_update()` is the first line of `main()` (git pull + re-exec once; guard `OPTIMUS_NO_UPDATE=1`).
+- **THE IN-HUNTER CROSS-MATCH (the money step).** As the hunter captures each GREEN/GOLD
+  address it matches it against the scraped businesses, loaded once into an in-memory dict keyed
+  by normalized address (`_norm_addr` = HOUSE|STREET-CORE; strips unit/city/zip, standardizes the
+  suffix). Hits write live to **"Fiber Green Biz"** (green dot + biz) / **"Upgrade Orange Biz"**
+  (gold). Hooks: `init_bizmatch(ws)` (once in main), `match_leads_to_biz(new)` (per flush),
+  `_backlog_match()` (one-time pass at startup over `precise_addresses.jsonl` so dots captured
+  BEFORE the scraper ran still match). Match = O(1) dict lookup. **KEY CONSEQUENCE: the match
+  runs at hunter STARTUP — so scrape a ZIP first, THEN (re)start the hunter to convert the dots.**
+- **maps_scraper_standalone.py (the Maps Scraper).** Standalone Playwright Google-Maps scraper
+  (reads Google's hidden JSON list feed). Prompts for ZIPs, embedded category sets
+  (Light ~20 / Heavy ~47 / Deep ~155), **headless by default** (`headless=not SCRAPER_SHOW`),
+  writes the **"Maps Businesses"** tab (or CSV if no Google key). VERSION-stamped, self-updates
+  from GitHub raw. Deep mode is slow (155 categories/ZIP) — that's why it can sit on one ZIP for
+  hours; use Heavy for speed.
+- **Supporting scripts (all in `optimus/`):** `optimus_api_capture.py` (`extract_features`, the
+  serviceability JSON reader) · `optimus_dot_detect.py` (pixel dot-colour RGB windows) ·
+  `enrich_phones.py` (OSM→Google-Places phone lookup → "Enriched Leads") · `business_score.py`
+  (rank/score, drops no-phone/customer) · `ghl_loader.py` (→ GHL contacts + AT&T Commercial opps
+  + power-dialer workflow) · `dialer_loader.py` (reads the green-biz tabs → ghl_loader, round-
+  robins owners, `--reassign`) · `commercial_split.py` (commercial vs residential) ·
+  `fiber_zone_scanner.py` / `fiber_precise_pipeline.py` (headless ZIP scanners) · `optimus_targets.py`.
+
+### 11b. Distribution (how the team installs — built/finalized this session)
+- **`optimus/install/INSTALL_OPTIMUS.bat`** = ONE installer for BOTH programs: installs Python
+  from python.org (PrependPath=1, dodges the Microsoft-Store "python not found" trap), pulls the
+  Hunter (repo zip) + Scraper (raw .py) from the **public** GitHub repo, installs deps + chromium
+  + the Google service-account key (public Drive link, so NO Drive access needed), and creates the
+  **two Desktop icons** (Optimus Fiber Hunter + Optimus Maps Scraper). All 12 python scripts ship
+  inside `optimus_hunter`. Re-run to refresh; programs also self-update each launch.
+- **Click-to-download release link (built this session via a GitHub Action).** Pure GitHub raw
+  `.bat` links open as text in a browser (annoying), and the GitHub MCP has no create-release
+  tool — so I committed `.github/workflows/make-installer-release.yml` (uses
+  `softprops/action-gh-release`) which, on push, publishes/updates the **"installer" release** with
+  `INSTALL_OPTIMUS.bat` attached as a real downloadable asset. Verified live (HTTP 200,
+  application/octet-stream). Permanent team link:
+  `https://github.com/patricksiado-prog/Go-High-Level-MCP-2026-Complete/releases/download/installer/INSTALL_OPTIMUS.bat`
+  (release page: `.../releases/tag/installer`). The Action re-publishes the same link whenever the
+  installer changes, so the link never goes stale.
+- Drive copies of the install instructions: Google Doc "Optimus Fiber Tools — Install (Link +
+  Instructions)" (id `1KAb8SftkL3zD42iO68MV8Ulc4DnVTZ4Q_omfMdccCFg`) and the full operating guide
+  "Optimus Fiber Pipeline — Handoff & Operating Guide" (id `1rqnrNS8h2mk6O31NLbN9Z-G0VhAzmQJR01OMHZaKEzo`).
+
+### 11c. How to ANALYZE the data (the method used this session)
+- Read the leads sheet (`1FhO2BTMXGefm1tLwKbbMPXvzT1160882Auauzep7ooA`, "ATT FIBER LEADS") via
+  Drive `download_file_content` with `exportMimeType: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+  → save base64 → parse with python/openpyxl (too big to read inline; CSV export only returns the
+  FIRST tab, so use xlsx for all tabs).
+- **Real match count = dedupe "Fiber Green Biz" by the LAST 10 DIGITS OF PHONE.** That tab has
+  thousands of duplicate rows (the hunter re-writes each match every sweep); raw row count ≠ leads.
+- **Where to scrape next:** hunter dot addresses are STREET-ONLY (no ZIP), so group GREEN dots by
+  street name to find dense clusters; group "Maps Businesses" by ZIP (their addresses carry ZIPs)
+  to see scraper coverage. GAP = many dots + few scraped = best target. Confirmed top gap =
+  **77046 Greenway (~1,500 dots, only ~12 scraped)**, then 77024 / 77092 / 77098.
+- Hunter health from "Hunter Status": `"continuous: N cells, 0 leads"` = parked in a built-out
+  all-grey area (move it); high lead counts = fresh fiber (good).
+
+### 11d. This session's actions / state
+- **Loaded green-biz matches into the Command dialer via MCP** (upsert_contact + assignedTo
+  round-robin across the 5 reps + add_contact_to_workflow `41e00387` + pitch note): +16 then +77,
+  bringing the loaded pool to ~215. Round-robin reps: `jBmInXreGR2oskVXax0h`/`lQ7gVrSONTWMAv4ZsEdO`/
+  `7c9QLWsTDyTALTMj0ast`/`J3PkeoYp8TNXMNNcaN4l`/`qOa2OVzPabolfU9xjVXM`.
+- **Match count:** 138 → 215 → **217 unique** (last confirmed). Almost all came from re-scraping
+  **77027** (deep, 477 → ~1,030 businesses). Dots grew to **76k+** but matches stay flat until the
+  scraper covers a NEW dot-rich ZIP — the scraper was **stalled** (Maps Businesses frozen ~3,624).
+- **DIALER MISTAKE + RULE (important).** Another chat mistakenly loaded ~**1,328 raw scraped
+  businesses from the "Maps Businesses" tab** (which contains NON-Houston data — OKC 405/580 ZIP
+  73102, New Orleans 504 ZIP 70112/70114) into the Command power dialer. That chat reversed it via
+  `remove_contact_from_workflow` (it kept its enrolled-id "fb_rem" files). **HARD RULE: load the
+  dialer ONLY from "Fiber Green Biz" (fiber-matched leads), NEVER from "Maps Businesses" (raw
+  scrape, includes other cities).** The scraper's non-Houston rows should be cleaned out of that tab.
+- **Drive MCP gets "session expired" on a long chat** (token goes stale and won't refresh) — when
+  the sheet read keeps failing, the fix is a FRESH chat, not retrying. The GHL connector stays fine.
