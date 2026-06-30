@@ -52,9 +52,11 @@
   clients stripped all arguments (writes 400, reads OK). Fixed on `main` (`1f9aaf0` + `422bd07`
   moves typescript to deps so Railway compiles). Redeploy `main` → writes/sends work. Verified by
   sending live SMS from Command (+13466840331) and Frontline.
-- Workflow read/toggle via busybee needs `GHL_FIREBASE_API_KEY` + `GHL_FIREBASE_REFRESH_TOKEN`
-  (or `GHL_REFRESH_TOKEN`) in Railway env — not set yet, so workflow on/off must be done in the
-  GHL UI for now.
+- Workflow read/create/clone/toggle via busybee needs `GHL_FIREBASE_API_KEY` +
+  `GHL_FIREBASE_REFRESH_TOKEN` (or `GHL_REFRESH_TOKEN`) in Railway env. **Update 2026-06-30:
+  Command's creds are set → workflow builder WORKS** (read/build/clone/toggle automations live).
+  **Frontline's Firebase refresh token is EXPIRED** (`INVALID_REFRESH_TOKEN`) → automations fail
+  there until it's renewed + redeployed (Frontline `pit-`/reads/SMS are unaffected).
 
 ## 2. Migration status (Frontline → Command)
 - **Config/pipelines: moved via snapshot.** Command now has pipeline **"AT&T Leads"**
@@ -67,13 +69,13 @@
 - The 45,579 fiber leads remain in **Frontline**. To use them from Command they must be
   **exported and imported** with DND/DNC/invalid flags preserved (consented subset first).
 
-## 3. Phone / SMS setups (verified 2026-06-07)
-- **Command** — 3 SMS-capable US local numbers, account `active`, default **+13466840331**
-  ("Patrick's number"); also +13466840217, +13613219339.
-- **Frontline** — 21 SMS-capable numbers (TX/AL/AZ/OK/LA/MS) + Voice-AI inbound on several,
-  default **+15043996804** ("New Orleans").
-- **A2P 10DLC unconfirmed on both** (`bundleSid: null`). Capability ≠ registration — verify the
-  Trust Center shows **Approved** before any volume, or US carriers will filter outbound.
+## 3. Phone / SMS setups (updated 2026-06-30)
+- **Command** — **6** SMS-capable US local numbers, account `active`, default **+13466840331**
+  ("Patrick's number"); also +13467886943, +13465212885, +13466840217, +13465982878, +12819035606.
+- **Frontline** — **22** SMS-capable numbers (TX/AL/AZ/OK/LA/MS) + Voice-AI inbound on several;
+  default now **+12283385872** ("Espeedy Biloxi"); includes Zack's 4 numbers.
+- **A2P 10DLC: Patrick confirms registered / Approved on both.** Per-number `bundleSid` still reads
+  `null`, but that's an LC Phone reseller quirk — trust the Trust Center, not the field.
 
 ## 4. Lead intelligence (Frontline)
 - 45,579 contacts. Main pipeline `ve4ERf2YoKvuUVQEZb85` (early stage `378c10e3…`, form opt-in
@@ -248,10 +250,10 @@ chooses the account. Like two walkie-talkie channels: same voice, different acco
   (redeploy / reload — see §1 inputSchema fix).
 
 **What does NOT work via the busybee (use the GHL UI, or add creds):**
-- **Workflows** (read/create/clone/toggle): needs `GHL_FIREBASE_API_KEY` +
-  `GHL_FIREBASE_REFRESH_TOKEN` (or `GHL_REFRESH_TOKEN`) in Railway env — currently unset, so
-  these 404 / "workflow builder not initialized." Toggle/build workflows in the GHL UI until
-  those env vars are added + redeployed.
+- **Workflows** (read/create/clone/toggle) — needs `GHL_FIREBASE_API_KEY` +
+  `GHL_FIREBASE_REFRESH_TOKEN` (or `GHL_REFRESH_TOKEN`). **2026-06-30: Command WORKS** (creds set —
+  read/build/clone/toggle automations via busybee). **Frontline DOWN** — Firebase refresh token
+  expired (`INVALID_REFRESH_TOKEN`); renew it + redeploy to enable. Reads/contacts/SMS fine on both.
 - **Smart-list create** (`POST /contacts/smart-lists`) → 404. Build smart lists in the UI.
 - **Bulk tag** (`POST /contacts/tags/bulk`) → 404. Tag per-contact with `add_contact_tags`,
   or bulk in the UI / via CSV re-import.
