@@ -42,8 +42,9 @@ import argparse
 # Reuse the proven driver + detector from the hunter (importing is safe: the
 # hunter guards its CLI behind `if __name__ == "__main__"`).
 from precise_fiber_hunter import (
-    self_update, PROFILE_DIR, MAP_URL, VIEWPORT,
+    self_update, PROFILE_DIR, MAP_URL, VIEWPORT, SEARCH_SETTLE,
     open_map_view, on_map, mouse_drag, zoom, find_map_dots, open_sheet, NetCapture,
+    search_this_area,
 )
 from optimus_dot_detect import zone_freshness, FRESH_MIN_ELIGIBLE
 
@@ -186,6 +187,12 @@ def main():
         while True:
             idx += 1
             try:
+                # press "Search this area" so the new view's dots actually load
+                # (the map doesn't refresh dots on a pan until this is clicked),
+                # then let them settle -- exactly like the hunter does each cell.
+                if on_map(page):
+                    search_this_area(page)
+                time.sleep(SEARCH_SETTLE)
                 green, gold, gray, gray_share, label = scan_cell(page)
             except Exception as e:
                 if any(k in str(e).lower() for k in ("closed", "crash", "target")):
