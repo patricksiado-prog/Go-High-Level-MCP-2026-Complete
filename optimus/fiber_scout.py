@@ -6,41 +6,38 @@ WHAT IT DOES
   Scans the AT&T dealer fiber map and flags JUST-LIT areas: viewports with lots
   of GREEN (eligible non-customers) + GOLD (copper-upgrade) dots and little/NO
   GREY (existing fiber customers). Grey share is the freshness signal -- a
-  brand-new fiber zone has ~no grey yet (nobody's a customer there). As a zone
-  ages, grey climbs. So:
+  brand-new fiber zone has ~no grey yet. Higher grey = older/worked area.
        no/low grey + plenty of green+gold  ->  FRESH  (new fiber, go here)
        some grey                            ->  WORKING
        high grey share                      ->  MATURE (worked out, skip)
 
-  It KEEPS MOVING continuously (serpentine pan, just like the hunter) until you
-  close the window -- it does not stop after a fixed grid.
+  It KEEPS MOVING continuously (serpentine pan + 'Search this area' each cell,
+  exactly like the hunter) until you close the window.
 
-  It also CAPTURES THE BACKEND (the F12 / network traffic) once it's panned a
-  few times, and writes it to a "Backend Capture" tab so Claude can analyse the
-  dot endpoint + fields remotely. No separate program to install.
+  It also CAPTURES THE BACKEND (the F12 / network traffic) and writes it where
+  Claude can read it -- the Google Sheet AND GitHub (so it works even when Drive
+  is flaky). Nothing extra to install.
 
-OUTPUT (all readable on Drive -- no screenshots needed)
-  - "Fiber Scout" tab : one row per cell with dots (green/gold/grey + verdict)
-  - "Backend Capture" tab : the dot endpoint(s), tile fields, parsed addresses
+OUTPUT (all Claude-readable)
+  - Sheet tab "Fiber Scout"     : per-cell freshness (green/gold/grey + verdict)
+  - Sheet tab "Backend Capture" : dot endpoints, tile fields, parsed addresses
+  - GitHub optimus/_live/backend_capture.txt + scout_findings.txt (if a
+    github_token.txt is present -- reliable read channel)
   - local: a screenshot of each FRESH/WORKING cell in ./fresh_zones/
 
 USAGE
-  python fiber_scout.py                 # position the map, press Enter, surveys until you close it
+  python fiber_scout.py                 # position map, press Enter, surveys until you close it
   python fiber_scout.py --cols 6        # wider serpentine strip
-  python fiber_scout.py --survey-out 3  # zoom OUT 3x first so each view covers more ground
-  python fiber_scout.py --auto          # no 'press Enter' pause
-
-Reuses the hunter's proven browser/map driver + the canonical colour detector.
+  python fiber_scout.py --survey-out 3  # zoom OUT first so each view covers more ground
 """
 import os
 import csv
 import json
 import time
 import socket
+import base64
 import argparse
 
-# Reuse the proven driver + detector from the hunter (importing is safe: the
-# hunter guards its CLI behind `if __name__ == "__main__"`).
 from precise_fiber_hunter import (
     self_update, PROFILE_DIR, MAP_URL, VIEWPORT, SEARCH_SETTLE,
     open_map_view, on_map, mouse_drag, zoom, find_map_dots, open_sheet, NetCapture,
@@ -51,12 +48,64 @@ from optimus_dot_detect import zone_freshness, FRESH_MIN_ELIGIBLE
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHOT_DIR = os.path.join(HERE, "fresh_zones")
 CSV_PATH = os.path.join(HERE, "fresh_zones.csv")
-SCOUT_TAB = "Fiber Scout"          # freshness results land here (Claude-readable)
-BACKEND_TAB = "Backend Capture"    # the F12/network capture lands here
+SCOUT_TAB = "Fiber Scout"
+BACKEND_TAB = "Backend Capture"
+GH_REPO = "patricksiado-prog/Go-High-Level-MCP-2026-Complete"
+GH_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
 
 
+# ---- GitHub write (reliable read channel for Claude when Drive is flaky) ----
+def _gh_token():
+    for p in [os.path.join(os.path.expanduser("~"), "Downloads", "github_token.txt"),
+              os.path.join(os.path.expanduser("~"), "Desktop", "github_token.txt"),
+              os.path.join(os.path.expanduser("~"), "github_token.txt"),
+              os.path.join(os.path.expanduser("~"), "optimus", "github_token.txt"),
+              os.path.join(HERE, "github_token.txt"), "github_token.txt"]:
+        try:
+            if os.path.exists(p):
+                t = open(p).read().strip()
+                if t:
+                    return t
+        except Exception:
+            pass
+    return os.environ.get("GITHUB_TOKEN")
+
+
+def gh_put(path, text):
+    """Best-effort: commit a small text file to the repo so Claude can read it at
+    the raw URL. Needs github_token.txt (or GITHUB_TOKEN); no token -> skip."""
+    token = _gh_token()
+    if not token:
+        return False
+    import urllib.request
+    api = "https://api.github.com/repos/%s/contents/%s" % (GH_REPO, path)
+    hdr = {"Authorization": "token %s" % token, "User-Agent": "optimus-scout",
+           "Accept": "application/vnd.github+json"}
+    sha = None
+    try:
+        req = urllib.request.Request(api + "?ref=" + GH_BRANCH, headers=hdr)
+        with urllib.request.urlopen(req, timeout=20) as r:
+            sha = json.load(r).get("sha")
+    except Exception:
+        pass
+    body = {"message": "live: %s" % path, "branch": GH_BRANCH,
+            "content": base64.b64encode(text.encode("utf-8")).decode("ascii")}
+    if sha:
+        body["sha"] = sha
+    try:
+        req = urllib.request.Request(api, data=json.dumps(body).encode("utf-8"),
+                                     headers=hdr, method="PUT")
+        with urllib.request.urlopen(req, timeout=25) as r:
+            r.read()
+        print("  -> pushed %s to GitHub (Claude can read it)." % path)
+        return True
+    except Exception as e:
+        print("  (GitHub push skipped: %s)" % str(e)[:70])
+        return False
+
+
+# ---- sheet tabs ----
 def _tab(ws, title, header, clear=False):
-    """Get/create a tab in the leads sheet. Returns a worksheet or None."""
     if ws is None:
         return None
     try:
@@ -76,7 +125,6 @@ def _tab(ws, title, header, clear=False):
 
 
 def _w(t, row):
-    """Best-effort append (never blocks the scan)."""
     if t is None:
         return
     try:
@@ -86,41 +134,47 @@ def _w(t, row):
 
 
 def write_backend(ws, cap, host):
-    """Dump the captured backend traffic (endpoints, tile fields, parsed leads,
-    serviceability JSON) to the 'Backend Capture' tab so Claude can analyse it."""
+    """Dump the captured backend traffic to the 'Backend Capture' sheet tab AND
+    push it to GitHub (optimus/_live/backend_capture.txt) so Claude can analyse
+    it even when Drive is down."""
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
     t = _tab(ws, BACKEND_TAB,
              ["Time", "Kind", "URL / Field / Address", "Type", "Bytes/Count", "Sample"],
              clear=True)
-    if t is None:
-        return
-    ts = time.strftime("%Y-%m-%d %H:%M:%S")
-    _w(t, [ts, "START", host, "", "", "F12/network capture"])
+    lines = ["OPTIMUS BACKEND CAPTURE  %s  host=%s" % (ts, host)]
+
+    def row(kind, a="", b="", c="", d=""):
+        _w(t, [ts, kind, a, b, c, d])
+        lines.append("%-13s| %s | %s | %s | %s" % (kind, a, b, c, d))
+
     rows = sorted(cap.seen_urls.items(), key=lambda kv: -kv[1][2])
+    lines.append("--- ENDPOINTS (biggest first) ---")
     for base, (ct, hits, mx) in rows[:25]:
-        _w(t, [ts, "ENDPOINT", base, ct, "%d B / %d hits" % (mx, hits), ""])
+        row("ENDPOINT", base, ct, "%dB/%dhits" % (mx, hits))
     if cap.tile_keys:
-        _w(t, [ts, "TILE FIELDS", ", ".join(sorted(cap.tile_keys)), "",
-               "%d fields" % len(cap.tile_keys), ""])
+        lines.append("--- TILE FIELDS (dot data schema) ---")
+        row("TILE FIELDS", ", ".join(sorted(cap.tile_keys)), "", "%d fields" % len(cap.tile_keys))
     leads = cap.pending
-    _w(t, [ts, "LEADS PARSED", "", "", "%d" % len(leads), ""])
+    lines.append("--- LEADS PARSED: %d ---" % len(leads))
+    row("LEADS PARSED", "", "", str(len(leads)))
     for ld in leads[:6]:
-        _w(t, [ts, "SAMPLE LEAD", str(ld.get("address")), "status=%s" % ld.get("status"),
-               "lat=%s lng=%s ban=%s" % (ld.get("lat"), ld.get("lng"), ld.get("ban")), ""])
+        row("SAMPLE LEAD", str(ld.get("address")), "status=%s" % ld.get("status"),
+            "lat=%s lng=%s ban=%s" % (ld.get("lat"), ld.get("lng"), ld.get("ban")))
     raw = os.path.join(HERE, "serviceability_raw.json")
     if os.path.exists(raw):
         try:
             data = json.load(open(raw))
             keys = list(data.keys()) if isinstance(data, dict) else ["<list of %d>" % len(data)]
-            _w(t, [ts, "JSON TOP KEYS", ", ".join(map(str, keys)), "", "", ""])
-            _w(t, [ts, "JSON SAMPLE", "", "", "", json.dumps(data)[:1500]])
+            row("JSON TOP KEYS", ", ".join(map(str, keys)))
+            lines.append("--- JSON SAMPLE ---")
+            lines.append(json.dumps(data)[:3000])
         except Exception:
             pass
-    _w(t, [ts, "DONE", host, "", "%d endpoints" % len(rows), "read the Backend Capture tab"])
-    print("  -> wrote the backend capture to the 'Backend Capture' tab.")
+    row("DONE", host, "", "%d endpoints" % len(rows))
+    gh_put("optimus/_live/backend_capture.txt", "\n".join(lines))
 
 
 def scan_cell(page):
-    """Count GREEN / GOLD / GREY in the current viewport and classify freshness."""
     dots, gray = find_map_dots(page)
     green = sum(1 for _x, _y, c in dots if c == "GREEN")
     gold = sum(1 for _x, _y, c in dots if c == "GOLD")
@@ -130,16 +184,15 @@ def scan_cell(page):
 
 def main():
     self_update()
-    ap = argparse.ArgumentParser(description="Scout the AT&T map for NEW fiber areas (green+gold, no grey).")
-    ap.add_argument("--cols", type=int, default=4, help="serpentine strip width before stepping down (default 4)")
-    ap.add_argument("--survey-out", type=int, default=0,
-                    help="zoom OUT this many times first so each viewport covers more ground")
-    ap.add_argument("--auto", action="store_true", help="no 'press Enter' pause (unattended)")
+    ap = argparse.ArgumentParser(description="Scout the AT&T map for NEW fiber areas.")
+    ap.add_argument("--cols", type=int, default=4, help="serpentine strip width before stepping down")
+    ap.add_argument("--survey-out", type=int, default=0, help="zoom OUT this many times first")
+    ap.add_argument("--auto", action="store_true", help="no 'press Enter' pause")
     ap.add_argument("--no-update", action="store_true", help="skip the GitHub auto-pull on start")
     args = ap.parse_args()
 
     os.makedirs(SHOT_DIR, exist_ok=True)
-    fresh = []   # (idx, down, col, green, gold, gray, gray_share, label, shot)
+    fresh = []
 
     from playwright.sync_api import sync_playwright
     with sync_playwright() as pw:
@@ -148,7 +201,7 @@ def main():
             args=["--disable-blink-features=AutomationControlled"])
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
 
-        cap = NetCapture(debug=True)            # capture backend traffic in the background
+        cap = NetCapture(debug=True)
         page.on("response", cap.handle)
 
         print("Opening the AT&T fiber map ...")
@@ -161,7 +214,7 @@ def main():
             time.sleep(2)
 
         if args.survey_out:
-            print("Zooming out %dx to survey wider ..." % args.survey_out)
+            print("Zooming out %dx ..." % args.survey_out)
             zoom(page, args.survey_out, "out")
             time.sleep(1.5)
 
@@ -179,19 +232,14 @@ def main():
                  "SURVEY", "continuous (close window to stop)"])
 
         print("\nSurveying CONTINUOUSLY -- it keeps panning until you close the window.\n")
-        idx = 0
-        col = 0
-        down = 0
+        idx = col = down = 0
         direction = "right"
         backend_done = False
         while True:
             idx += 1
             try:
-                # press "Search this area" so the new view's dots actually load
-                # (the map doesn't refresh dots on a pan until this is clicked),
-                # then let them settle -- exactly like the hunter does each cell.
                 if on_map(page):
-                    search_this_area(page)
+                    search_this_area(page)     # load the new view's dots first
                 time.sleep(SEARCH_SETTLE)
                 green, gold, gray, gray_share, label = scan_cell(page)
             except Exception as e:
@@ -218,13 +266,10 @@ def main():
                     shot = ""
                 fresh.append((idx, down, col, green, gold, gray, gray_share, label, shot))
 
-            # one-time backend capture once we've panned enough to trigger the fetches
             if not backend_done and idx >= 8:
                 write_backend(ws, cap, host)
                 backend_done = True
 
-            # CONTINUOUS serpentine motion: across a strip of width --cols, then
-            # step down and reverse -- forever, until the window closes.
             if col >= args.cols - 1:
                 ok = mouse_drag(page, "down")
                 down += 1
@@ -236,7 +281,7 @@ def main():
             if not ok:
                 print("\nMotion stopped (window closed?). Stopping."); break
 
-        # on exit: local CSV + ranked summary + DONE to the sheet
+        # exit: local CSV + ranked summary -> sheet + GitHub
         try:
             with open(CSV_PATH, "w", newline="") as f:
                 wr = csv.writer(f)
@@ -250,27 +295,29 @@ def main():
 
         fresh.sort(key=lambda x: (-(x[3] + x[4]), x[6]))
         ts1 = time.strftime("%Y-%m-%d %H:%M:%S")
-        for z in fresh[:10]:
+        flines = ["OPTIMUS SCOUT FINDINGS  %s  host=%s" % (ts1, host),
+                  "fresh/working cells: %d" % len(fresh), "TOP:"]
+        for z in fresh[:12]:
             i, dn, cc, g, o, gy, gs, lb, sh = z
             _w(sws, [ts1, host, "TOP d%dc%d" % (dn, cc), g, o, gy,
                      "%.0f%%" % (gs * 100), lb, "top spot to hunt"])
-        _w(sws, [ts1, host, "DONE", "", "", "", "", "%d fresh/working" % len(fresh),
-                 "survey stopped"])
-        if not backend_done:          # never reached 8 cells -> still dump what we got
+            flines.append("  d%dc%d  GREEN %d + GOLD %d  (grey %d, %.0f%%)  %s  %s"
+                          % (dn, cc, g, o, gy, gs * 100, lb, os.path.basename(sh)))
+        _w(sws, [ts1, host, "DONE", "", "", "", "", "%d fresh/working" % len(fresh), "survey stopped"])
+        if not backend_done:
             write_backend(ws, cap, host)
+        gh_put("optimus/_live/scout_findings.txt", "\n".join(flines))
 
         print("\n=========== NEW-FIBER SCOUT RESULTS ===========")
         if not fresh:
-            print("No fresh/working cells -- area read as MATURE/EMPTY. Try a newer suburb")
-            print("(La Porte 77571, Katy 77449, Cypress 77433, Spring 77386, Pearland 77584).")
+            print("No fresh/working cells -- area read as MATURE/EMPTY. Try a newer suburb.")
         else:
             print("Fresh/working cells found: %d  (top ones):" % len(fresh))
             for z in fresh[:10]:
                 i, dn, cc, g, o, gy, gs, lb, sh = z
                 print("  GREEN %3d + GOLD %3d  (grey %d, %.0f%%)  %-7s  %s"
                       % (g, o, gy, gs * 100, lb, os.path.basename(sh)))
-            print("Screenshots in: %s" % SHOT_DIR)
-        print("Results are also in the 'Fiber Scout' + 'Backend Capture' sheet tabs.")
+        print("Results in the 'Fiber Scout' + 'Backend Capture' tabs and on GitHub (optimus/_live/).")
         print("===============================================")
 
         try:
