@@ -263,3 +263,42 @@ Same call, twice — once per connector. Each box is bound to its own account's 
 so it writes to the right sub-account automatically. (The server also supports per-request headers
 `x-ghl-access-token` + `x-ghl-location-id` for one-box-both-accounts; matched pair required —
 see Section 6.)
+
+## 8. FIBER GREEN BIZ — the real lead count, verified from the sheet (2026-06-30)
+
+Sheet: **"ATT FIBER LEADS"** — https://docs.google.com/spreadsheets/d/1FhO2BTMXGefm1tLwKbbMPXvzT1160882Auauzep7ooA/edit
+(fileId `1FhO2BTMXGefm1tLwKbbMPXvzT1160882Auauzep7ooA`)
+
+### THE NUMBER (authoritative, parsed from the live sheet 2026-06-30)
+Tab **"Fiber Green Biz"** (header: `Business Name | Phone | Address | Website | Category`):
+- **19,532 raw rows** (18,132 with a phone, 1,400 blank-phone)
+- **1,944 UNIQUE businesses** deduped by last-10 phone digits  ← the real sellable count, **Houston INCLUDED** (per Patrick: keep Houston)
+  - Houston-tagged unique: **1,664**
+  - non-Houston unique: **969**  (buckets overlap — same business matched to addresses in both — so 1664+969 > 1944)
+- Heavy duplication is real: one business phone is matched to up to **302** addresses (top three: 302 / 282 / 254). That's why 19.5k rows collapse to ~1,944 businesses.
+
+### CORRECTIONS (both prior figures were WRONG — do not reuse)
+- The handoff-doc **"216"** is stale / mis-scaled (likely echoes "Precise Fiber" ~216k rows). NOT the green-biz count.
+- An earlier read of **"499"** was a ~1% truncated slice of the WRONG tab ("Precise Fiber"), not the matches. Garbage.
+- Correct = **1,944 unique / 19,532 raw.**
+
+### HOW TO READ THIS SHEET (the gotcha that caused the wrong numbers)
+- Drive `read_file_content` returns ONLY THE FIRST TAB ("Precise Fiber") and truncates ~2,200 of its 216,342 rows. Never count green-biz from it.
+- CSV export = first tab only; XLSX export exceeded the MCP 10 MB cap. **ODS export works** and contains ALL tabs — decode the base64, it's a zip, read `content.xml` (stdlib `zipfile`+`xml.etree`; pip is blocked in the sandbox).
+- Dedupe rule = **last 10 digits of the Phone column** (strip non-digits).
+
+### WORKBOOK STRUCTURE (9 tabs, row counts 2026-06-30)
+- Precise Fiber: 216,342 (raw GREEN/GOLD dot captures from the AT&T map — this is the first tab)
+- Fiber Green Biz: 19,532 (the matches → 1,944 unique businesses)
+- Maps Businesses: 17,148 (Google-Maps business scrape)
+- Hunter Status: 18,659 (scraper heartbeat logs — `LAPTOP-… | watching | pass N`)
+- Enriched Leads: 1,124 · Fiber Scout: 49 · Backend Capture: 36 · Upgrade Orange Biz / Sheet6: empty
+
+### MY UNDERSTANDING OF THE PIPELINE (so this isn't re-derived)
+- **Hunter** (`precise_fiber_hunter.py`, a.k.a. "Precise"/"precise hunter") drives the AT&T dealer fiber map and captures every GREEN dot (fiber-eligible, NOT yet a customer = a lead) + GOLD (copper upgrade), skips GREY (existing customer) → writes "Precise Fiber".
+- **Maps Scraper** (`maps_scraper_standalone.py`, old "MapMan") scrapes Google-Maps businesses by ZIP → "Maps Businesses".
+- **The match = the money:** Hunter cross-references each green dot address against scraped businesses in the same ZIP; hits land in **"Fiber Green Biz"** (the 1,944). A business with a phone + a fiber-green address = a sellable lead.
+- Control plane = `drive_commander.py` reading sheet `12PIIplhqUuZWAfEUdJMP3J04nAyrsFsFB07bDDDV2Ag` tab "COMMAND" (A1=command / B1=params / C1=status). That sheet is flagged "ineligible for generative AI" — AI tools CANNOT read it; the green count does NOT live there.
+
+### NEXT ACTION (when ready)
+Collapse 19,532 → 1,944 (one row per business: name, phone normalized to `+1…`, one address, website, category), then upsert into **GHL Command** (T-OPTIMUS `xZj500…`) via the `cmndconevtor` connector. Dedupe by phone before load.
