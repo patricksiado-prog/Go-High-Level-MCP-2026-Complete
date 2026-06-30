@@ -35,19 +35,50 @@ so it pans and reads dots exactly like precise_fiber_hunter.
 import os
 import csv
 import time
+import socket
 import argparse
 
 # Reuse the proven driver + detector from the hunter (importing is safe: the
 # hunter guards its CLI behind `if __name__ == "__main__"`).
 from precise_fiber_hunter import (
     self_update, PROFILE_DIR, MAP_URL, VIEWPORT,
-    open_map_view, on_map, mouse_drag, zoom, find_map_dots,
+    open_map_view, on_map, mouse_drag, zoom, find_map_dots, open_sheet,
 )
 from optimus_dot_detect import zone_freshness, FRESH_MIN_ELIGIBLE
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHOT_DIR = os.path.join(HERE, "fresh_zones")
 CSV_PATH = os.path.join(HERE, "fresh_zones.csv")
+SCOUT_TAB = "Fiber Scout"          # results land here so Claude can read them on Drive
+
+
+def scout_tab(ws):
+    """Get/create the 'Fiber Scout' tab in the same sheet so the scout's output
+    is readable on Drive (no screenshots needed). Returns a worksheet or None."""
+    if ws is None:
+        return None
+    try:
+        sh = ws.spreadsheet
+        try:
+            sws = sh.worksheet(SCOUT_TAB)
+        except Exception:
+            sws = sh.add_worksheet(title=SCOUT_TAB, rows="3000", cols="9")
+            sws.append_row(["Time", "Host", "Cell", "Green", "Gold", "Grey",
+                            "Grey%", "Verdict", "Note"])
+        return sws
+    except Exception as e:
+        print("(Fiber Scout tab unavailable: %s)" % str(e)[:70])
+        return None
+
+
+def scout_write(sws, row):
+    """Best-effort append one row to the Fiber Scout tab (never blocks the scan)."""
+    if sws is None:
+        return
+    try:
+        sws.append_row(row)
+    except Exception:
+        pass
 
 
 def scan_cell(page):
@@ -99,6 +130,14 @@ def main():
             except EOFError:
                 pass
 
+        # open the sheet so the scout's output is readable on Drive (best-effort;
+        # writes to a 'Fiber Scout' tab). No creds -> just local CSV + screenshots.
+        ws = open_sheet()
+        sws = scout_tab(ws)
+        host = socket.gethostname()
+        scout_write(sws, [time.strftime("%Y-%m-%d %H:%M:%S"), host, "START",
+                          "", "", "", "", "SURVEY", "grid %dx%d" % (args.cols, args.rows)])
+
         idx = 0
         # serpentine grid: left-to-right on even rows, right-to-left on odd, then down.
         for r in range(args.rows):
@@ -111,6 +150,13 @@ def main():
                        "MATURE": "   mature (skip)", "EMPTY": "   empty"}.get(label, label)
                 print("cell %2d [r%d c%d]  GREEN %3d  GOLD %3d  GREY %3d  grey%%=%.0f%%  -> %s"
                       % (idx, r, c, green, gold, gray, gray_share * 100, tag))
+
+                # log every cell that had ANY dots to the sheet (skip pure-empty
+                # cells to save writes) so Claude can read the survey on Drive.
+                if (green + gold + gray) > 0:
+                    scout_write(sws, [time.strftime("%Y-%m-%d %H:%M:%S"), host,
+                                      "r%dc%d" % (r, c), green, gold, gray,
+                                      "%.0f%%" % (gray_share * 100), label, ""])
 
                 if label in ("FRESH", "WORKING") and elig >= 1:
                     shot = os.path.join(
@@ -141,6 +187,17 @@ def main():
 
         # ranked summary: freshest = most green+gold, least grey
         fresh.sort(key=lambda x: (-(x[3] + x[4]), x[6]))
+
+        # write the top spots + a DONE marker to the sheet so Claude can read
+        # the result without a screenshot.
+        ts1 = time.strftime("%Y-%m-%d %H:%M:%S")
+        for z in fresh[:10]:
+            i, rr, cc, g, o, gy, gs, lb, sh = z
+            scout_write(sws, [ts1, host, "TOP r%dc%d" % (rr, cc), g, o, gy,
+                              "%.0f%%" % (gs * 100), lb, "top spot to hunt"])
+        scout_write(sws, [ts1, host, "DONE", "", "", "", "",
+                          "%d fresh/working cells" % len(fresh), "survey complete"])
+
         print("\n=========== NEW-FIBER SCOUT RESULTS ===========")
         if not fresh:
             print("No fresh/working zones found in this survey -- the whole area")
