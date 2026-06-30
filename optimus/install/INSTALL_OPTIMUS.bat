@@ -53,21 +53,24 @@ echo [6/7] Google key ^(public link - lets the tools write to the sheet; no Driv
 powershell -NoProfile -ExecutionPolicy Bypass -Command "try{iwr '%CREDS%' -OutFile '%HUNTER%\google_creds.json'}catch{}"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "try{Copy-Item '%HUNTER%\google_creds.json' '%SCRAPER%\google_creds.json' -Force}catch{}"
 
-echo [7/7] Creating the two Desktop icons...
+echo [7/7] Creating the three Desktop icons...
 if not exist "%LAUNCH%" mkdir "%LAUNCH%"
 curl -L -o "%LAUNCH%\RUN_HUNTER.bat"  "%BASE%/RUN_HUNTER.bat"
 curl -L -o "%LAUNCH%\RUN_SCRAPER.bat" "%BASE%/RUN_SCRAPER.bat"
+curl -L -o "%LAUNCH%\RUN_SCOUT.bat"   "%BASE%/RUN_SCOUT.bat"
 curl -L -o "%LAUNCH%\hunter.ico"  "%BASE%/icons/hunter.ico"
 curl -L -o "%LAUNCH%\scraper.ico" "%BASE%/icons/scraper.ico"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$w=New-Object -ComObject WScript.Shell; $d=[Environment]::GetFolderPath('Desktop'); $a=$w.CreateShortcut((Join-Path $d 'Optimus Fiber Hunter.lnk')); $a.TargetPath=(Join-Path $env:USERPROFILE 'optimus\launchers\RUN_HUNTER.bat'); $a.IconLocation=(Join-Path $env:USERPROFILE 'optimus\launchers\hunter.ico'); $a.WorkingDirectory=(Join-Path $env:USERPROFILE 'optimus\launchers'); $a.Save(); $b=$w.CreateShortcut((Join-Path $d 'Optimus Maps Scraper.lnk')); $b.TargetPath=(Join-Path $env:USERPROFILE 'optimus\launchers\RUN_SCRAPER.bat'); $b.IconLocation=(Join-Path $env:USERPROFILE 'optimus\launchers\scraper.ico'); $b.WorkingDirectory=(Join-Path $env:USERPROFILE 'optimus\launchers'); $b.Save()"
+curl -L -o "%LAUNCH%\scout.ico"   "%BASE%/icons/scout.ico"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$w=New-Object -ComObject WScript.Shell; $d=[Environment]::GetFolderPath('Desktop'); $a=$w.CreateShortcut((Join-Path $d 'Optimus Fiber Hunter.lnk')); $a.TargetPath=(Join-Path $env:USERPROFILE 'optimus\launchers\RUN_HUNTER.bat'); $a.IconLocation=(Join-Path $env:USERPROFILE 'optimus\launchers\hunter.ico'); $a.WorkingDirectory=(Join-Path $env:USERPROFILE 'optimus\launchers'); $a.Save(); $b=$w.CreateShortcut((Join-Path $d 'Optimus Maps Scraper.lnk')); $b.TargetPath=(Join-Path $env:USERPROFILE 'optimus\launchers\RUN_SCRAPER.bat'); $b.IconLocation=(Join-Path $env:USERPROFILE 'optimus\launchers\scraper.ico'); $b.WorkingDirectory=(Join-Path $env:USERPROFILE 'optimus\launchers'); $b.Save(); $c=$w.CreateShortcut((Join-Path $d 'Optimus Fiber Scout.lnk')); $c.TargetPath=(Join-Path $env:USERPROFILE 'optimus\launchers\RUN_SCOUT.bat'); $c.IconLocation=(Join-Path $env:USERPROFILE 'optimus\launchers\scout.ico'); $c.WorkingDirectory=(Join-Path $env:USERPROFILE 'optimus\launchers'); $c.Save()"
 
 echo.
 echo  ============================================================
-echo   DONE! Python + BOTH tools are installed.
-echo   Two icons are now on your Desktop:
+echo   DONE! Python + ALL tools are installed.
+echo   Three icons are now on your Desktop:
 echo      - Optimus Fiber Hunter   ^(log into AT^&T once on first run^)
 echo      - Optimus Maps Scraper   ^(type ZIP codes when it asks^)
-echo   Double-click either one to run. They auto-update each launch.
+echo      - Optimus Fiber Scout    ^(finds NEW fiber areas to hunt^)
+echo   Double-click any one to run. They auto-update each launch.
 echo  ============================================================
 echo.
 pause
