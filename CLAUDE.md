@@ -755,6 +755,17 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
 >    retune drag/timing), and whether the dot endpoint got renamed.
 > 4. Researched + added the `mapbox-extraction` skill (recover the hidden map object) as the path to
 >    retire pixel/tile guessing entirely.
+>
+> **SPEED IS ALSO CRITICAL (Patrick, 2026-07-01) — motion must be FAST *and* sturdy, not one or the
+> other.** So: (a) the pan-gesture holds I added are only ~100ms/pan — keep them (they're what makes
+> the drag land) but don't add more. (b) The backend monitor now writes in a BACKGROUND THREAD
+> (`_backend_busy` skip-if-in-flight) so the F12 snapshot NEVER stalls the sweep — the sheet write is
+> off the hot path. (c) Real speed tuning is DATA-DRIVEN from the Backend Capture tab: find the
+> MINIMUM `SEARCH_SETTLE`/`WAIT_AFTER_PAN` at which the serviceability hit-count still climbs per pan
+> (fetch still fires), and set pacing to that floor — don't guess (too-tight caused the old
+> "captured 0"). Per-cell budget today ≈ SEARCH_SETTLE(0.3) + drag(~0.3) ≈ 0.6s + flush; shave via
+> the backend signal, not by removing the holds. Recovering the hidden map object (mapbox-extraction
+> skill) is ALSO a speed win — one `querySourceFeatures` read per view beats per-cell pixel scans.
 
 - **"Precise hunter stopped / won't pan / slower" (Patrick + Ara saw it) is NOT a code change.** Git
   history confirms: the hunter's last change was **2026-06-18** (`02ba61a`), working tree clean, no

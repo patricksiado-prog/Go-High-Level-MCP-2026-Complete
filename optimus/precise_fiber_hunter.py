@@ -2354,6 +2354,7 @@ def report_status(ws, area, state, found="", note=""):
 BACKEND_TAB = "Backend Capture"
 _backend_ws = [None]
 _BACKEND_ON = [True]
+_backend_busy = [False]   # a dump is in flight -> skip, so the sweep never waits
 
 
 def _backend_sheet(ws):
@@ -2375,14 +2376,32 @@ def _backend_sheet(ws):
 
 
 def dump_backend(ws, cap):
-    """Write the current network capture (F12 view) to the 'Backend Capture' tab so
-    the backend is readable remotely. Overwrites with the latest snapshot each call.
+    """Snapshot the network capture (F12 view) to the 'Backend Capture' tab so the
+    backend is readable remotely. SPEED: runs in a BACKGROUND THREAD and skips if a
+    prior dump is still in flight, so the sweep NEVER waits on a sheet write.
     Best-effort; never breaks a run."""
-    if cap is None or not _BACKEND_ON[0]:
+    if cap is None or not _BACKEND_ON[0] or _backend_busy[0]:
         return
     t = _backend_sheet(ws)
     if t is None:
         return
+    import threading
+    # snapshot the numbers on the hot path (cheap), do the sheet write off-thread
+    _backend_busy[0] = True
+    th = threading.Thread(target=_dump_backend_worker, args=(t, cap), daemon=True)
+    th.start()
+
+
+def _dump_backend_worker(t, cap):
+    try:
+        _dump_backend_write(t, cap)
+    except Exception as e:
+        print("  (backend monitor skipped: %s)" % str(e)[:60])
+    finally:
+        _backend_busy[0] = False
+
+
+def _dump_backend_write(t, cap):
     import socket
     ts = time.strftime("%Y-%m-%d %H:%M:%S")
     host = socket.gethostname()
@@ -2404,13 +2423,10 @@ def dump_backend(ws, cap):
         rows.append([ts, "SAMPLE LEAD", str(ld.get("address")),
                      "status=%s" % ld.get("status"),
                      "lat=%s lng=%s" % (ld.get("lat"), ld.get("lng")), ""])
-    try:
-        t.clear()
-        t.append_rows([[str(c)[:490] for c in r] for r in rows], value_input_option="RAW")
-        print("  [backend] wrote %d endpoints + %d parsed leads to '%s'"
-              % (len(cap.seen_urls), len(cap.pending), BACKEND_TAB))
-    except Exception as e:
-        print("  (backend monitor skipped: %s)" % str(e)[:60])
+    t.clear()
+    t.append_rows([[str(c)[:490] for c in r] for r in rows], value_input_option="RAW")
+    print("  [backend] wrote %d endpoints + %d parsed leads to '%s'"
+          % (len(cap.seen_urls), len(cap.pending), BACKEND_TAB))
 
 
 # ----------------------------------------------------------------------------
