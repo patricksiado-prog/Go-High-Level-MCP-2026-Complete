@@ -109,6 +109,9 @@
 > the front of the funnel; (A) is the back. Build both. (The old "nationwide vision — parked" note
 > below is now UN-parked for the new-fiber half — start with FCC new-fiber, defer the paid cable-outage
 > source.)
+> **RECOMMENDED ORDER:** (B) new-fiber finder first (free FCC data, feeds the whole funnel), then
+> (A) textable filter to unlock the send — UNLESS Patrick wants to text the ~200+ already-isolated
+> green biz now, in which case (A) first for immediate results. His call.
 
 - Opener: Patrick w/ AT&T, fiber available, 1 Gig in the $40s, 2 months free, free install,
   ask for a day/time.
