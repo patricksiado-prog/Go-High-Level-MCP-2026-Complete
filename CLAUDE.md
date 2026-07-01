@@ -733,6 +733,29 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   the sheet read keeps failing, the fix is a FRESH chat, not retrying. The GHL connector stays fine.
 
 ### 11e. SESSION 2026-07-01 — hunter "stopped panning" diagnosed + fixed, tester + backend monitor built
+
+> **TODAY'S PROBLEM (2026-07-01):** the precise hunter "stopped / won't pan / motion feels slower"
+> (Patrick AND Ara hit it), and matches have been flat. The map isn't visibly moving when it should
+> be sweeping.
+>
+> **WHAT WE PROVED:** it's NOT a code change — the hunter's last edit was 2026-06-18 and the working
+> tree is clean (nobody touched it). And the sweep loop can't stall on its own (it fires a drag every
+> cell forever until the browser closes). So "stopped panning" = the drag IS being issued but the MAP
+> ISN'T MOVING → a GESTURE failure, or AT&T changed their site.
+>
+> **HOW WE'RE CORRECTING IT (the loop, agreed with Patrick):**
+> 1. Hardened the pan gesture + added portal auto-recovery in code (pushed — see below).
+> 2. Built `att_test.py` (RUN_TEST.bat) — a PASS/FAIL health-check whose `PAN MOVES` line settles
+>    "us vs AT&T" in 30s.
+> 3. Baked a **backend F12 monitor** into the hunter that writes what the map does on the wire to a
+>    **"Backend Capture"** sheet tab. **THE WORKING LOOP: Patrick runs the hunter → Claude READS the
+>    Backend Capture tab (via Drive MCP) → uses the real endpoint/pan-fetch signal to build sturdier
+>    motion,** instead of guessing. Next time: read that tab first, check if the serviceability
+>    fetch's hit-count CLIMBS per pan (motion working) or is FLAT (pan not triggering the fetch →
+>    retune drag/timing), and whether the dot endpoint got renamed.
+> 4. Researched + added the `mapbox-extraction` skill (recover the hidden map object) as the path to
+>    retire pixel/tile guessing entirely.
+
 - **"Precise hunter stopped / won't pan / slower" (Patrick + Ara saw it) is NOT a code change.** Git
   history confirms: the hunter's last change was **2026-06-18** (`02ba61a`), working tree clean, no
   local edits, and the last MOTION change was 2026-06-17. Nobody touched it. So the breakage is
