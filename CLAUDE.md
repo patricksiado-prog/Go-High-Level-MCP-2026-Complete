@@ -731,3 +731,51 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   scrape, includes other cities).** The scraper's non-Houston rows should be cleaned out of that tab.
 - **Drive MCP gets "session expired" on a long chat** (token goes stale and won't refresh) — when
   the sheet read keeps failing, the fix is a FRESH chat, not retrying. The GHL connector stays fine.
+
+### 11e. SESSION 2026-07-01 — hunter "stopped panning" diagnosed + fixed, tester + backend monitor built
+- **"Precise hunter stopped / won't pan / slower" (Patrick + Ara saw it) is NOT a code change.** Git
+  history confirms: the hunter's last change was **2026-06-18** (`02ba61a`), working tree clean, no
+  local edits, and the last MOTION change was 2026-06-17. Nobody touched it. So the breakage is
+  external (AT&T site) or environmental (Scout sharing `att_profile`, stuck Chromium, all-grey area).
+- **KEY INSIGHT — the sweep loops can't stop themselves.** `sweep_continuous`/`sweep_grid`/
+  `sweep_backend` fire a drag EVERY cell and only quit when `mouse_drag` returns False, which only
+  happens when the browser is CLOSED (`page.mouse` throws). `_viewport_map_box` always returns a box,
+  so mouse_drag never returns False for a "missing canvas." Therefore "stopped panning" = the drag is
+  STILL being issued but the MAP isn't moving in response. It's a GESTURE failure, not a dead loop.
+- **PAN GESTURE HARDENED (pushed `3177221`).** Root cause candidate #1: the drag was a too-fast flick
+  (`down → move(steps=4) → up`, no hold) which Mapbox can read as a CLICK (pans nothing) instead of a
+  drag. FIX in `mouse_drag`: hold ~60ms after `down` so the grab registers, move in TWO staged
+  segments while held (`steps=6` each), settle ~40ms before `up` so the pan commits. Same distance
+  (`DRAG_FRAC=0.45`), just an unambiguous drag now.
+- **PORTAL AUTO-RECOVERY (same commit).** Root cause candidate #2: if a "Search this area" click lands
+  on nav the view flips map→portal, and every drag after that hits the portal (doesn't pan) forever.
+  FIX: `sweep_continuous` + `sweep_grid` now re-check `on_map` each cell and call `open_map_view()` to
+  flip back if it's on the portal (prints `(view flipped to portal -- re-opening the map)`).
+- **STILL UNPROVEN from the sandbox:** whether AT&T changed their site (candidate #3 — the
+  screen-region drag fallback landing off a shifted layout). That's what `att_test.py` answers.
+- **`att_test.py` — AT&T MAP HEALTH CHECK (us vs them), pushed `f3a82c4`.** Reuses the hunter's OWN
+  helpers (open_map_view/on_map/_map_canvas_box/find_map_dots/mouse_drag/search_this_area/NetCapture)
+  to run a PASS/FAIL checklist: PAGE LOADS · LOGGED IN · MAP OPENS · MAP CANVAS · DOTS RENDER · PAN
+  MOVES (screenshot-hash before/after a drag) · SEARCH CONTROL · SERVICEABILITY FEED. Prints a VERDICT
+  naming the culprit (THEM/login, likely-THEM map change, PAN broke, feed renamed, or ALL-CLEAR),
+  writes an **"AT&T Test"** sheet tab + `att_test_report.txt` + dumps every endpoint to
+  net_responses.log (so a renamed dot feed shows). Launcher `optimus/install/RUN_TEST.bat`. Run it
+  ALONE (shares att_profile). One-paste curl of RUN_TEST.bat in chat. **If PAN MOVES still FAILs after
+  the gesture fix → it's AT&T's layout; re-anchor the drag region.**
+- **BACKEND F12 MONITOR baked INTO the hunter (pushed `5508df9`) — Patrick's "add it to the program,
+  I don't wanna install anything else."** New `dump_backend(ws, cap)` writes the live NetCapture state
+  to a **"Backend Capture"** tab (overwritten each pass): every endpoint the map hit (biggest first =
+  the dot/address feed), the vector-tile FIELD names (dot schema), and #addresses parsed off the wire
+  + samples (status/lat/lng). Fires early (cell 4) then every 15 cells in BOTH sweeps, next to the
+  status heartbeat. **ON by default** (`--no-backend` off); NetCapture already runs `debug=True` so
+  `seen_urls`/`tile_keys` populate. So Claude reads the backend from the sheet — no screenshot, no F12.
+  (The standalone `backend_probe.py` still exists but the in-hunter monitor is the no-extra-install path.)
+- **MATCH OUTPUT UNIFIED across hunter + scraper (pushed `be5eb13`).** Confirmed BOTH programs run
+  IDENTICAL matching (same `_norm_addr` HOUSE|STREET key, same "Fiber Green Biz"/"Upgrade Orange Biz"
+  tabs, same `["Business Name","Phone","Address","Website","Category"]` header + row, same green/orange
+  split + dedup-by-address). Patrick's guess that the scraper lacked matching was WRONG — the scraper's
+  `init_match()` reads the "Precise Fiber" tab and `_match_new()` matches each scraped business; the
+  hunter's `init_bizmatch()`/`match_leads_to_biz()` matches each captured dot. They match from opposite
+  ends into the SAME tabs. Only the console WORDING differed; now both print `COMBO MATCH ON: …` on load
+  and `MATCH  +N green (fiber lead + business), +N orange (upgrade + business)  [total matches: T]` per
+  hit, with a running total.
