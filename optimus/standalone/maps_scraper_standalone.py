@@ -282,7 +282,7 @@ NEXT_ZIPS = HOUSTON_ZIPS   # back-compat alias
 
 def region_for(zip_code):
     """Return (region_name, its ZIP list) for a ZIP, so the auto-advance stays in
-    that metro. Unknown metro -> (None, []) = only scrape what the user typed."""
+    that metro. Unknown metro -> (None, []) = fall back to numeric-nearby ZIPs."""
     z = (zip_code or "").strip()
     for name, zips in REGIONS:
         if z in zips:
@@ -292,6 +292,32 @@ def region_for(zip_code):
         if rn == name:
             return rn, zips
     return None, []
+
+
+def nearby_zips(seeds, want=60):
+    """Generate ZIPs numerically near the seed ZIP(s) -- the 'next logical place'
+    once the curated metro list runs out. ZIP numbering is GEOGRAPHIC (the first 3
+    digits = a Sectional Center Facility, a physical region), so same-SCF and
+    adjacent-SCF ZIPs are physically nearby. Returns them ordered by distance from
+    the seed, so it expands outward. Empty/rural ZIPs just scrape few businesses --
+    harmless, it moves on. Keeps the scraper covering ground on its own."""
+    seed_ints = sorted({int(z) for z in seeds if z.isdigit() and len(z) == 5})
+    if not seed_ints:
+        return []
+    scfs = set()
+    for z in seed_ints:
+        s = z // 100                     # first 3 digits = the SCF (a real region)
+        for d in (-2, -1, 0, 1, 2):
+            if s + d > 0:
+                scfs.add(s + d)
+    cands = []
+    for scf in scfs:
+        for tail in range(100):
+            c = scf * 100 + tail
+            if 0 < c < 100000 and c not in seed_ints:
+                cands.append(c)
+    cands.sort(key=lambda c: min(abs(c - z) for z in seed_ints))   # closest first
+    return ["%05d" % c for c in cands[:want]]
 
 
 def load_zips_done():
@@ -599,18 +625,23 @@ def main():
     # stays in OKC and Houston stays in Houston -- no cross-city mixing.
     zips_done = load_zips_done()
     region, region_zips = region_for(zips[0])
-    extra = [z for z in region_zips if z not in zips]
+    curated = [z for z in region_zips if z not in zips]
+    # after the curated metro list, keep going to the NEXT LOGICAL PLACE = numeric-
+    # nearby ZIPs (same/adjacent SCF), ordered outward. So it never just stops.
+    near = [z for z in nearby_zips(zips + curated) if z not in zips and z not in curated]
+    extra = list(dict.fromkeys(curated + near))
     zip_plan = [z for z in zips if z not in zips_done] + [z for z in extra if z not in zips_done]
     if not zip_plan:                          # everything known is covered -> start fresh
         zips_done = set(); save_zips_done(zips_done)
         zip_plan = list(dict.fromkeys(zips + extra))
     qdone = load_progress()                    # per-search resume within a ZIP
     if region:
-        print("\nMetro: %s -- after your ZIP(s) it auto-advances through nearby %s "
-              "fiber ZIPs (same city only)." % (region, region))
+        print("\nMetro: %s -- after your ZIP(s) it works the %s fiber ZIPs, then keeps "
+              "going OUTWARD to the next nearby ZIPs (same region, never another city)."
+              % (region, region))
     else:
-        print("\n(ZIP not in a known metro -- scraping ONLY what you entered, no "
-              "auto-advance, so it can't wander into another city.)")
+        print("\n(ZIP not in a curated metro -- it scrapes your ZIP(s) then auto-advances "
+              "to the NEAREST ZIPs numerically (same area), expanding outward.)")
     shown = ", ".join(zip_plan[:10]) + (" +%d more" % (len(zip_plan) - 10) if len(zip_plan) > 10 else "")
     print("ZIP plan (auto-advances to the next ZIP after each; close the window to stop):\n  %s\n" % shown)
 
