@@ -864,6 +864,13 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   `omkarcloud/google-maps-scraper` + `botasaurus` (async/parallel). Sources: scrap.io GH scraper guide,
   serpapi pb-decoder, scrape.do tbm=map JSON. Decision on the big rewrite (embedded-JSON vs concurrency)
   deferred; resource-block + Heavy-mode are the wins for now.
+  **SHIPPED SAFE SPEEDUP — smart waits (`60694ee`, 2026-07-01).** Replaced the fixed per-page sleeps
+  (2.5s after search, 1.1s per place page) with `wait_for_selector` on the elements actually read
+  (`div[role="feed"]`; `button[data-item-id='address'|^='phone']`), capped at the SAME durations. Pages
+  usually paint faster than the caps, so it drops the dead waiting across the thousands of pages a Deep
+  run visits — ZERO risk: same cap = never reads too early (no missing/wrong data), identical requests
+  = no extra block risk, same categories = full coverage. THROTTLE (0.8s human pacing) kept — that's
+  safety, not waste. This is the safe half of "faster map scraping."
   **>>> PARKED (Patrick, 2026-07-01: "put this in the brain, mess w it later"). Current state = the
   scraper is left as its PROVEN, reliable self (image-blocking OFF by default; Deep stays for full
   coverage — Patrick wants ALL businesses, not fewer categories). Nothing more shipped. WHEN WE
