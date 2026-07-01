@@ -841,6 +841,16 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   Command GHL (Houston reps). So OKC needs its OWN dialer lane — its own GHL sub-account/reps, or at
   minimum a city tag + a separate load — before OKC matches get dialed. Don't feed OKC into the
   Houston power dialer. (Patrick to say whether OKC has its own GHL account/team.)
+- **"WE'RE GOING TO BE WORKING EVERYWHERE" (Patrick, 2026-07-01).** The pipeline must scale to MANY
+  metros, not just Houston/OKC. Already handled: the scraper's `nearby_zips` fallback means ANY ZIP in
+  ANY metro auto-advances outward (Houston/OKC just have hand-tuned curated orders on top). Confirmed
+  live: entering **73132** → `Metro: Oklahoma City` + plan `73132, 73106, 73103, … +83 more` (all OKC,
+  no Houston bleed). **OPEN SCALABILITY GAP (flag before multi-city dialer loads):** all cities pile
+  into the SAME "Maps Businesses"/"Fiber Green Biz" tabs, so the wrong city's leads can reach the wrong
+  team's dialer. Separation is currently enforced by hand at load time — won't scale. Clean fix =
+  **tag every scraped row + match with its market (ZIP/city)** so each dialer filters to its own city
+  (needs a new column + a `dialer_loader` update to read it). Offered; Patrick to say now vs. when the
+  2nd city gets a dialer.
 - **NATIONWIDE VISION (Patrick, 2026-07-01) — PARKED, build later.** Goal: take the software
   nationwide to auto-find two "buy-now" signals and point the hunter/scraper at them: (1) **new AT&T
   fiber** just lit, and (2) **cable-ISP outages** (Comcast/Spectrum/Cox down = frustrated customers
