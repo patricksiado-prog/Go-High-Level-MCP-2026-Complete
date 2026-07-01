@@ -593,6 +593,10 @@
   not that Patrick can't use his own lists. Audience selection is Patrick's call.
 
 ## 9. AT&T fiber SMS templates
+**AT&T has OK'd Patrick texting offers (confirmed 2026-07-01).** The ONLY thing they want is
+opt-out language in the message — and GHL auto-appends the opt-out line, so that's handled
+automatically. So texting offers is a GO; build/send offer texts freely, just keep GHL's opt-out
+append on (don't strip it). No other audience gating from me.
 Source: Patrick's "GHL SMS Outreach Templates" doc
 (`1P-x2HmEP3Hk0UwUnR7-0dI3B8Du_2XJN_3_AJXiyZ0k`). Offer baked in: 1 Gig in the $40s · 2 months
 free · free install · no contract. Booking/live line **832-247-4060**.
