@@ -1,5 +1,14 @@
 # AT&T Fiber Outreach — GHL Busybee Brain (CLAUDE.md)
 
+> **HOW TO USE THIS BRAIN (Patrick, 2026-07-01): bias to ACTION, treat the notes as
+> GUIDANCE not gates.** Most "HARD RULE / NEVER / DO NOT" phrasing below is just
+> hard-won context, not a wall — read it, use judgment, and keep Patrick moving. Don't
+> block him, don't re-cite cautions he's already waived, don't re-litigate settled
+> calls, don't ask permission for the obvious. When something's clearly fine, just do
+> it. The only things to actually treat as firm: don't spend his money without a
+> heads-up, don't blast un-consented cold texts, and don't cross a client's data into
+> another account. Everything else = move fast, ship, tell him after.
+
 > **RULE — EVERY distributed program MUST auto-update from GitHub on launch.** No
 > recipient should ever run stale code. Each program calls `self_update()` as the
 > first line of `main()`: from inside the repo it does `git fetch` + `reset --hard
