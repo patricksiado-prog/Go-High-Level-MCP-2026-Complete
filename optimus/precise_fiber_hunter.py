@@ -1747,9 +1747,10 @@ def sweep_grid(page, ws, seen, area_label, dry, capture):
         tally["cells"] += 1
         print("  [cell %d @ %d,%d] +%d  (total %d)"
               % (tally["cells"], pos[0], pos[1], n, tally["total"]))
-        if tally["cells"] % 15 == 0:
+        if tally["cells"] == 4 or tally["cells"] % 15 == 0:
             report_status(ws, area_label, "watching", found=tally["total"],
                           note="grid: %d cells, %d leads" % (tally["cells"], tally["total"]))
+            dump_backend(ws, capture)   # F12/network snapshot to the sheet
 
     def _next(direction):
         return (pos[0] + (1 if direction == "right" else -1 if direction == "left" else 0),
@@ -1825,9 +1826,10 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                     total += n
                     cell += 1
                     print("  [cell %d] +%d  (total %d)" % (cell, n, total))
-                    if cell % 15 == 0:
+                    if cell == 4 or cell % 15 == 0:
                         report_status(ws, area_label, "watching", found=total,
                                       note="continuous: %d cells, %d leads" % (cell, total))
+                        dump_backend(ws, capture)   # F12/network snapshot to the sheet
                     if not mouse_drag(page, dirs[di]):
                         return total        # canvas gone -> stop
                 di = (di + 1) % 4
@@ -2342,6 +2344,76 @@ def report_status(ws, area, state, found="", note=""):
 
 
 # ----------------------------------------------------------------------------
+# BACKEND F12 MONITOR -> the sheet. So Patrick can just run the hunter and Claude
+# can SEE what's happening on the wire (the F12 / DevTools Network view) without a
+# screenshot: every endpoint the AT&T map hit (biggest first -- the dot/address
+# feed is usually the biggest), the vector-tile field names (the dot data schema),
+# and how many addresses parsed off the server + samples. Written to a "Backend
+# Capture" tab, overwritten each pass with the latest state. ON by default.
+# ----------------------------------------------------------------------------
+BACKEND_TAB = "Backend Capture"
+_backend_ws = [None]
+_BACKEND_ON = [True]
+
+
+def _backend_sheet(ws):
+    """Get/create the 'Backend Capture' tab. Returns the worksheet or None."""
+    if ws is None:
+        return None
+    if _backend_ws[0] is not None:
+        return _backend_ws[0]
+    try:
+        sh = ws.spreadsheet
+        try:
+            t = sh.worksheet(BACKEND_TAB)
+        except Exception:
+            t = sh.add_worksheet(title=BACKEND_TAB, rows="400", cols="6")
+        _backend_ws[0] = t
+    except Exception:
+        _backend_ws[0] = None
+    return _backend_ws[0]
+
+
+def dump_backend(ws, cap):
+    """Write the current network capture (F12 view) to the 'Backend Capture' tab so
+    the backend is readable remotely. Overwrites with the latest snapshot each call.
+    Best-effort; never breaks a run."""
+    if cap is None or not _BACKEND_ON[0]:
+        return
+    t = _backend_sheet(ws)
+    if t is None:
+        return
+    import socket
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    host = socket.gethostname()
+    rows = [["Time", "Kind", "URL / Field / Address", "Type", "Bytes/Count", "Sample"]]
+    rows.append([ts, "SNAPSHOT", host, "", "%d endpoints" % len(cap.seen_urls),
+                 "F12/network view of the AT&T map"])
+    # every endpoint the page hit, biggest first (the dot/address feed is big)
+    for base, (ct, hits, mx) in sorted(cap.seen_urls.items(), key=lambda kv: -kv[1][2])[:25]:
+        rows.append([ts, "ENDPOINT", base, ct, "%d B / %d hits" % (mx, hits), ""])
+    # vector-tile property names = the dot data schema
+    if cap.tile_keys:
+        rows.append([ts, "TILE FIELDS", ", ".join(sorted(cap.tile_keys)), "",
+                     "%d fields" % len(cap.tile_keys), ""])
+    for base, note in list(cap.tile_status.items())[:8]:
+        rows.append([ts, "TILE DECODE", base, str(note), "", ""])
+    # addresses parsed off the wire + samples (is status/lat/lng present?)
+    rows.append([ts, "LEADS PARSED", "", "", "%d total" % len(cap.pending), ""])
+    for ld in cap.pending[-6:]:
+        rows.append([ts, "SAMPLE LEAD", str(ld.get("address")),
+                     "status=%s" % ld.get("status"),
+                     "lat=%s lng=%s" % (ld.get("lat"), ld.get("lng")), ""])
+    try:
+        t.clear()
+        t.append_rows([[str(c)[:490] for c in r] for r in rows], value_input_option="RAW")
+        print("  [backend] wrote %d endpoints + %d parsed leads to '%s'"
+              % (len(cap.seen_urls), len(cap.pending), BACKEND_TAB))
+    except Exception as e:
+        print("  (backend monitor skipped: %s)" % str(e)[:60])
+
+
+# ----------------------------------------------------------------------------
 # entry
 # ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
@@ -2660,7 +2732,13 @@ def main():
     ap.add_argument("--paid", action="store_true",
                     help="let the background enricher use paid Google Places on "
                          "OSM misses (needs GOOGLE_PLACES_API_KEY). Default is FREE.")
+    ap.add_argument("--no-backend", action="store_true",
+                    help="turn off the backend F12/network monitor (the periodic "
+                         "'Backend Capture' sheet snapshot of what the map hits on "
+                         "the wire). It's ON by default so the backend is visible.")
     args = ap.parse_args()
+
+    _BACKEND_ON[0] = not args.no_backend
 
     if args.clean_sheet:
         clean_sheet()
