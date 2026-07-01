@@ -828,6 +828,19 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   sheet-quota/stall + console-noise source. Patrick must RESTART to pull all of it (his run showed old
   "business match ON" wording). NOTE he was hunting **OKC 73106 (NW 13th St), not Houston** — fine for
   proving capture, but those matches must NOT feed the Houston dialer.
+- **OKC IS A REAL MARKET (Patrick, 2026-07-01: "we do lots of biz there").** He ran the scraper on
+  **73106 (Oklahoma City)** from a different PC and noticed the "alternative ZIPs" (the auto-advance
+  list) were missing/different. Cause: the scraper's auto-advance `NEXT_ZIPS` was hard-coded to
+  **Houston** (77027, 77098, …), and `maps_zips_done.json` is per-machine (fresh PC = no memory).
+  Entering an OKC ZIP would have rolled straight into Houston ZIPs → mixing both cities in
+  "Maps Businesses" → polluting the Houston dialer. FIX (pushed): scraper auto-advance is now
+  **region-aware** — `region_for(zip)` picks the metro from the first ZIP entered: `HOUSTON_ZIPS`,
+  new `OKC_ZIPS` (OKC/Edmond/Norman/Moore/MWC), or NO auto-advance for an unknown metro (scrape only
+  what's typed). Houston stays Houston, OKC stays OKC. **OPEN / NEXT DECISION:** OKC green-biz matches
+  still land in the SAME "Fiber Green Biz" tab and `dialer_loader` loads that into the **Houston**
+  Command GHL (Houston reps). So OKC needs its OWN dialer lane — its own GHL sub-account/reps, or at
+  minimum a city tag + a separate load — before OKC matches get dialed. Don't feed OKC into the
+  Houston power dialer. (Patrick to say whether OKC has its own GHL account/team.)
 - **NEW SKILL `mapbox-extraction` (researched + added 2026-07-01).** Codifies how to pull
   dot/feature data off a Mapbox map that HIDES its instance — the exact AT&T dead-end the brain
   called "IMPOSSIBLE." Research finding: it is NOT impossible; the standard escape hatches are (1)
