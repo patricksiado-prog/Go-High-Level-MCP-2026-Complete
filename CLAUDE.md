@@ -100,6 +100,15 @@
 >    "nationwide signals" build (FCC new-fiber + cable-outage) is for — it now has a clear purpose:
 >    point the hunter/scraper at those areas so the green-biz SMS list is fresh + motivated.
 > Net: hunter+scraper → Fiber Green Biz (bulk) → filter to textable numbers → bulk SMS the AT&T offer.
+>
+> **THE TWO ACTIVE BUILD PRIORITIES (Patrick, 2026-07-01) — these two make the goal real:**
+> **(A) Textable-number filter** — so we can bulk-text only the mobile/VoIP green-biz numbers.
+> **(B) FIND THE NEW STUFF** — a finder for freshly-lit AT&T fiber (FCC National Broadband Map / BDC
+> API, free — see the `fiber-signals` skill) and, when we can source it, recently-messed-up cable
+> areas → outputs a target queue that points the hunter/scraper at the hottest fresh ground. This is
+> the front of the funnel; (A) is the back. Build both. (The old "nationwide vision — parked" note
+> below is now UN-parked for the new-fiber half — start with FCC new-fiber, defer the paid cable-outage
+> source.)
 
 - Opener: Patrick w/ AT&T, fiber available, 1 Gig in the $40s, 2 months free, free install,
   ask for a day/time.
