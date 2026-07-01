@@ -813,6 +813,21 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   ends into the SAME tabs. Only the console WORDING differed; now both print `COMBO MATCH ON: …` on load
   and `MATCH  +N green (fiber lead + business), +N orange (upgrade + business)  [total matches: T]` per
   hit, with a running total.
+- **LIVE RUN 2026-07-01 (Patrick's screenshots) — two real causes of "it stopped," both now fixed.**
+  Console showed the sweep panning (PAN right/down/left/up) but EVERY drag "from (683,384)" (same
+  point) and the total FLATLINED at 13 after cell 4 (`+11`, `+2`, then `+0,+0,+0`), with several
+  "(no 'search this area' control found this view)". That's the map NOT actually moving on the
+  too-fast flick = the OLD pan code (the run predated the gesture fix). ALSO: the `[none]/[cache]`
+  spam in the log = the background **enrichment thread**, which ALSO writes to the sheet, so it
+  competes with the sweep for the Sheets write quota (60/min) → 429 throttle → the flush stalls →
+  looks frozen. FIXES: (1) hardened pan gesture (already pushed) makes the drag actually pan; (2)
+  **enrichment is now OFF by default** (opt-in `--enrich`) — it was low value anyway (captures in the
+  shot were a single commercial building `605 NW 13TH ST` with many suites, all "no phone"; houses
+  have no free phone; business phones come from the scraper match). Patrick's instinct that "the free
+  enrichment is messing things up" was PARTLY right — it wasn't the pan stall, but it was a real
+  sheet-quota/stall + console-noise source. Patrick must RESTART to pull all of it (his run showed old
+  "business match ON" wording). NOTE he was hunting **OKC 73106 (NW 13th St), not Houston** — fine for
+  proving capture, but those matches must NOT feed the Houston dialer.
 - **NEW SKILL `mapbox-extraction` (researched + added 2026-07-01).** Codifies how to pull
   dot/feature data off a Mapbox map that HIDES its instance — the exact AT&T dead-end the brain
   called "IMPOSSIBLE." Research finding: it is NOT impossible; the standard escape hatches are (1)
