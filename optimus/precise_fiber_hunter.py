@@ -2507,12 +2507,28 @@ def _ensure_biz_tab(sh, title):
         return None
 
 
+def _biz_key(row5):
+    """The dedup identity of a match row [name, phone, addr, web, cat]: the phone's
+    last 10 digits when present (same lead even if the address TEXT varies between
+    the hunter's and the scraper's write), else the normalized address, else
+    name|address. This is how the real UNIQUE lead count is taken (by phone), so
+    keying dedup on it kills the pile-up in the match tabs."""
+    row5 = (list(row5) + [""] * 5)[:5]
+    digits = re.sub(r"\D", "", row5[1] or "")
+    if len(digits) >= 10:
+        return "P:" + digits[-10:]
+    a = _norm_addr(row5[2])
+    if a:
+        return "A:" + a
+    return "R:" + (str(row5[0]) + "|" + str(row5[2])).strip().upper()
+
+
 def _biz_seen(ws):
     if ws is None:
         return set()
     try:
-        return set(r[2].strip().upper() for r in ws.get_all_values()[1:]
-                   if len(r) > 2 and r[2].strip())
+        return set(_biz_key(r) for r in ws.get_all_values()[1:]
+                   if any((c or "").strip() for c in r[:3]))
     except Exception:
         return set()
 
@@ -2523,11 +2539,64 @@ def _csv_seen(path):
         import csv as _csv
         with open(path, newline="") as f:
             for row in _csv.reader(f):
-                if len(row) > 2 and row[2].strip():
-                    s.add(row[2].strip().upper())
+                if row and any((c or "").strip() for c in row[:3]):
+                    s.add(_biz_key(row))
     except Exception:
         pass
     return s
+
+
+def dedupe_biz_tab(ws, title):
+    """Remove duplicate rows from ONE match tab in place, keeping the first row per
+    unique lead (by _biz_key) plus the header. No-op if it's already unique (so it's
+    cheap to call every startup -- one read, no rewrite when clean)."""
+    if ws is None:
+        return
+    try:
+        vals = ws.get_all_values()
+    except Exception:
+        return
+    if len(vals) <= 2:
+        return
+    header = vals[0] if vals[0] else BIZ_HEADER
+    body = vals[1:]
+    seen, kept = set(), []
+    for r in body:
+        r = (list(r) + [""] * 5)[:5]
+        if not any((c or "").strip() for c in r):
+            continue
+        k = _biz_key(r)
+        if k in seen:
+            continue
+        seen.add(k)
+        kept.append(r)
+    if len(kept) == len(body):
+        return   # already unique -> don't rewrite (no quota burn, no slowdown)
+    try:
+        ws.clear()
+        ws.append_row(header)
+        for i in range(0, len(kept), 500):
+            ws.append_rows(kept[i:i + 500], value_input_option="RAW")
+        print("  deduped '%s': %d rows -> %d unique (removed %d duplicates)"
+              % (title, len(body), len(kept), len(body) - len(kept)))
+    except Exception as e:
+        print("  (dedupe '%s' skipped: %s)" % (title, str(e)[:50]))
+
+
+def dedupe_biz_tabs(ws):
+    """Dedupe BOTH match tabs. Safe to call every startup -- only rewrites a tab
+    that actually has duplicates."""
+    if ws is None:
+        return
+    try:
+        sh = ws.spreadsheet
+        for title in (GREEN_BIZ_TAB, ORANGE_BIZ_TAB):
+            try:
+                dedupe_biz_tab(sh.worksheet(title), title)
+            except Exception:
+                pass
+    except Exception:
+        pass
 
 
 def _append_biz_csv(path, rows):
@@ -2571,6 +2640,7 @@ def init_bizmatch(ws):
     # matching off; we fall back to a local CSV so matches are still saved.
     _BIZ["green_ws"] = _ensure_biz_tab(sh, GREEN_BIZ_TAB)
     _BIZ["orange_ws"] = _ensure_biz_tab(sh, ORANGE_BIZ_TAB)
+    dedupe_biz_tabs(ws)   # clean historical duplicate rows once (no-op if already unique)
     _BIZ["green_seen"] = _biz_seen(_BIZ["green_ws"]) | _csv_seen(GREEN_CSV)
     _BIZ["orange_seen"] = _biz_seen(_BIZ["orange_ws"]) | _csv_seen(ORANGE_CSV)
     dst = ("the '%s' / '%s' tabs" % (GREEN_BIZ_TAB, ORANGE_BIZ_TAB)
@@ -2649,18 +2719,18 @@ def match_leads_to_biz(new_records):
         if not b:
             continue
         addr = ld.get("address") or ""
-        au = addr.strip().upper()
         row = [b.get("name") or "", b.get("phone") or "", addr,
                b.get("website") or "", b.get("category") or ""]
+        k = _biz_key(row)   # dedup by phone (else address) so the tab can't pile up
         if (ld.get("dot_status") or "").lower() == "copper_upgrade":
-            if au in _BIZ["orange_seen"]:
+            if k in _BIZ["orange_seen"]:
                 continue
-            _BIZ["orange_seen"].add(au)
+            _BIZ["orange_seen"].add(k)
             o_rows.append(row)
         else:
-            if au in _BIZ["green_seen"]:
+            if k in _BIZ["green_seen"]:
                 continue
-            _BIZ["green_seen"].add(au)
+            _BIZ["green_seen"].add(k)
             g_rows.append(row)
     try:
         if g_rows:
@@ -2752,9 +2822,23 @@ def main():
                     help="turn off the backend F12/network monitor (the periodic "
                          "'Backend Capture' sheet snapshot of what the map hits on "
                          "the wire). It's ON by default so the backend is visible.")
+    ap.add_argument("--dedupe-biz", action="store_true",
+                    help="remove duplicate rows from the Fiber Green Biz / Upgrade "
+                         "Orange Biz tabs (keep one row per unique lead, by phone), "
+                         "then exit. The hunter also auto-dedupes these on startup.")
     args = ap.parse_args()
 
     _BACKEND_ON[0] = not args.no_backend
+
+    if args.dedupe_biz:
+        ws = open_sheet()
+        if ws is None:
+            print("No sheet available -- nothing to dedupe.")
+        else:
+            print("Deduping the business-match tabs...")
+            dedupe_biz_tabs(ws)
+            print("Done.")
+        return
 
     if args.clean_sheet:
         clean_sheet()
