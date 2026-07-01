@@ -841,6 +841,23 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   Command GHL (Houston reps). So OKC needs its OWN dialer lane — its own GHL sub-account/reps, or at
   minimum a city tag + a separate load — before OKC matches get dialed. Don't feed OKC into the
   Houston power dialer. (Patrick to say whether OKC has its own GHL account/team.)
+- **NATIONWIDE VISION (Patrick, 2026-07-01) — PARKED, build later.** Goal: take the software
+  nationwide to auto-find two "buy-now" signals and point the hunter/scraper at them: (1) **new AT&T
+  fiber** just lit, and (2) **cable-ISP outages** (Comcast/Spectrum/Cox down = frustrated customers
+  ready to switch). Architecture = NATIONAL SIGNALS → target queue → hunter + scraper (the region
+  system built today, Houston/OKC, is the seed — generalize the ZIP→metro registry to all metros).
+  Research done 2026-07-01: **new-fiber signal is buildable for free** via the **FCC National Broadband
+  Map / BDC API** (`broadbandmap.fcc.gov`, `broadbandmap.com/developers`) — query provider + technology
+  (fiber/cable/DSL) by location nationwide → find where AT&T fiber is newly available + where cable is
+  the only option (the `fiber-signals` skill already documents BDC). **Cable-outage signal** = harder:
+  **Downdetector** is the gold standard (ZIP-level, ~60s refresh) but its API is **PAID** + Cloudflare-
+  protected (unofficial scrapers unreliable); free alternatives = provider status maps (Xfinity/
+  Spectrum/Cox) + Reddit/X outage chatter (coarser). DECISION on the outage data source (free signals
+  vs paid Downdetector) deferred. **What Patrick DID want now (done):** the scraper keeps going to the
+  "next logical place" after the curated metro — `nearby_zips()` auto-advances to the numerically
+  nearest ZIPs (same/adjacent SCF = geographic), expanding outward, so it never just stops. When the
+  nationwide build resumes, start with the FCC new-fiber engine (free, clear value), then revisit the
+  outage source.
 - **NEW SKILL `mapbox-extraction` (researched + added 2026-07-01).** Codifies how to pull
   dot/feature data off a Mapbox map that HIDES its instance — the exact AT&T dead-end the brain
   called "IMPOSSIBLE." Research finding: it is NOT impossible; the standard escape hatches are (1)
