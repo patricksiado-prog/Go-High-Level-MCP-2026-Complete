@@ -2810,7 +2810,14 @@ def main():
                     help="re-enable the old pixel-click dot capture (off by "
                          "default because the clicks can flip the view to the portal)")
     ap.add_argument("--no-enrich", action="store_true",
-                    help="don't run phone/business enrichment in the background")
+                    help="(kept for compatibility; enrichment is OFF by default now)")
+    ap.add_argument("--enrich", action="store_true",
+                    help="run phone/business enrichment in the background during the "
+                         "hunt. OFF by default now -- it writes to the sheet too, so it "
+                         "competes for the write quota and can stall the sweep, and most "
+                         "captures are houses with no free phone anyway (business phones "
+                         "already come from the scraper match). Run it as its own pass "
+                         "instead, or pass --enrich to re-enable it inline.")
     ap.add_argument("--no-match", action="store_true",
                     help="don't cross-reference captured leads to the scraped "
                          "businesses live (skip the Fiber Green Biz / Upgrade "
@@ -2946,7 +2953,7 @@ def main():
         # OSM first; paid Places only with --paid + a key). It tails
         # precise_addresses.jsonl, so every address the hunter writes gets a
         # name/phone attached while the scan keeps going. Daemon = dies with us.
-        if not args.no_enrich and not args.dry:
+        if args.enrich and not args.no_enrich and not args.dry:
             _start_enrichment(args.paid)
 
         def one_pass():
