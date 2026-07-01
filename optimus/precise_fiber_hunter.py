@@ -84,6 +84,7 @@ RUN:
 """
 
 import os, sys, time, argparse, re
+import hashlib
 
 import json
 import threading
@@ -1657,34 +1658,34 @@ def _viewport_map_box(page):
             "height": vp["height"] * (MAP_BOTTOM_FRAC - MAP_TOP_FRAC)}
 
 
-def mouse_drag(page, direction, quiet=False):
-    """PROVEN fiber_hunter motion: DRAG to pan (the original used
-    pyautogui.dragRel, ~150px serpentine). A drag is a map gesture, so it pans
-    the HIDDEN Mapbox map where arrow keys / panBy do nothing. We drag the map
-    CANVAS if we can find it (even in a frame); otherwise we drag the map REGION
-    of the screen -- either way page.mouse moves the map. Drag the content the
-    OPPOSITE way you want the viewport to move. quiet=True is a fast, silent
-    pass-through pan (used to skate across cells already scanned)."""
+def _view_sig(page):
+    """A cheap fingerprint of the current view -- used to tell if a pan actually
+    MOVED the map (different pixels = it moved). Returns a hash or None."""
+    try:
+        return hashlib.md5(page.screenshot(type="png")).hexdigest()
+    except Exception:
+        return None
+
+
+def _do_drag(page, direction, frac):
+    """The raw drag gesture at a given distance fraction. Returns True if the drag
+    ran, False only if the browser is gone (page.mouse threw)."""
     box = _map_canvas_box(page)
-    src = "canvas"
     if not box:
         box = _viewport_map_box(page)   # canvas hidden in a frame -> drag screen
-        src = "screen"
     cx = box["x"] + box["width"] / 2.0
     cy = box["y"] + box["height"] / 2.0
     sx, sy = {"right": (-1, 0), "left": (1, 0),
               "down": (0, -1), "up": (0, 1)}[direction]
-    dx = sx * box["width"] * DRAG_FRAC
-    dy = sy * box["height"] * DRAG_FRAC
-    if not quiet:
-        print("  -> PAN %s: drag %s from (%d,%d)" % (direction, src, int(cx), int(cy)))
+    dx = sx * box["width"] * frac
+    dy = sy * box["height"] * frac
     try:
         page.mouse.move(cx, cy)
         page.mouse.down()
         # A too-fast flick (down->move->up with no hold) can be read by Mapbox as a
-        # CLICK, not a drag -> the map doesn't pan ("stopped panning"). Hold briefly
-        # after down so the grab registers, move in TWO stages while held so it's an
-        # unambiguous drag-pan, then settle before release so the pan commits.
+        # CLICK, not a drag -> the map doesn't pan. Hold briefly after down so the
+        # grab registers, move in TWO stages while held so it's an unambiguous
+        # drag-pan, then settle before release so the pan commits.
         page.wait_for_timeout(60)
         page.mouse.move(cx + dx * 0.5, cy + dy * 0.5, steps=6)
         page.mouse.move(cx + dx, cy + dy, steps=6)
@@ -1693,7 +1694,58 @@ def mouse_drag(page, direction, quiet=False):
     except Exception as e:
         print("     drag failed: %s" % str(e)[:70])
         return False
-    time.sleep(0.05 if quiet else WAIT_AFTER_PAN)
+    return True
+
+
+def _arrow_pan(page, direction):
+    """Fallback motion: focus the map canvas, then arrow-key pan. Some views honor
+    keys after a focus click even when a drag is being swallowed."""
+    try:
+        focus_map(page)
+        key = {"left": "ArrowLeft", "right": "ArrowRight",
+               "up": "ArrowUp", "down": "ArrowDown"}[direction]
+        for _ in range(PAN_PRESSES):
+            page.keyboard.press(key)
+            time.sleep(0.05)
+        return True
+    except Exception:
+        return False
+
+
+def mouse_drag(page, direction, quiet=False):
+    """PAN the map and VERIFY it actually moved -- the fix for 'it stopped panning'.
+    Does the proven drag, screenshots before/after, and if the view DIDN'T change it
+    ESCALATES: a bigger drag, then focus+arrow-keys -- adapting to whatever the map
+    responds to instead of blindly dragging dead space. Returns False ONLY if the
+    browser is gone (so the sweep stops on a real close, never on a stuck cell).
+    quiet=True = fast silent pass-through (skating over already-scanned cells), no
+    verify. Drag the content the OPPOSITE way you want the viewport to move."""
+    src = "canvas" if _map_canvas_box(page) else "screen"
+    if quiet:
+        return _do_drag(page, direction, DRAG_FRAC)
+    print("  -> PAN %s: drag %s" % (direction, src))
+    before = _view_sig(page)
+    if not _do_drag(page, direction, DRAG_FRAC):
+        return False                     # browser gone -> let the sweep stop
+    time.sleep(WAIT_AFTER_PAN)
+    if before is None or _view_sig(page) != before:
+        return True                      # moved (or can't tell) -> good
+    # DIDN'T MOVE -> (1) a bigger drag
+    if not _do_drag(page, direction, min(0.9, DRAG_FRAC * 1.8)):
+        return False
+    time.sleep(WAIT_AFTER_PAN)
+    if _view_sig(page) != before:
+        print("     (needed a bigger drag)")
+        return True
+    # (2) focus the canvas + arrow keys
+    _arrow_pan(page, direction)
+    time.sleep(WAIT_AFTER_PAN)
+    if _view_sig(page) != before:
+        print("     (fell back to arrow keys)")
+        return True
+    # still unchanged: the area may be identical, or the map is briefly stuck --
+    # DON'T stop the sweep (browser is alive); report and move on.
+    print("     (view unchanged -- area may be identical or map briefly stuck; continuing)")
     return True
 
 
