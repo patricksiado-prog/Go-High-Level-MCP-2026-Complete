@@ -841,6 +841,24 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   Command GHL (Houston reps). So OKC needs its OWN dialer lane — its own GHL sub-account/reps, or at
   minimum a city tag + a separate load — before OKC matches get dialed. Don't feed OKC into the
   Houston power dialer. (Patrick to say whether OKC has its own GHL account/team.)
+- **SCRAPER SPEED — research + roadmap (Patrick asked "can it go faster?", 2026-07-01).** Current
+  standalone scraper is Playwright, SEQUENTIAL, and its #1 time sink is the **per-place `page.goto(href)`**
+  (`scrape_query` lines ~210-230): for EVERY business it navigates to that business's Maps page (wait
+  1100ms) just to read phone/website. Deep=155 categories/ZIP × ~20 places each = thousands of page
+  loads. **SHIPPED (safe, high-confidence, `d8eddf7`):** `ctx.route` now aborts image/media/font
+  requests — map tiles (images) are the heaviest bytes on every page, and we only read TEXT, so this
+  ~90% data cut speeds every load AND lowers block risk (fewer requests). Data read is unaffected.
+  **IMMEDIATE, zero-code:** use **Heavy (47 cats)** not **Deep (155)** → ~3x fewer searches. **Bigger
+  levers (need live testing — can't test scrapers from the sandbox, Google 403s here):** (1) **read
+  phone/website from the search feed's embedded JSON** (`APP_INITIALIZATION_STATE` / the pb-protobuf
+  nested-array) instead of visiting each place page — kills the per-place goto entirely = the biggest
+  win AND fewer requests; this is how the fastest tool works. (2) **Concurrency** — parallel place
+  visits via multiple pages/contexts (async Playwright, 5-10x) BUT raises block risk. (3) trim the
+  fixed waits (2500/1400/1100ms). **Fastest existing OSS = `gosom/google-maps-scraper` (Go)** — reads
+  Google's internal JSON, `-c` concurrency flag; but needs Go/Docker (team can't easily). Python OSS:
+  `omkarcloud/google-maps-scraper` + `botasaurus` (async/parallel). Sources: scrap.io GH scraper guide,
+  serpapi pb-decoder, scrape.do tbm=map JSON. Decision on the big rewrite (embedded-JSON vs concurrency)
+  deferred; resource-block + Heavy-mode are the wins for now.
 - **"WE'RE GOING TO BE WORKING EVERYWHERE" (Patrick, 2026-07-01).** The pipeline must scale to MANY
   metros, not just Houston/OKC. Already handled: the scraper's `nearby_zips` fallback means ANY ZIP in
   ANY metro auto-advances outward (Houston/OKC just have hand-tuned curated orders on top). Confirmed
