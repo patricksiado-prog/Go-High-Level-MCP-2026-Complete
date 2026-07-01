@@ -661,26 +661,30 @@ def main():
             print("  Running in the background (no window). You can keep using your PC.")
         ctx = p.chromium.launch_persistent_context(
             PROFILE_DIR, headless=not show, viewport={"width": 1280, "height": 900})
-        # SPEED: block images / map tiles / media / fonts. We only read TEXT from the
-        # DOM (name, address, phone, website), so those bytes are pure waste -- and on
-        # Google Maps the map tiles (images) are the heaviest thing on every page. This
-        # makes each page load (the search AND every per-place visit, the #1 time sink)
-        # much faster, cuts transferred data ~90%, and LOWERS block risk (fewer
-        # requests) -- unlike parallelism, which raises it. Data we read is unaffected.
-        def _block_heavy(route):
+        # SPEED (OPT-IN): block images / map tiles / media / fonts so pages load
+        # lighter. It's a real, mainstream speed technique (omkarcloud's Botasaurus
+        # ships `block_resources`), BUT it is ALSO a documented BOT-DETECTION signal:
+        # a real browser loads images; one that never requests them looks automated,
+        # and Google Maps is an aggressive detector. So it's OFF BY DEFAULT (keep the
+        # proven, works-without-blocking behavior) and only turns on when you set
+        # SCRAPER_BLOCK_IMAGES=1 -- opt in, watch for more blocks, back out if so.
+        if os.environ.get("SCRAPER_BLOCK_IMAGES") == "1":
+            def _block_heavy(route):
+                try:
+                    if route.request.resource_type in ("image", "media", "font"):
+                        return route.abort()
+                except Exception:
+                    pass
+                try:
+                    return route.continue_()
+                except Exception:
+                    pass
             try:
-                if route.request.resource_type in ("image", "media", "font"):
-                    return route.abort()
+                ctx.route("**/*", _block_heavy)
+                print("  (SPEED: image/tile blocking ON -- watch for more Google blocks; "
+                      "unset SCRAPER_BLOCK_IMAGES to revert)")
             except Exception:
                 pass
-            try:
-                return route.continue_()
-            except Exception:
-                pass
-        try:
-            ctx.route("**/*", _block_heavy)
-        except Exception:
-            pass
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
         out_f = open(OUT_PATH, csv_mode, newline="", encoding="utf-8")
         writer = csv.DictWriter(out_f, fieldnames=FIELDS)
