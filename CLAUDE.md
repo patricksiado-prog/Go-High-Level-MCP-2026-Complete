@@ -85,6 +85,22 @@
 - La Porte upload = 319 skip-traced (222 DNC, 187 landline, 190 clean) → door/call route.
 
 ## 5. Outreach playbook
+
+> **★ PRIMARY GOAL OF THIS WHOLE PROJECT (Patrick, 2026-07-01): bulk-TEXT the Fiber Green Biz.**
+> Texting converts way better than calling (his lead guy proved it), and AT&T has OK'd texting
+> offers (only needs opt-out language, which GHL auto-appends). Now that fiber-green businesses are
+> isolated in bulk, the goal is to **message LOTS of them by SMS** — the pipeline exists to feed this.
+> **Two things that make it work:**
+> 1. **Textable numbers only.** Send only to non-landline (mobile/VoIP) numbers. Line-type is NOT
+>    known from Google Maps, so we need a line-type check to filter out landlines before texting —
+>    e.g. Twilio Lookup (~1¢/number) or similar. Building that filter = the key enabler for bulk SMS.
+>    (Until it exists, texting is unfiltered by line type.)
+> 2. **Target NEW fiber + RECENTLY-messed-up cable areas.** Freshly-lit AT&T fiber and areas with a
+>    recent cable-ISP outage are the hottest SMS audiences. This is exactly what the parked
+>    "nationwide signals" build (FCC new-fiber + cable-outage) is for — it now has a clear purpose:
+>    point the hunter/scraper at those areas so the green-biz SMS list is fresh + motivated.
+> Net: hunter+scraper → Fiber Green Biz (bulk) → filter to textable numbers → bulk SMS the AT&T offer.
+
 - Opener: Patrick w/ AT&T, fiber available, 1 Gig in the $40s, 2 months free, free install,
   ask for a day/time.
 - Flow: converse → confirm address → check eligibility → offer 2 windows → book → move opp to
