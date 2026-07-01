@@ -864,13 +864,13 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   `omkarcloud/google-maps-scraper` + `botasaurus` (async/parallel). Sources: scrap.io GH scraper guide,
   serpapi pb-decoder, scrape.do tbm=map JSON. Decision on the big rewrite (embedded-JSON vs concurrency)
   deferred; resource-block + Heavy-mode are the wins for now.
-  **SHIPPED SAFE SPEEDUP — smart waits (`60694ee`, 2026-07-01).** Replaced the fixed per-page sleeps
-  (2.5s after search, 1.1s per place page) with `wait_for_selector` on the elements actually read
-  (`div[role="feed"]`; `button[data-item-id='address'|^='phone']`), capped at the SAME durations. Pages
-  usually paint faster than the caps, so it drops the dead waiting across the thousands of pages a Deep
-  run visits — ZERO risk: same cap = never reads too early (no missing/wrong data), identical requests
-  = no extra block risk, same categories = full coverage. THROTTLE (0.8s human pacing) kept — that's
-  safety, not waste. This is the safe half of "faster map scraping."
+  **HANDS OFF THE SCRAPER (Patrick, 2026-07-01: "hold off on ANY changes to the map scraper besides it
+  looks for zips next to it after finishing zip").** ALL speed experiments were REVERTED (`f64bebc`) —
+  the smart-wait timing change AND the opt-in image-blocking are GONE; the scraper is back to its
+  PROVEN behavior (flat 2.5s/1.1s waits, no resource blocking, Deep = full coverage). The ONLY recent
+  feature KEPT is the **nearby-ZIP auto-advance** (`region_for` + `nearby_zips`: after a ZIP it works
+  the metro's ZIPs then expands to numeric-nearby ones). DO NOT touch the scraper again without an
+  explicit ask. The embedded-JSON fast-path etc. below stay PARKED — do not build unless he says so.
   **>>> PARKED (Patrick, 2026-07-01: "put this in the brain, mess w it later"). Current state = the
   scraper is left as its PROVEN, reliable self (image-blocking OFF by default; Deep stays for full
   coverage — Patrick wants ALL businesses, not fewer categories). Nothing more shipped. WHEN WE
