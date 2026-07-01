@@ -256,13 +256,42 @@ def clear_progress():
         pass
 
 
-# After the ZIPs you enter, the scraper AUTO-ADVANCES through these nearby Houston
-# fiber ZIPs (inner-loop first), skipping any already finished, until you close it.
-NEXT_ZIPS = ["77027", "77098", "77006", "77019", "77005", "77025", "77002", "77004",
-             "77003", "77007", "77008", "77009", "77030", "77023", "77046", "77056",
-             "77057", "77081", "77401", "77055", "77024", "77018", "77020", "77026",
-             "77087", "77021", "77033", "77074", "77036", "77063", "77042", "77077",
-             "77079", "77080", "77043", "77092", "77017", "77011", "77012", "77051"]
+# After the ZIPs you enter, the scraper AUTO-ADVANCES through nearby fiber ZIPs in
+# the SAME metro (inner-loop first), skipping any already finished, until you close
+# it. It picks the list by the region of the FIRST ZIP you enter, so a market stays
+# in its own lane -- an OKC ZIP never rolls into Houston (which would mix cities in
+# the 'Maps Businesses' tab and pollute the Houston dialer).
+HOUSTON_ZIPS = ["77027", "77098", "77006", "77019", "77005", "77025", "77002", "77004",
+                "77003", "77007", "77008", "77009", "77030", "77023", "77046", "77056",
+                "77057", "77081", "77401", "77055", "77024", "77018", "77020", "77026",
+                "77087", "77021", "77033", "77074", "77036", "77063", "77042", "77077",
+                "77079", "77080", "77043", "77092", "77017", "77011", "77012", "77051"]
+# Oklahoma City metro fiber ZIPs (inner OKC first, then Edmond/Norman/Moore/MWC).
+OKC_ZIPS = ["73106", "73103", "73102", "73104", "73105", "73107", "73108", "73109",
+            "73112", "73118", "73116", "73114", "73111", "73120", "73127", "73128",
+            "73119", "73129", "73139", "73142", "73159", "73162", "73170", "73013",
+            "73034", "73003", "73160", "73110", "73130", "73069", "73071", "73072"]
+REGIONS = [("Houston", HOUSTON_ZIPS), ("Oklahoma City", OKC_ZIPS)]
+# 3-digit ZIP prefixes -> region, so a ZIP we didn't hardcode still lands in the
+# right lane (or no auto-advance if it's a metro we don't have a list for).
+_REGION_PREFIX = {"770": "Houston", "771": "Houston", "772": "Houston",
+                  "773": "Houston", "774": "Houston", "775": "Houston",
+                  "730": "Oklahoma City", "731": "Oklahoma City"}
+NEXT_ZIPS = HOUSTON_ZIPS   # back-compat alias
+
+
+def region_for(zip_code):
+    """Return (region_name, its ZIP list) for a ZIP, so the auto-advance stays in
+    that metro. Unknown metro -> (None, []) = only scrape what the user typed."""
+    z = (zip_code or "").strip()
+    for name, zips in REGIONS:
+        if z in zips:
+            return name, zips
+    name = _REGION_PREFIX.get(z[:3])
+    for rn, zips in REGIONS:
+        if rn == name:
+            return rn, zips
+    return None, []
 
 
 def load_zips_done():
@@ -565,17 +594,25 @@ def main():
     print("  [3] Deep   (~155 categories - most thorough, slowest)")
     cats = categories_for(input("Choose 1, 2, or 3 (press Enter for 2): ").strip() or "2")
     # ZIP PLAN: the ZIPs you entered come first, then the scraper AUTO-ADVANCES
-    # through nearby Houston fiber ZIPs (skipping any already finished) until you
-    # close the window -- so it keeps covering the next needed ZIP on its own.
+    # through nearby fiber ZIPs IN THE SAME METRO (skipping any already finished)
+    # until you close the window. The metro is picked from your first ZIP, so OKC
+    # stays in OKC and Houston stays in Houston -- no cross-city mixing.
     zips_done = load_zips_done()
-    extra = [z for z in NEXT_ZIPS if z not in zips]
+    region, region_zips = region_for(zips[0])
+    extra = [z for z in region_zips if z not in zips]
     zip_plan = [z for z in zips if z not in zips_done] + [z for z in extra if z not in zips_done]
     if not zip_plan:                          # everything known is covered -> start fresh
         zips_done = set(); save_zips_done(zips_done)
         zip_plan = list(dict.fromkeys(zips + extra))
     qdone = load_progress()                    # per-search resume within a ZIP
+    if region:
+        print("\nMetro: %s -- after your ZIP(s) it auto-advances through nearby %s "
+              "fiber ZIPs (same city only)." % (region, region))
+    else:
+        print("\n(ZIP not in a known metro -- scraping ONLY what you entered, no "
+              "auto-advance, so it can't wander into another city.)")
     shown = ", ".join(zip_plan[:10]) + (" +%d more" % (len(zip_plan) - 10) if len(zip_plan) > 10 else "")
-    print("\nZIP plan (auto-advances to the next ZIP after each; close the window to stop):\n  %s\n" % shown)
+    print("ZIP plan (auto-advances to the next ZIP after each; close the window to stop):\n  %s\n" % shown)
 
     from playwright.sync_api import sync_playwright
     os.makedirs(PROFILE_DIR, exist_ok=True)
