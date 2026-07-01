@@ -1681,9 +1681,14 @@ def mouse_drag(page, direction, quiet=False):
     try:
         page.mouse.move(cx, cy)
         page.mouse.down()
-        # FAST flick: few steps = a quick drag (like fiber_hunter's dragRel);
-        # Mapbox adds a little inertia so it pans snappy AND a touch further.
-        page.mouse.move(cx + dx, cy + dy, steps=4)
+        # A too-fast flick (down->move->up with no hold) can be read by Mapbox as a
+        # CLICK, not a drag -> the map doesn't pan ("stopped panning"). Hold briefly
+        # after down so the grab registers, move in TWO stages while held so it's an
+        # unambiguous drag-pan, then settle before release so the pan commits.
+        page.wait_for_timeout(60)
+        page.mouse.move(cx + dx * 0.5, cy + dy * 0.5, steps=6)
+        page.mouse.move(cx + dx, cy + dy, steps=6)
+        page.wait_for_timeout(40)
         page.mouse.up()
     except Exception as e:
         print("     drag failed: %s" % str(e)[:70])
@@ -1733,6 +1738,9 @@ def sweep_grid(page, ws, seen, area_label, dry, capture):
         done.add(key)
         if on_map(page):
             search_this_area(page)
+        else:
+            print("  (view flipped to portal -- re-opening the map)")
+            open_map_view(page)   # else the drags land on the portal and don't pan
         time.sleep(SEARCH_SETTLE)
         n = capture.flush(ws, seen, area_label, dry)
         tally["total"] += n
@@ -1807,6 +1815,11 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                 for _ in range(run):
                     if on_map(page):
                         search_this_area(page)
+                    else:
+                        # view flipped to the portal -> flip back, else every drag
+                        # from here on hits the portal and nothing pans
+                        print("  (view flipped to portal -- re-opening the map)")
+                        open_map_view(page)
                     time.sleep(SEARCH_SETTLE)
                     n = capture.flush(ws, seen, area_label, dry)
                     total += n
