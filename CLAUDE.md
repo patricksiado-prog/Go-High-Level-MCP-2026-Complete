@@ -845,9 +845,14 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   standalone scraper is Playwright, SEQUENTIAL, and its #1 time sink is the **per-place `page.goto(href)`**
   (`scrape_query` lines ~210-230): for EVERY business it navigates to that business's Maps page (wait
   1100ms) just to read phone/website. Deep=155 categories/ZIP × ~20 places each = thousands of page
-  loads. **SHIPPED (safe, high-confidence, `d8eddf7`):** `ctx.route` now aborts image/media/font
-  requests — map tiles (images) are the heaviest bytes on every page, and we only read TEXT, so this
-  ~90% data cut speeds every load AND lowers block risk (fewer requests). Data read is unaffected.
+  loads. **IMAGE-BLOCKING now OPT-IN after a research check (`bc9de4f`, supersedes `d8eddf7`).**
+  Patrick pushed back ("the popular OSS one doesn't do it for a reason"). Verdict: resource-blocking
+  IS mainstream (omkarcloud's **Botasaurus** ships `block_resources`; ~4s/12MB to ~1s/100KB) BUT
+  anti-bot guidance flags it as a **bot-detection metric** (a real browser loads images; one that
+  never does looks automated) and **Google Maps is an aggressive detector**; gosom doesn't rely on it
+  (its speed = Go + concurrency). The proven scraper works WITHOUT it, so it's gated behind
+  **`SCRAPER_BLOCK_IMAGES=1`, default OFF** (unchanged behavior); opt in to test + watch for blocks.
+  LESSON: validate a speed hack against real anti-bot experience before defaulting it on.
   **IMMEDIATE, zero-code:** use **Heavy (47 cats)** not **Deep (155)** → ~3x fewer searches. **Bigger
   levers (need live testing — can't test scrapers from the sandbox, Google 403s here):** (1) **read
   phone/website from the search feed's embedded JSON** (`APP_INITIALIZATION_STATE` / the pb-protobuf
