@@ -864,6 +864,15 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   `omkarcloud/google-maps-scraper` + `botasaurus` (async/parallel). Sources: scrap.io GH scraper guide,
   serpapi pb-decoder, scrape.do tbm=map JSON. Decision on the big rewrite (embedded-JSON vs concurrency)
   deferred; resource-block + Heavy-mode are the wins for now.
+  **>>> PARKED (Patrick, 2026-07-01: "put this in the brain, mess w it later"). Current state = the
+  scraper is left as its PROVEN, reliable self (image-blocking OFF by default; Deep stays for full
+  coverage — Patrick wants ALL businesses, not fewer categories). Nothing more shipped. WHEN WE
+  RESUME: the ONE safe speedup that keeps full Deep coverage AND doesn't raise block risk is the
+  embedded-JSON read (read phone/website from the search page's `APP_INITIALIZATION_STATE` instead of
+  visiting each business page). Build it as a FAST-PATH-WITH-FALLBACK (if the JSON read fails, fall
+  back to the current per-place visit so it can't lose/false data), and VALIDATE on one test ZIP
+  (compare JSON-path phones vs per-place phones) BEFORE making it default. Do NOT blind-ship a Maps
+  JSON parser (wrong-phone risk). Concurrency + wait-trims raise block risk — lower priority. <<<**
 - **"WE'RE GOING TO BE WORKING EVERYWHERE" (Patrick, 2026-07-01).** The pipeline must scale to MANY
   metros, not just Houston/OKC. Already handled: the scraper's `nearby_zips` fallback means ANY ZIP in
   ANY metro auto-advances outward (Houston/OKC just have hand-tuned curated orders on top). Confirmed
