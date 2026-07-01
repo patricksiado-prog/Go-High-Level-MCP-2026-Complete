@@ -186,7 +186,14 @@ def scrape_query(page, query, category):
     target_zip = query.split(" in ")[-1].strip() if " in " in query else ""
     page.goto("https://www.google.com/maps/search/" + urllib.parse.quote(query),
               wait_until="domcontentloaded", timeout=45000)
-    page.wait_for_timeout(2500)
+    # SPEED (safe): proceed the moment the results feed appears instead of a flat
+    # 2.5s wait -- pages usually paint faster. Same 2.5s CAP, so it never runs before
+    # the data exists and never slower than before; it just skips the dead waiting.
+    try:
+        page.wait_for_selector('div[role="feed"]', timeout=2500)
+    except Exception:
+        pass
+    page.wait_for_timeout(250)
     _dismiss_consent(page)
     if "/sorry/" in page.url or "consent.google" in page.url:
         return None
@@ -209,7 +216,16 @@ def scrape_query(page, query, category):
             continue
         try:
             page.goto(href, wait_until="domcontentloaded", timeout=30000)
-            page.wait_for_timeout(1100)
+            # SPEED (safe): return as soon as the address/phone element is on the page
+            # instead of a flat 1.1s wait. Same 1.1s CAP -> never reads too early, it
+            # just drops the leftover dead time on the ~thousands of place pages Deep
+            # visits. This is the biggest safe win (no block-risk, no coverage change).
+            try:
+                page.wait_for_selector(
+                    "button[data-item-id='address'], button[data-item-id^='phone']",
+                    timeout=1100)
+            except Exception:
+                pass
             addr = _text_attr(page, "button[data-item-id='address']")
             phone_lbl = _text_attr(page, "button[data-item-id^='phone']")
             website = None
