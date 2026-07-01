@@ -818,6 +818,16 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   flip back if it's on the portal (prints `(view flipped to portal -- re-opening the map)`).
 - **STILL UNPROVEN from the sandbox:** whether AT&T changed their site (candidate #3 — the
   screen-region drag fallback landing off a shifted layout). That's what `att_test.py` answers.
+- **SELF-VERIFYING PAN — the real motion fix (pushed `f82178a`, 2026-07-01).** Root problem: the
+  sweep fired a drag every cell but had NO WAY to know if the map actually moved, so a swallowed
+  drag = it re-scans the same view = flatlines at +0 (exactly Patrick's screenshots: drag from the
+  same point, +11/+2 then +0/+0/+0). FIX: `mouse_drag` now screenshots before/after (`_view_sig`) and
+  if the view DIDN'T change it ESCALATES — a bigger drag (DRAG_FRAC×1.8), then focus+arrow-keys
+  (`_arrow_pan`) — adapting to whatever the map honors instead of dragging dead space. Refactored:
+  `_do_drag` (raw gesture at a given fraction), `_arrow_pan` (fallback), `_view_sig` (md5 of a
+  screenshot). Returns False ONLY on a closed browser, so the sweep never stops on a stuck/identical
+  cell — only on a real close. Cost: 1-2 extra screenshots per non-quiet pan (worth it for a pan that
+  actually lands). This is the strongest fix yet for "it stopped panning."
 - **`att_test.py` — AT&T MAP HEALTH CHECK (us vs them), pushed `f3a82c4`.** Reuses the hunter's OWN
   helpers (open_map_view/on_map/_map_canvas_box/find_map_dots/mouse_drag/search_this_area/NetCapture)
   to run a PASS/FAIL checklist: PAGE LOADS · LOGGED IN · MAP OPENS · MAP CANVAS · DOTS RENDER · PAN
