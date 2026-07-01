@@ -779,3 +779,17 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   ends into the SAME tabs. Only the console WORDING differed; now both print `COMBO MATCH ON: …` on load
   and `MATCH  +N green (fiber lead + business), +N orange (upgrade + business)  [total matches: T]` per
   hit, with a running total.
+- **NEW SKILL `mapbox-extraction` (researched + added 2026-07-01).** Codifies how to pull
+  dot/feature data off a Mapbox map that HIDES its instance — the exact AT&T dead-end the brain
+  called "IMPOSSIBLE." Research finding: it is NOT impossible; the standard escape hatches are (1)
+  a **constructor hook** via `page.add_init_script` wrapping `mapboxgl/maplibregl.Map` so instances
+  self-register (only works if a global is ever set — AT&T's bundle sets none), and (2) for a
+  BUNDLED build with no global, a **canvas `getContext` hook + React-fiber walk**: catch the WebGL
+  canvas as Mapbox creates it, then BFS the React fiber tree near `.mapboxgl-map` for the object
+  that has `queryRenderedFeatures`+`getStyle`, register it to `window.__optimusMaps`, then read via
+  `querySourceFeatures` (all loaded-tile features, more complete than queryRenderedFeatures) +
+  `m.project()` for each dot's exact pixel. Hooks MUST be injected BEFORE `page.goto`. Fallbacks
+  stay: network capture (the floor, always works — dots crossed the wire) + `mapbox-vector-tile`
+  protobuf decode (tile-local→lng/lat web-mercator). NEXT worth trying on AT&T: inject the
+  getContext+fiber-walk recovery to see if the hidden map becomes readable (would beat pixel/tile
+  guessing). Skill file: `.claude/skills/mapbox-extraction/SKILL.md`.
