@@ -411,8 +411,9 @@ def init_match(sh):
                 _MATCH[key] = set()
     except Exception:
         pass
-    print("  cross-match ON: %d captured fiber leads loaded -> a scraped business on "
-          "a green/orange dot also lands in the match tabs." % len(leads))
+    print("  COMBO MATCH ON: %d captured fiber leads loaded -> a scraped business on "
+          "a green/orange dot lands in the 'Fiber Green Biz' / 'Upgrade Orange Biz' tabs."
+          % len(leads))
 
 
 def _match_new(new):
@@ -442,7 +443,9 @@ def _match_new(new):
         if o and _MATCH.get("orange_ws"):
             _MATCH["orange_ws"].append_rows(o, value_input_option="RAW")
         if g or o:
-            print("    cross-match: +%d on a GREEN dot, +%d on an ORANGE dot" % (len(g), len(o)))
+            total = len(_MATCH["green_seen"]) + len(_MATCH["orange_seen"])
+            print("    MATCH  +%d green (fiber lead + business), +%d orange (upgrade + business)"
+                  "  [total matches: %d]" % (len(g), len(o), total))
     except Exception:
         pass
 

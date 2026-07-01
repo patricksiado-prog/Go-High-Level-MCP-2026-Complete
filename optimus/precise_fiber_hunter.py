@@ -2472,10 +2472,10 @@ def init_bizmatch(ws):
     _BIZ["orange_ws"] = _ensure_biz_tab(sh, ORANGE_BIZ_TAB)
     _BIZ["green_seen"] = _biz_seen(_BIZ["green_ws"]) | _csv_seen(GREEN_CSV)
     _BIZ["orange_seen"] = _biz_seen(_BIZ["orange_ws"]) | _csv_seen(ORANGE_CSV)
-    dst = ("the '%s'/'%s' tabs" % (GREEN_BIZ_TAB, ORANGE_BIZ_TAB)
+    dst = ("the '%s' / '%s' tabs" % (GREEN_BIZ_TAB, ORANGE_BIZ_TAB)
            if _BIZ["green_ws"] else "local CSV (sheet is full)")
-    print("  business match ON: %d businesses loaded -> matches go to %s, live."
-          % (len(idx), dst))
+    print("  COMBO MATCH ON: %d scraped businesses loaded -> fiber+business matches "
+          "go to %s, live." % (len(idx), dst))
     # BACKLOG: match every lead captured in prior runs (local jsonl, no quota) so
     # leads grabbed before the scraper ran still get a business name+phone. The
     # seen-sets above (sheet + CSV) keep this from re-writing duplicates.
@@ -2574,8 +2574,10 @@ def match_leads_to_biz(new_records):
                 _append_biz_csv(ORANGE_CSV, o_rows)
         if g_rows or o_rows:
             where = "sheet" if _BIZ["green_ws"] else "CSV"
-            print("    business match: +%d Fiber Green Biz, +%d Upgrade Orange Biz (-> %s)"
-                  % (len(g_rows), len(o_rows), where))
+            total = len(_BIZ["green_seen"]) + len(_BIZ["orange_seen"])
+            print("    MATCH  +%d green (fiber lead + business), +%d orange (upgrade + business)"
+                  "  [total matches: %d -> %s]"
+                  % (len(g_rows), len(o_rows), total, where))
     except Exception as e:
         print("    (biz write hiccup: %s)" % str(e)[:60])
 
