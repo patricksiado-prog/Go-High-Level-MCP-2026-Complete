@@ -142,7 +142,7 @@ REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
 # BUILD STAMP -- bumped on every push so you can SEE the code actually changed.
 # It prints a big banner at startup. If the number here matches what your screen
 # shows, you're on the newest code.
-HUNTER_BUILD = "BUILD 2026-07-02  #23  NEVER ENDS ON ITS OWN: sweep auto-resumes while the browser is open; pure ever-expanding spiral (boomerang removed per Patrick)"
+HUNTER_BUILD = "BUILD 2026-07-02  #24  SPLIT: motion process NEVER touches Google -- a separate uploader process does all sheet work"
 
 VIEWPORT = {"width": 1366, "height": 768}
 
@@ -191,6 +191,21 @@ CLICK_OFFSETS = [(0, 0), (3, 0), (-3, 0), (0, 3), (0, -3)]   # retry spiral
 ALLOW_CLICK = False
 _AUTO_PROBED = [False]   # run the frame diagnostic at most once per session
 _NET_CAPTURE = [None]    # the always-on network capture (set in main)
+
+# SPLIT MODE (Patrick, 2026-07-02: "backend memory processing separate from
+# motion"): the browser process NEVER touches Google Sheets while sweeping.
+# Captures append to the local JSONL (microseconds) and a separate UPLOADER
+# process (this same file, --uploader) tails the file and does ALL sheet work:
+# dedupe, batched writes, biz matching, status mirroring. Two processes =
+# zero interference with Playwright (the in-process background-thread version
+# froze Chromium -- processes don't share the greenlet loop or the GIL).
+_SPLIT = [False]
+RUN_STATUS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "run_status.json")
+BACKEND_LOCAL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  "backend_capture_local.json")
+UPLOADER_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "uploader_log.txt")
 
 JSONL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           "precise_addresses.jsonl")
@@ -937,6 +952,10 @@ class NetCapture:
         (UNIT DUMMY/CTR/COIN) never reach the sheet, and dedup is drift-proof
         (canonical core-address key -- 'STE 1800' vs 'UNIT COIN' vs ZIP drift all
         resolve to the same building)."""
+        if _SPLIT[0]:
+            # split mode: EVERY flush path becomes a local disk append; the
+            # uploader process owns the sheet. Motion never waits on Google.
+            return self.flush_local(seen, area_label, dry)
         self.seen = seen
         new_rows, new_records = [], []
         while self.pending:
@@ -1005,6 +1024,38 @@ class NetCapture:
         # ITS side (unified matching), and the hunter re-matches everything at
         # the next startup (_backlog_match). Nothing heavy runs between pans.
         return len(new_rows)
+
+    def flush_local(self, seen, area_label, dry):
+        """SPLIT-MODE flush: drain captures to the local JSONL ONLY (a disk
+        append, microseconds) -- the separate --uploader process ships them to
+        the sheet. The motion process never touches Google. (Patrick 2026-07-02:
+        'backend memory processing separate from motion'.)"""
+        new_records = []
+        while self.pending:
+            ld = self.pending.pop()
+            addr = (ld.get("address") or "").strip()
+            if not addr or is_junk_address(addr):
+                continue
+            addr, _stripped = clean_address(addr)
+            if not seen.is_new(addr):
+                continue
+            dot_status = classify_status(text=ld.get("status"), ban=ld.get("ban"))
+            if dot_color(dot_status) == "GREY":
+                continue
+            ts = time.strftime("%Y-%m-%d %H:%M:%S")
+            new_records.append({"address": addr, "dot_status": dot_status,
+                                "zone_label": "WORKING", "popup_status": ld.get("status"),
+                                "ban": ld.get("ban"), "area": area_label, "ts": ts,
+                                "via": "network", "lat": ld.get("lat"), "lng": ld.get("lng")})
+        if not new_records:
+            return 0
+        if dry:
+            for r in new_records[:20]:
+                print("   + %s | %s" % (r["address"], dot_color(r["dot_status"])))
+            return len(new_records)
+        for rec in new_records:
+            append_jsonl(rec)          # the uploader tails this file
+        return len(new_records)
 
 # --- popup parsing (canonical regexes from optimus_dot_detect) ---
 POPUP_KEYS = {
@@ -2136,12 +2187,16 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                         open_map_view(page)          # flipped to portal -> flip back
                     elif cell % 3 == 0:
                         search_this_area(page)       # nudge the fetch every few cells
-                    # PAN PATH RULE: nothing heavy between pans. The flush (one
-                    # batched sheet write, 15s-capped, keeps rows on failure) runs
-                    # at most every FLUSH_GAP_SECS -- most cells are pure motion.
+                    # PAN PATH RULE: nothing heavy between pans. Split mode
+                    # (default): flush = a local disk append (microseconds), the
+                    # uploader process does ALL sheet work. Legacy mode: one
+                    # batched 15s-capped write per gap.
                     now = time.time()
                     if now - last_flush >= FLUSH_GAP_SECS:
-                        n_flush = capture.flush(ws, seen, area_label, dry)
+                        if _SPLIT[0]:
+                            n_flush = capture.flush_local(seen, area_label, dry)
+                        else:
+                            n_flush = capture.flush(ws, seen, area_label, dry)
                         total += n_flush
                         last_flush = now
                         # DRY-AREA ALARM: sweeping empty ground (golf course /
@@ -2171,10 +2226,16 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                         report_status(ws, area_label, "watching", found=total,
                                       note="%d cells, %d leads" % (cell, total))
                     if cell % 60 == 0:
-                        dump_backend(ws, capture)    # rare snapshot, off the hot cadence
+                        if _SPLIT[0]:
+                            dump_backend_local(capture)  # disk only; uploader ships it
+                        else:
+                            dump_backend(ws, capture)
                     _beat()                          # tell the watchdog we're alive
                     if not pan_next(page, dirs[di]):     # PAN; False = browser closed
-                        capture.flush(ws, seen, area_label, dry)
+                        if _SPLIT[0]:
+                            capture.flush_local(seen, area_label, dry)
+                        else:
+                            capture.flush(ws, seen, area_label, dry)
                         return total
                     time.sleep(PAN_INTERVAL)
                 di = (di + 1) % 4
@@ -2188,7 +2249,10 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
         else:
             print("\nSweep stopped: %s" % str(e)[:100])
         try:
-            capture.flush(ws, seen, area_label, dry)
+            if _SPLIT[0]:
+                capture.flush_local(seen, area_label, dry)
+            else:
+                capture.flush(ws, seen, area_label, dry)
         except Exception:
             pass
         return total
@@ -2725,6 +2789,9 @@ def report_status(ws, area, state, found="", note=""):
         pass
     print("[status] %s  %s  area=%s  %s %s" % (stamp, state, area, found, note))
     drive_log("STATUS %s host=%s area=%s found=%s %s" % (state, host, area, found, note))
+    if _SPLIT[0]:
+        return   # split mode: the uploader process mirrors run_status.json to
+                 # the sheet -- the MOTION process never touches Google.
     sws = _status_sheet(ws)
     if sws is not None:
         try:
@@ -2782,7 +2849,27 @@ def dump_backend(ws, cap):
         print("  (backend monitor skipped: %s)" % str(e)[:60])
 
 
+def dump_backend_local(cap):
+    """SPLIT-MODE backend snapshot: write the F12 rows to a LOCAL json file
+    (disk only); the uploader process ships them to the Backend Capture tab."""
+    if cap is None or not _BACKEND_ON[0]:
+        return
+    try:
+        with open(BACKEND_LOCAL_PATH, "w") as f:
+            json.dump(_backend_rows(cap), f)
+    except Exception:
+        pass
+
+
 def _dump_backend_write(t, cap):
+    t.clear()
+    t.append_rows([[str(c)[:490] for c in r] for r in _backend_rows(cap)],
+                  value_input_option="RAW")
+    print("  [backend] wrote %d endpoints + %d parsed leads to '%s'"
+          % (len(cap.seen_urls), len(cap.pending), BACKEND_TAB))
+
+
+def _backend_rows(cap):
     import socket
     ts = time.strftime("%Y-%m-%d %H:%M:%S")
     host = socket.gethostname()
@@ -2804,10 +2891,146 @@ def _dump_backend_write(t, cap):
         rows.append([ts, "SAMPLE LEAD", str(ld.get("address")),
                      "status=%s" % ld.get("status"),
                      "lat=%s lng=%s" % (ld.get("lat"), ld.get("lng")), ""])
-    t.clear()
-    t.append_rows([[str(c)[:490] for c in r] for r in rows], value_input_option="RAW")
-    print("  [backend] wrote %d endpoints + %d parsed leads to '%s'"
-          % (len(cap.seen_urls), len(cap.pending), BACKEND_TAB))
+    return rows
+
+
+# ----------------------------------------------------------------------------
+# UPLOADER PROCESS (split mode) -- ALL sheet work lives here, in a separate
+# process, so the motion process never waits on Google for anything.
+# ----------------------------------------------------------------------------
+def _ulog(msg):
+    line = "%s  %s" % (time.strftime("%H:%M:%S"), msg)
+    print(line)
+    try:
+        with open(UPLOADER_LOG, "a") as f:
+            f.write(line + "\n")
+    except OSError:
+        pass
+
+
+def uploader_main():
+    """Tail precise_addresses.jsonl from the offset the hunter handed us and do
+    ALL the sheet work: dedupe vs the sheet, batched Precise Fiber writes (rows
+    survive failures via SafePending), live biz matching, Hunter Status
+    mirroring, Backend Capture shipping. Exits by itself once the hunter has
+    been silent for a long while and everything is shipped."""
+    _ulog("uploader up (pid %d) -- all sheet work happens here" % os.getpid())
+    ws = None
+    delay = 5
+    while ws is None:
+        try:
+            ws = open_sheet()
+        except Exception as e:
+            _ulog("sheet connect failed: %s -- retrying" % str(e)[:80])
+        if ws is None:
+            time.sleep(delay)
+            delay = min(delay * 2, 120)
+    seen = already_seen(ws)
+    _ulog("seeded %d known addresses from the sheet" % len(seen))
+    try:
+        init_bizmatch(ws)
+    except Exception as e:
+        _ulog("biz match init skipped: %s" % str(e)[:80])
+    try:
+        offset = int(os.environ.get("OPTIMUS_OUTBOX_OFFSET", "0") or 0)
+    except ValueError:
+        offset = 0
+    outbox = SafePending()
+    remainder = b""
+    last_status = ""
+    last_backend = 0.0
+    idle_since = time.time()
+    while True:
+        # ---- 1. new captures from the hunter ----
+        new_records = []
+        try:
+            size = os.path.getsize(JSONL_PATH) if os.path.exists(JSONL_PATH) else 0
+            if size < offset:
+                offset = 0          # file rotated/reset
+            if size > offset:
+                with open(JSONL_PATH, "rb") as f:
+                    f.seek(offset)
+                    data = f.read()
+                offset += len(data)
+                data = remainder + data
+                lines = data.split(b"\n")
+                remainder = lines.pop()          # partial trailing line, if any
+                for raw in lines:
+                    raw = raw.strip()
+                    if not raw:
+                        continue
+                    try:
+                        d = json.loads(raw.decode("utf-8", "replace"))
+                    except Exception:
+                        continue
+                    addr = (d.get("address") or "").strip()
+                    if not addr or is_junk_address(addr):
+                        continue
+                    addr, _st = clean_address(addr)
+                    if not seen.is_new(addr):
+                        continue
+                    ds = d.get("dot_status")
+                    if dot_color(ds) == "GREY":
+                        continue
+                    _bidx = _BIZ.get("index") or {}
+                    _b = _bidx.get(_norm_addr(addr)) if _bidx else None
+                    outbox.add([addr, dot_color(ds), d.get("ts") or "",
+                                (_b or {}).get("name", ""), (_b or {}).get("phone", "")])
+                    d["address"] = addr
+                    new_records.append(d)
+        except Exception as e:
+            _ulog("outbox read error: %s" % str(e)[:80])
+        if new_records or len(outbox):
+            idle_since = time.time()
+
+            def _write(batch):
+                ws.append_rows(batch, value_input_option="RAW")
+
+            shipped = outbox.flush(_write, batch_size=500)
+            if shipped:
+                _ulog("shipped %d rows to '%s' (%d queued)"
+                      % (shipped, OUT_TAB, len(outbox)))
+            elif len(outbox):
+                _ulog("write failed -- %d rows stay queued for retry" % len(outbox))
+            if new_records:
+                try:
+                    match_leads_to_biz(new_records)
+                except Exception as e:
+                    _ulog("biz match error: %s" % str(e)[:80])
+        # ---- 2. mirror the hunter's status heartbeats to the sheet ----
+        try:
+            if os.path.exists(RUN_STATUS_PATH):
+                s = open(RUN_STATUS_PATH).read()
+                if s and s != last_status:
+                    last_status = s
+                    rec = json.loads(s)
+                    sws = _status_sheet(ws)
+                    if sws is not None:
+                        sws.append_row([rec.get("time", ""), rec.get("host", ""),
+                                        str(rec.get("area", "")), rec.get("state", ""),
+                                        str(rec.get("found", "")), str(rec.get("note", ""))])
+                    idle_since = time.time()
+        except Exception:
+            pass
+        # ---- 3. ship the backend snapshot when the hunter refreshes it ----
+        try:
+            if os.path.exists(BACKEND_LOCAL_PATH):
+                mt = os.path.getmtime(BACKEND_LOCAL_PATH)
+                if mt > last_backend:
+                    last_backend = mt
+                    rows = json.load(open(BACKEND_LOCAL_PATH))
+                    t = _backend_sheet(ws)
+                    if t is not None:
+                        t.clear()
+                        t.append_rows([[str(c)[:490] for c in r] for r in rows],
+                                      value_input_option="RAW")
+        except Exception:
+            pass
+        # ---- 4. quit once the hunter has clearly gone away and we're drained --
+        if not len(outbox) and time.time() - idle_since > 900:
+            _ulog("hunter silent 15 min and everything shipped -- uploader done")
+            return
+        time.sleep(2)
 
 
 # ----------------------------------------------------------------------------
@@ -3176,6 +3399,11 @@ def _start_watchdog():
 def main():
     self_update()
     ap = argparse.ArgumentParser()
+    ap.add_argument("--uploader", action="store_true",
+                    help=argparse.SUPPRESS)   # internal: the sheet-work process
+    ap.add_argument("--no-split", action="store_true",
+                    help="run sheet writes in-process (old behavior) instead of "
+                         "the separate uploader process")
     ap.add_argument("--login", action="store_true", help="open browser to log in once, then quit")
     ap.add_argument("--zip", default=None, help="ZIP/area to search before scanning")
     ap.add_argument("--cols", type=int, default=3)   # grid so it ALWAYS sweeps
@@ -3254,6 +3482,10 @@ def main():
                          "Orange Biz tabs (keep one row per unique lead, by phone), "
                          "then exit. The hunter also auto-dedupes these on startup.")
     args = ap.parse_args()
+
+    if args.uploader:
+        uploader_main()          # sheet-work process: no browser, no Playwright
+        return
 
     # print the build stamp FIRST so you can see, immediately, which code is running
     print("\n" + "#" * 60)
@@ -3351,6 +3583,37 @@ def main():
         # old sheet was full) -- write them into the active sheet now (with biz merge).
         if not args.dry and ws is not None:
             backfill_jsonl(ws, seen)
+
+        # SPLIT MODE (default): spawn the UPLOADER process. From here on the
+        # motion process does ZERO sheet work -- captures append to disk and the
+        # uploader ships them. "Backend memory processing separate from motion."
+        if not args.dry and ws is not None and not args.no_split:
+            try:
+                import subprocess as _sp
+                _env = dict(os.environ)
+                _env["OPTIMUS_NO_UPDATE"] = "1"
+                _here = os.path.dirname(os.path.abspath(__file__))
+                _env["OPTIMUS_OUTBOX_OFFSET"] = str(
+                    os.path.getsize(JSONL_PATH) if os.path.exists(JSONL_PATH) else 0)
+                _flags = 0
+                if os.name == "nt":
+                    _flags = 0x00000008 | 0x08000000   # DETACHED | NO_WINDOW
+                _logf = open(UPLOADER_LOG, "a")
+                _kw = {"cwd": _here, "env": _env, "stdout": _logf,
+                       "stderr": _logf, "stdin": _sp.DEVNULL}
+                if os.name == "nt":
+                    _kw["creationflags"] = _flags
+                else:
+                    _kw["start_new_session"] = True
+                _sp.Popen([sys.executable, os.path.abspath(__file__),
+                           "--uploader"], **_kw)
+                _SPLIT[0] = True
+                print("  MOTION <-> SHEET SPLIT ON: uploader process handles all "
+                      "sheet work (log: uploader_log.txt).\n"
+                      "  The motion process never waits on Google -- ever.")
+            except Exception as e:
+                print("  (uploader spawn failed: %s -- using in-process writes)"
+                      % str(e)[:80])
 
         if args.net_debug:
             # RESEARCH short-circuit: load the map, trigger a few data loads by
