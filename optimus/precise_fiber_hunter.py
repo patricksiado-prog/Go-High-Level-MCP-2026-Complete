@@ -1739,18 +1739,25 @@ def _arrow_pan(page, direction):
         return False
 
 
-def mouse_drag(page, direction, quiet=False):
-    """PAN the map and VERIFY it actually moved -- the fix for 'it stopped panning'.
-    Does the proven drag, screenshots before/after, and if the view DIDN'T change it
-    ESCALATES: a bigger drag, then focus+arrow-keys -- adapting to whatever the map
-    responds to instead of blindly dragging dead space. Returns False ONLY if the
-    browser is gone (so the sweep stops on a real close, never on a stuck cell).
-    quiet=True = fast silent pass-through (skating over already-scanned cells), no
-    verify. Drag the content the OPPOSITE way you want the viewport to move."""
-    src = "canvas" if _map_canvas_box(page) else "screen"
+def mouse_drag(page, direction, quiet=False, verify=False):
+    """PAN the map. FAST by default: just the proven hardened drag, NO screenshots
+    (the gesture already lands reliably, so normal sweeping stays quick). Pass
+    verify=True to screenshot before/after and ESCALATE (bigger drag, then focus+
+    arrow-keys) if the view didn't change -- used ONLY when the sweep suspects it's
+    stuck (a run of empty cells), so we don't pay the screenshot cost every pan.
+    Returns False ONLY if the browser is gone. quiet=True = fast silent pass-through.
+    Drag the content the OPPOSITE way you want the viewport to move."""
     if quiet:
         return _do_drag(page, direction, DRAG_FRAC)
+    src = "canvas" if _map_canvas_box(page) else "screen"
     print("  -> PAN %s: drag %s" % (direction, src))
+    if not verify:
+        # FAST PATH -- no before/after screenshots (the common case).
+        ok = _do_drag(page, direction, DRAG_FRAC)
+        if ok:
+            time.sleep(WAIT_AFTER_PAN)
+        return ok
+    # VERIFY PATH -- only when the caller thinks it may be stuck.
     before = _view_sig(page)
     if not _do_drag(page, direction, DRAG_FRAC):
         return False                     # browser gone -> let the sweep stop
@@ -1770,8 +1777,6 @@ def mouse_drag(page, direction, quiet=False):
     if _view_sig(page) != before:
         print("     (fell back to arrow keys)")
         return True
-    # still unchanged: the area may be identical, or the map is briefly stuck --
-    # DON'T stop the sweep (browser is alive); report and move on.
     print("     (view unchanged -- area may be identical or map briefly stuck; continuing)")
     return True
 
@@ -1887,7 +1892,7 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
     and it covers that area and keeps expanding past it until the computer (or
     you closing the window) stops it. Returns the total captured."""
     dirs = ["right", "down", "left", "up"]
-    di, run, cell, total = 0, 1, 0, 0
+    di, run, cell, total, zeros = 0, 1, 0, 0, 0
     print("Continuous sweep -- panning outward until you close the browser.\n")
     try:
         while True:
@@ -1904,12 +1909,15 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                     n = capture.flush(ws, seen, area_label, dry)
                     total += n
                     cell += 1
+                    zeros = zeros + 1 if n == 0 else 0
                     print("  [cell %d] +%d  (total %d)" % (cell, n, total))
                     if cell == 4 or cell % 15 == 0:
                         report_status(ws, area_label, "watching", found=total,
                                       note="continuous: %d cells, %d leads" % (cell, total))
                         dump_backend(ws, capture)   # F12/network snapshot to the sheet
-                    if not mouse_drag(page, dirs[di]):
+                    # FAST pan normally; only screenshot-VERIFY when a run of empty
+                    # cells suggests we might be stuck (not just a sparse area).
+                    if not mouse_drag(page, dirs[di], verify=(zeros >= 3)):
                         return total        # canvas gone -> stop
                 di = (di + 1) % 4
             run += 1
