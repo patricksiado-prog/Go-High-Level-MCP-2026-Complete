@@ -818,6 +818,26 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   flip back if it's on the portal (prints `(view flipped to portal -- re-opening the map)`).
 - **STILL UNPROVEN from the sandbox:** whether AT&T changed their site (candidate #3 — the
   screen-region drag fallback landing off a shifted layout). That's what `att_test.py` answers.
+- **AT&T MAP NAVIGATION PATH (confirmed live 2026-07-01 from Patrick's screenshots — save for future
+  resets/reinstalls).** After login at `oidc.idp.elogin.att.com` (Global Logon, UserID `zg431x`, choose
+  "AT&T Employee"), you land on the **you Refer HOME** (`youachieve.att.com/yourefer/`). Path to the
+  map: click the **"AT&T Fiber"** tile → `/yourefer/fiber` page → click the **"Fiber Availability Map"**
+  button → the dot map. The hunter now automates ALL of this in `open_map_view()` (`b2e7b1e`): try the
+  "Fiber Availability Map" button; if absent, click "AT&T Fiber" (or `goto(MAP_URL)`) then the map
+  button. `MAP_URL = youachieve.att.com/yourefer/fiber`. Login is saved in `att_profile/` — a FRESH
+  computer has no saved login, so it shows the AT&T Global Logon first (normal, not a bug).
+- **UPDATE MECHANISM — the fix that ended "still running old code" (2026-07-01, `ad04844`).** There are
+  TWO install layouts: (1) `START OPTIMUS.bat` → `%USERPROFILE%\optimus\repo` = a GIT CLONE (updates via
+  git). (2) the desktop "Optimus Fiber Hunter" icon (INSTALL_OPTIMUS) → `%USERPROFILE%\optimus_hunter` =
+  a ZIP download, **NO .git** → `self_update()`'s git pull failed silently → stale FOREVER (this is why
+  Patrick kept running old "business match"/enrichment-on code). FIX: `self_update()` now detects a
+  non-git install and RE-DOWNLOADS `precise_fiber_hunter.py` + `optimus_dot_detect.py` +
+  `optimus_api_capture.py` from GitHub raw (cache-busted) via `_raw_refresh()`, then re-execs. So the
+  ZIP install self-heals every launch now. **ESCAPE-THE-STALE-LOOP one-time command** (a stale hunter
+  has the OLD git-only updater, so it can't pull the fix itself — run once):
+  `cd /d "%USERPROFILE%\optimus_hunter" && curl -L -o precise_fiber_hunter.py "<raw>/optimus/precise_fiber_hunter.py"`
+  (+ the two sibling modules). After that it stays current on its own. Verify new code by the startup
+  line **"COMBO MATCH ON:"** (not "business match ON") and NO "Enrichment running" line.
 - **SELF-VERIFYING PAN — the real motion fix (pushed `f82178a`, 2026-07-01).** Root problem: the
   sweep fired a drag every cell but had NO WAY to know if the map actually moved, so a swallowed
   drag = it re-scans the same view = flatlines at +0 (exactly Patrick's screenshots: drag from the
