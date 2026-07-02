@@ -36,11 +36,27 @@ where py >nul 2>&1 || ( echo     Python install did not finish - reboot and run 
 
 echo [2/7] Downloading the Fiber Hunter from GitHub...
 if not exist "%HUNTER%" mkdir "%HUNTER%"
+REM whole repo (brings every module) -- gets the full file set...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr '%ZIP%' -OutFile $env:TEMP\opt.zip; $ex=Join-Path $env:TEMP 'optx'; if(Test-Path $ex){Remove-Item $ex -Recurse -Force}; Expand-Archive $env:TEMP\opt.zip -DestinationPath $ex -Force; $src=(Get-ChildItem $ex -Recurse -Directory -Filter optimus | Select-Object -First 1).FullName; Copy-Item (Join-Path $src '*') '%HUNTER%' -Recurse -Force" || ( echo     Could not reach GitHub. Check your internet. & pause & exit /b 1 )
+REM ...then FORCE the core files straight from raw with a cache-buster, so even if
+REM the repo-zip CDN is stale you still get the newest hunter code (this is what
+REM kept people on old code before).
+set "CB=%RANDOM%%RANDOM%"
+curl -L -o "%HUNTER%\precise_fiber_hunter.py" "%RAW%/precise_fiber_hunter.py?cb=%CB%"
+curl -L -o "%HUNTER%\optimus_dot_detect.py"   "%RAW%/optimus_dot_detect.py?cb=%CB%"
+curl -L -o "%HUNTER%\optimus_api_capture.py"  "%RAW%/optimus_api_capture.py?cb=%CB%"
+REM VERIFY we actually got the new code (the new build says "COMBO MATCH ON").
+findstr /C:"COMBO MATCH ON" "%HUNTER%\precise_fiber_hunter.py" >nul 2>&1
+if errorlevel 1 (
+  echo     ^*^* WARNING: still got OLD hunter code ^(GitHub cache^). Wait 60 seconds
+  echo        and run this installer again -- it will pick up the new version.
+) else (
+  echo     OK - newest Fiber Hunter code confirmed ^(COMBO MATCH ON^).
+)
 
 echo [3/7] Downloading the Maps Scraper from GitHub...
 if not exist "%SCRAPER%" mkdir "%SCRAPER%"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr '%SCRAPERPY%' -OutFile '%SCRAPER%\maps_scraper_standalone.py'" || ( echo     Could not reach GitHub. Check your internet. & pause & exit /b 1 )
+curl -L -o "%SCRAPER%\maps_scraper_standalone.py" "%SCRAPERPY%?cb=%CB%" || ( echo     Could not reach GitHub. Check your internet. & pause & exit /b 1 )
 
 echo [4/7] Packages ^(both tools^)...
 py -m pip install --upgrade pip >nul 2>&1
@@ -68,6 +84,9 @@ echo   Two icons are now on your Desktop:
 echo      - Optimus Fiber Hunter   ^(log into AT^&T once on first run^)
 echo      - Optimus Maps Scraper   ^(type ZIP codes when it asks^)
 echo   Double-click either one to run. They auto-update each launch.
+echo.
+echo   The Fiber Hunter now starts with "COMBO MATCH ON:" and has NO
+echo   "Enrichment running" line -- that's how you know it's the new code.
 echo  ============================================================
 echo.
 pause
