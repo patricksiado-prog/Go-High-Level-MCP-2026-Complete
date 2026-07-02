@@ -142,7 +142,7 @@ REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
 # BUILD STAMP -- bumped on every push so you can SEE the code actually changed.
 # It prints a big banner at startup. If the number here matches what your screen
 # shows, you're on the newest code.
-HUNTER_BUILD = "BUILD 2026-07-02  #29  NO screenshots on the pan path (the real 200k motion) + freezes self-diagnose (last_freeze.txt shows the exact line)"
+HUNTER_BUILD = "BUILD 2026-07-02  #30  THE 200k MOTION, byte-for-byte from the June build: fast flick drag, no holds, no screenshots"
 
 VIEWPORT = {"width": 1366, "height": 768}
 
@@ -1958,16 +1958,13 @@ def _do_drag(page, direction, frac):
     dx = sx * box["width"] * frac
     dy = sy * box["height"] * frac
     try:
+        # THE 200k GESTURE, byte-for-byte from the June build (02ba61a) that
+        # banked the volume: grab, one FAST flick (steps=4, like fiber_hunter's
+        # dragRel -- Mapbox adds a little inertia so it pans snappy AND a touch
+        # further), release. No holds, no stages, no screenshots.
         page.mouse.move(cx, cy)
         page.mouse.down()
-        # A too-fast flick (down->move->up with no hold) can be read by Mapbox as a
-        # CLICK, not a drag -> the map doesn't pan. Hold briefly after down so the
-        # grab registers, move in TWO stages while held so it's an unambiguous
-        # drag-pan, then settle before release so the pan commits.
-        page.wait_for_timeout(60)
-        page.mouse.move(cx + dx * 0.5, cy + dy * 0.5, steps=6)
-        page.mouse.move(cx + dx, cy + dy, steps=6)
-        page.wait_for_timeout(40)
+        page.mouse.move(cx + dx, cy + dy, steps=4)
         page.mouse.up()
     except Exception as e:
         print("     drag failed: %s" % str(e)[:70])
