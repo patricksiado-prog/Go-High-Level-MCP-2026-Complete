@@ -38,6 +38,7 @@ REM exit code 42 = the watchdog decided it froze -> relaunch fresh automatically
 if errorlevel 42 (
   echo.
   echo   It locked up -- restarting the hunter automatically...
+  set "OPTIMUS_AUTORESUME=1"
   timeout /t 3 >nul
   goto runloop
 )

@@ -3199,7 +3199,11 @@ def main():
             _sweep = sweep_grid if args.grid else sweep_continuous
             return _sweep(page, ws, seen, args.zip or "manual", args.dry, cap)
 
-        if not args.auto:
+        # After a WATCHDOG restart we must NOT sit waiting for Enter (that would
+        # defeat the auto-restart). The launcher sets OPTIMUS_AUTORESUME=1 on a
+        # relaunch so the hunter resumes scanning on its own.
+        _auto_resume = os.environ.get("OPTIMUS_AUTORESUME") == "1"
+        if not args.auto and not _auto_resume:
             # MANUAL mode: let the user get the map where they want it, then
             # scan THAT view (don't auto-jump to a ZIP). They press Enter to go.
             searched[0] = True
@@ -3212,6 +3216,9 @@ def main():
                 input("  Press Enter to start... ")
             except EOFError:
                 pass
+        elif _auto_resume:
+            searched[0] = True
+            print("\n  (auto-resumed after a restart -- scanning the current view)\n")
 
         # Manual mode keeps watching by default: you pan the map by hand and it
         # collects the backend dots from each view, every few seconds, until you
