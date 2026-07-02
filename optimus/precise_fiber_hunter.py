@@ -142,7 +142,7 @@ REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
 # BUILD STAMP -- bumped on every push so you can SEE the code actually changed.
 # It prints a big banner at startup. If the number here matches what your screen
 # shows, you're on the newest code.
-HUNTER_BUILD = "BUILD 2026-07-02  #26  TICKER: a timestamped line every cell -- if the clock advances, it's working"
+HUNTER_BUILD = "BUILD 2026-07-02  #27  OLD-PROGRAM SEARCH CLICK: calibrate the button spot once, then blind-click it after EVERY pan"
 
 VIEWPORT = {"width": 1366, "height": 768}
 
@@ -1713,26 +1713,80 @@ SEARCH_SELECTORS = ["[aria-label*='search this area' i]",
                     "[class*='search-this-area' i]",
                     "[data-testid*='search-area' i]"]
 
+# THE OLD PROGRAM'S PROVEN PATTERN (fiber_hunter.py): don't hunt the button --
+# CALIBRATE its position once, save it, then blind-click that same spot after
+# every pan. Same filename as the original. The viewport is fixed (1366x768),
+# so the spot is stable across machines once learned.
+SEARCH_POS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "search_button_pos.json")
+_SEARCH_POS = [None]     # None = not loaded yet; False = no calibration; (x,y)
+
+
+def _load_search_pos():
+    if _SEARCH_POS[0] is None:
+        try:
+            with open(SEARCH_POS_PATH) as f:
+                d = json.load(f)
+            _SEARCH_POS[0] = (float(d["x"]), float(d["y"]))
+        except Exception:
+            _SEARCH_POS[0] = False
+    return _SEARCH_POS[0] or None
+
+
+def _save_search_pos(x, y):
+    _SEARCH_POS[0] = (x, y)
+    try:
+        with open(SEARCH_POS_PATH, "w") as f:
+            json.dump({"x": x, "y": y}, f)
+        print("     (CALIBRATED the Search spot at %d,%d -- clicking it every "
+              "pan from now on, old-program style)" % (x, y))
+    except OSError:
+        pass
+
+
+def _drop_search_pos():
+    """Layout changed (we keep landing off the map) -> forget the calibration
+    so the next DOM find re-learns the fresh position."""
+    _SEARCH_POS[0] = False
+    try:
+        os.remove(SEARCH_POS_PATH)
+    except OSError:
+        pass
+
 
 def search_this_area(page):
-    """After a pan the new view's dots only load when the map's 'search this
-    area' control is clicked. The exact label varies AND the button can live in
-    a frame with the map (a top-page text search finds only the nav menu), so:
-    search the page + EVERY frame, by text AND by aria-label/CSS. If nothing
-    matches, dump the visible controls ONCE so we can pin the right one. Note
-    the pan itself usually triggers the fetch too -- NetCapture is always
-    listening -- so a missing button slows nothing down."""
+    """Press 'Search this area' the OLD PROGRAM'S way: once the button has been
+    seen ONCE, its position is calibrated (search_button_pos.json) and every
+    press after that is a blind click at that exact spot -- no DOM hunting, no
+    'control not found', it just presses. Until calibrated: hunt the page +
+    every frame by text AND aria/CSS; the first hit records the position."""
+    pos = _load_search_pos()
+    if pos:
+        try:
+            page.mouse.click(pos[0], pos[1])
+            print("  -> pressing 'Search this area' (calibrated spot)")
+            return True
+        except Exception:
+            return False
     for ctx in [page] + list(page.frames):
         for label in SEARCH_LABELS:
             try:
                 btn = ctx.get_by_text(label, exact=False)
                 if btn.count() > 0:
                     print("  -> pressing '%s' (fetching dots from server)..." % label)
+                    bb = None
+                    try:
+                        bb = btn.first.bounding_box()
+                    except Exception:
+                        pass
                     try:
                         # Cap the click at 1s. It's only a CAP -- a normal view's
                         # button is clickable instantly. On a slow/stuck view it
                         # bails so the loop pans on (capture rides the pan anyway).
                         btn.first.click(timeout=1000)
+                        if bb:
+                            _save_search_pos(bb["x"] + bb["width"] / 2.0,
+                                             bb["y"] + bb["height"] / 2.0)
                         return True
                     except Exception:
                         print("     (search didn't take -- moving on, panning next)")
@@ -1744,15 +1798,24 @@ def search_this_area(page):
                 el = ctx.query_selector(sel)
                 if el and el.is_visible():
                     print("  -> pressing search control %s (fetching dots)..." % sel)
+                    bb = None
+                    try:
+                        bb = el.bounding_box()
+                    except Exception:
+                        pass
                     try:
                         el.click(timeout=1000)
+                        if bb:
+                            _save_search_pos(bb["x"] + bb["width"] / 2.0,
+                                             bb["y"] + bb["height"] / 2.0)
                         return True
                     except Exception:
                         print("     (search didn't take -- moving on, panning next)")
                         return False
             except Exception:
                 pass
-    print("  -> (no 'search this area' control found this view)")
+    print("  -> (no 'search this area' control found this view -- the pan "
+          "itself still triggers the fetch)")
     if not _DUMPED_CONTROLS[0]:
         _DUMPED_CONTROLS[0] = True
         dump_clickables(page)
@@ -2196,13 +2259,17 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                             open_map_view(page)
                             if off_map >= 5:
                                 print("  (still off the map -- reloading the map page)")
+                                _drop_search_pos()   # stale spot may be clicking nav
                                 safe_goto(page, MAP_URL)
                                 time.sleep(3)
                                 open_map_view(page)
                                 off_map = 0
                         else:
                             off_map = 0
-                            if cell % 3 == 0:
+                            # OLD-PROGRAM RULE: once the button spot is
+                            # calibrated, press it after EVERY pan (a blind
+                            # click, ~50ms). Uncalibrated, hunt every 3rd cell.
+                            if _load_search_pos() or cell % 3 == 0:
                                 search_this_area(page)   # nudge the fetch
                     except Exception as e:
                         # a mid-navigation hiccup must never end the sweep
