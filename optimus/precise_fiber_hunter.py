@@ -142,7 +142,7 @@ REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
 # BUILD STAMP -- bumped on every push so you can SEE the code actually changed.
 # It prints a big banner at startup. If the number here matches what your screen
 # shows, you're on the newest code.
-HUNTER_BUILD = "BUILD 2026-07-02  #31  the 200k motion + 25-second watchdog: a freeze costs 25s, then it restarts and resumes itself"
+HUNTER_BUILD = "BUILD 2026-07-02  #32  uploader singleton: exactly ONE sheet-work process, ever (the 5-uploader pile-up is fixed)"
 
 VIEWPORT = {"width": 1366, "height": 768}
 
@@ -212,6 +212,8 @@ UPLOADER_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             "uploader_log.txt")
 FREEZE_DUMP_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 "last_freeze.txt")
+UPLOADER_LOCK = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "uploader.lock")
 
 JSONL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           "precise_addresses.jsonl")
@@ -2942,6 +2944,17 @@ def uploader_main():
     survive failures via SafePending), live biz matching, Hunter Status
     mirroring, Backend Capture shipping. Exits by itself once the hunter has
     been silent for a long while and everything is shipped."""
+    # SINGLETON: exactly ONE uploader, ever. Every hunter relaunch spawns one,
+    # and before this guard the old ones never exited -- five of them ended up
+    # hammering the sheet with duplicate rows and eating the laptop's CPU.
+    # The live uploader touches the lock every loop; a fresh lock = stand down.
+    try:
+        if os.path.exists(UPLOADER_LOCK) and \
+                time.time() - os.path.getmtime(UPLOADER_LOCK) < 60:
+            print("another uploader is live -- standing down (pid %d)" % os.getpid())
+            return
+    except OSError:
+        pass
     _ulog("uploader up (pid %d) -- all sheet work happens here" % os.getpid())
     ws = None
     delay = 5
@@ -3062,9 +3075,18 @@ def uploader_main():
                                       value_input_option="RAW")
         except Exception:
             pass
-        # ---- 4. quit once the hunter has clearly gone away and we're drained --
+        # ---- 4. heartbeat the singleton lock, quit when the hunter is gone ----
+        try:
+            with open(UPLOADER_LOCK, "w") as f:
+                f.write(str(os.getpid()))
+        except OSError:
+            pass
         if not len(outbox) and time.time() - idle_since > 900:
             _ulog("hunter silent 15 min and everything shipped -- uploader done")
+            try:
+                os.remove(UPLOADER_LOCK)
+            except OSError:
+                pass
             return
         time.sleep(2)
 
