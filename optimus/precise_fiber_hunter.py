@@ -132,7 +132,7 @@ MAP_RIGHT_FRAC = 0.98
 WAIT_AFTER_PAN = 0.2
 WAIT_AFTER_ZOOM = 0.45
 SEARCH_SETTLE = 0.3           # wait after "Search this area" for dots to load
-PAN_INTERVAL = 0.05          # TIMED sweep: near-continuous panning (tiny gap between drags)
+PAN_INTERVAL = 0.3           # TIMED sweep: brisk but gives the browser room (0.05 hung weak PCs)
 FLUSH_INTERVAL = 4.0         # TIMED sweep: how often the background thread writes dots
 SPIRAL_MAX = 5               # TIMED sweep: how far (cells) it may drift from the start
 #                              before snapping back -- stops it wandering into empty edges
@@ -3079,7 +3079,13 @@ def main():
                   "--hide-crash-restore-bubble",
                   "--no-first-run",
                   "--no-default-browser-check",
-                  "--disable-features=InfiniteSessionRestore"],
+                  "--disable-features=InfiniteSessionRestore",
+                  # stability on weak laptops (the map + long runs were hanging Chromium):
+                  "--disable-dev-shm-usage",
+                  "--disable-background-timer-throttling",
+                  "--disable-backgrounding-occluded-windows",
+                  "--disable-renderer-backgrounding",
+                  "--disable-ipc-flooding-protection"],
         )
         ctx.add_init_script(MAPBOX_HOOK_JS)   # hook the map before it loads
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
