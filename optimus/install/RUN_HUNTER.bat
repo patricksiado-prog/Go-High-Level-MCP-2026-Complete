@@ -35,12 +35,22 @@ curl -L -s -o backend_classifier.py   "%RAW%/backend_classifier.py?cb=!CB!"
 findstr /C:"COMBO MATCH ON" precise_fiber_hunter.py >nul 2>&1 && echo   (on the latest version) || echo   (could not refresh -- running the copy you have)
 
 echo.
-py precise_fiber_hunter.py 2>nul || python precise_fiber_hunter.py
-REM exit code 42 = the watchdog decided it froze -> relaunch fresh automatically.
-if errorlevel 42 (
-  echo.
+set "PYCMD=python"
+where py >nul 2>&1 && set "PYCMD=py"
+%PYCMD% precise_fiber_hunter.py
+set "RC=%ERRORLEVEL%"
+REM  0  = you closed the browser on purpose  -> stop (the only way it stays down)
+REM  42 = the watchdog says it froze         -> relaunch fresh automatically
+REM  anything else = it crashed              -> relaunch fresh automatically
+REM  (every relaunch re-downloads the latest code first, so even a bad update
+REM   heals itself on the next loop)
+if "%RC%"=="0" goto :eof
+echo.
+if "%RC%"=="42" (
   echo   It locked up -- restarting the hunter automatically...
-  set "OPTIMUS_AUTORESUME=1"
-  timeout /t 3 >nul
-  goto runloop
+) else (
+  echo   It stopped unexpectedly ^(code %RC%^) -- restarting automatically...
 )
+set "OPTIMUS_AUTORESUME=1"
+timeout /t 5 >nul
+goto runloop
