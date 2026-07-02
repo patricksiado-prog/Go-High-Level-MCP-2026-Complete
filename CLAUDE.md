@@ -826,6 +826,17 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   "Fiber Availability Map" button; if absent, click "AT&T Fiber" (or `goto(MAP_URL)`) then the map
   button. `MAP_URL = youachieve.att.com/yourefer/fiber`. Login is saved in `att_profile/` — a FRESH
   computer has no saved login, so it shows the AT&T Global Logon first (normal, not a bug).
+- **PARKED NEXT-STEPS (Patrick: "later" / "don't worry about it now", 2026-07-01) — build when he says go.**
+  (1) **Auto-restart watchdog** — if the hunter locks up (browser hang / stale profile lock), detect the
+  stall (no progress for N min via the run_status heartbeat) and restart fresh: `_clear_profile_lock()`
+  (remove Chromium `SingletonLock`/`SingletonCookie`/`SingletonSocket` in att_profile so a relaunch after
+  a crash works) + a watchdog thread that `os._exit(42)` on stall + a launcher loop that relaunches on
+  exit code 42. Do NOT broadly `taskkill chrome` (kills Patrick's own browser) — rely on the lock-clear.
+  (2) **Deterministic motion via map-object recovery** — inject the `mapbox-extraction` getContext +
+  React-fiber hook BEFORE goto to recover the hidden Mapbox map, then pan with `map.panBy()` (guaranteed
+  movement, immune to the layout shifts / overlays that can break a drag). Keep the hardened self-verifying
+  drag as fallback. (The map-hook plumbing partly exists: `window.__optimusMaps`, `MAPBOX_DOTS_JS` — but
+  prior probes found the instance hidden; the getContext+fiber-walk is the un-tried recovery path.)
 - **UPDATE MECHANISM — the fix that ended "still running old code" (2026-07-01, `ad04844`).** There are
   TWO install layouts: (1) `START OPTIMUS.bat` → `%USERPROFILE%\optimus\repo` = a GIT CLONE (updates via
   git). (2) the desktop "Optimus Fiber Hunter" icon (INSTALL_OPTIMUS) → `%USERPROFILE%\optimus_hunter` =
