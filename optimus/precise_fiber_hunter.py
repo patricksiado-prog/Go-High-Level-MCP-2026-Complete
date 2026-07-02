@@ -136,7 +136,7 @@ PAN_INTERVAL = 0.05          # TIMED sweep: near-continuous panning (tiny gap be
 FLUSH_INTERVAL = 4.0         # TIMED sweep: how often the background thread writes dots
 SPIRAL_MAX = 5               # TIMED sweep: how far (cells) it may drift from the start
 #                              before snapping back -- stops it wandering into empty edges
-STALL_SECS = 150             # WATCHDOG: no progress this long -> assume frozen, restart
+STALL_SECS = 40              # WATCHDOG: browser hung this long -> restart FAST (was 150)
 RESTART_CODE = 42            # exit code the launcher loop watches to relaunch fresh
 _last_beat = [0.0]           # last time the sweep made progress (0 = watchdog not armed)
 SEARCH_CLICK_WAIT = 1.5       # wait after CLICKING the search control for the fetch
@@ -2935,7 +2935,7 @@ def _start_watchdog():
     _beat()
     def _run():
         while True:
-            time.sleep(20)
+            time.sleep(8)
             if _last_beat[0] and (time.time() - _last_beat[0]) > STALL_SECS:
                 print("\n[watchdog] no progress for %ds -- looks frozen. "
                       "Restarting fresh...\n" % STALL_SECS)
@@ -3072,7 +3072,14 @@ def main():
             PROFILE_DIR, headless=False,
             viewport=VIEWPORT,
             device_scale_factor=1,   # screenshot px == click px (HiDPI fix)
-            args=["--start-maximized"],
+            args=["--start-maximized",
+                  # kill the "Chromium didn't shut down / Restore pages" bubble that
+                  # kept covering the map after a restart (it blocked the sweep).
+                  "--disable-session-crashed-bubble",
+                  "--hide-crash-restore-bubble",
+                  "--no-first-run",
+                  "--no-default-browser-check",
+                  "--disable-features=InfiniteSessionRestore"],
         )
         ctx.add_init_script(MAPBOX_HOOK_JS)   # hook the map before it loads
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
