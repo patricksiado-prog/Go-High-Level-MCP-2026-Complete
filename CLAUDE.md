@@ -19,6 +19,17 @@
 > Covered: precise_fiber_hunter.py, maps_scraper_standalone.py, dialer_loader.py.
 > When you add ANY new runnable program, wire in self_update the same way.
 
+> **RULE — "JUST REINSTALL" IS THE UNIVERSAL FIX (Patrick, 2026-07-01).** The installer
+> (`optimus/install/INSTALL_OPTIMUS.bat`) must ALWAYS pull the newest code from GitHub and set up the
+> self-updating programs, so that **re-running the installer fixes ANY broken/stale install**, and
+> from then on it **auto-updates every launch**. So the standing answer to "it's broken / on old code"
+> is simply: RE-RUN THE INSTALLER. Keep the installer able to do this (force-overwrite the code, keep
+> the raw-refresh self-updater intact). Distribution = the permanent GitHub release link
+> `github.com/patricksiado-prog/Go-High-Level-MCP-2026-Complete/releases/download/installer/INSTALL_OPTIMUS.bat`
+> (auto-republished by the `make-installer-release.yml` Action on every push) + a Drive copy for the
+> team. Never tell Patrick or the team to hand-run curl commands as the normal path — "reinstall" is
+> the one instruction.
+
 > Operator: Patrick William Siado (AT&T Fiber dealer).
 > This repo IS the "busybee" — the GoHighLevel MCP server (834 tools) deployed on Railway.
 > Companion brain: Google Drive doc "AT&T Outreach Bot — Master Handoff & GHL Brain"
