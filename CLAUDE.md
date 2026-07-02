@@ -826,6 +826,12 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   "Fiber Availability Map" button; if absent, click "AT&T Fiber" (or `goto(MAP_URL)`) then the map
   button. `MAP_URL = youachieve.att.com/yourefer/fiber`. Login is saved in `att_profile/` — a FRESH
   computer has no saved login, so it shows the AT&T Global Logon first (normal, not a bug).
+- **★ GOAL — BULLETPROOF, SELF-HEALING PROGRAMS (Patrick, 2026-07-01).** The tools should "just work"
+  for the team with zero babysitting: (a) ALWAYS run the latest code (self-update every launch — the
+  raw-refresh fix now covers ZIP installs too), and (b) **auto-restart completely if they lock up**
+  (browser hang / stale profile lock → detect the stall and relaunch fresh, no user action). Build the
+  watchdog below toward this goal. North star: a rep double-clicks the icon and it runs, updates, and
+  recovers itself — nobody should ever be stuck on a frozen or stale program again.
 - **PARKED NEXT-STEPS (Patrick: "later" / "don't worry about it now", 2026-07-01) — build when he says go.**
   (1) **Auto-restart watchdog** — if the hunter locks up (browser hang / stale profile lock), detect the
   stall (no progress for N min via the run_status heartbeat) and restart fresh: `_clear_profile_lock()`
