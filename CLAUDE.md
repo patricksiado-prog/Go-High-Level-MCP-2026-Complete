@@ -871,13 +871,18 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   (browser hang / stale profile lock → detect the stall and relaunch fresh, no user action). Build the
   watchdog below toward this goal. North star: a rep double-clicks the icon and it runs, updates, and
   recovers itself — nobody should ever be stuck on a frozen or stale program again.
-- **PARKED NEXT-STEPS (Patrick: "later" / "don't worry about it now", 2026-07-01) — build when he says go.**
-  (1) **Auto-restart watchdog** — if the hunter locks up (browser hang / stale profile lock), detect the
-  stall (no progress for N min via the run_status heartbeat) and restart fresh: `_clear_profile_lock()`
-  (remove Chromium `SingletonLock`/`SingletonCookie`/`SingletonSocket` in att_profile so a relaunch after
-  a crash works) + a watchdog thread that `os._exit(42)` on stall + a launcher loop that relaunches on
-  exit code 42. Do NOT broadly `taskkill chrome` (kills Patrick's own browser) — rely on the lock-clear.
-  (2) **Deterministic motion via map-object recovery** — inject the `mapbox-extraction` getContext +
+- **SHIPPED 2026-07-01: TIMED MOTION + AUTO-RESTART WATCHDOG (`ad7bfe2`, `3713fcd`).** (a) `sweep_continuous`
+  is now a TIMED sweep: the pan loop runs on a fixed clock (`PAN_INTERVAL=0.5`) and NEVER waits on the
+  system; a background thread flushes the dots NetCapture grabbed off the wire (`FLUSH_INTERVAL=4s`; flush
+  is page-free so it's safe off-thread) + status + backend. So pan→search→capture never stops, even over
+  empty ground. (b) Auto-restart watchdog: `_start_watchdog()` (armed when scanning starts) beats on every
+  pan; if no progress for `STALL_SECS=150`, a daemon thread `os._exit(RESTART_CODE=42)` even if the main
+  thread is hung on the browser; `RUN_HUNTER.bat` loops and relaunches on exit 42; `_clear_profile_lock()`
+  clears the Chromium SingletonLock on startup so the fresh launch opens clean. Self-heals a freeze with no
+  user action. THE UPDATE PATH FINALLY WORKS: `RUN_HUNTER.bat` re-downloads the core files every click
+  (cache-busted) + prints "Checking for the latest version... (on the latest version)" — confirmed live on
+  Patrick's screen 2026-07-01.
+- **STILL PARKED (build when he says go): Deterministic motion via map-object recovery** — inject the `mapbox-extraction` getContext +
   React-fiber hook BEFORE goto to recover the hidden Mapbox map, then pan with `map.panBy()` (guaranteed
   movement, immune to the layout shifts / overlays that can break a drag). Keep the hardened self-verifying
   drag as fallback. (The map-hook plumbing partly exists: `window.__optimusMaps`, `MAPBOX_DOTS_JS` — but
