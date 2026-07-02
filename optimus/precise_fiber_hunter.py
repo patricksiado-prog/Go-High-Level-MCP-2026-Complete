@@ -118,6 +118,11 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
 # Self-update: which branch to pull on each start (matches the launcher).
 REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
 
+# BUILD STAMP -- bumped on every push so you can SEE the code actually changed.
+# It prints a big banner at startup. If the number here matches what your screen
+# shows, you're on the newest code.
+HUNTER_BUILD = "BUILD 2026-07-02  #16  single-threaded (no background thread)"
+
 VIEWPORT = {"width": 1366, "height": 768}
 
 # --- map viewport region of the screen (fractions of the window) ---
@@ -2998,6 +3003,11 @@ def main():
                          "Orange Biz tabs (keep one row per unique lead, by phone), "
                          "then exit. The hunter also auto-dedupes these on startup.")
     args = ap.parse_args()
+
+    # print the build stamp FIRST so you can see, immediately, which code is running
+    print("\n" + "#" * 60)
+    print("#  OPTIMUS FIBER HUNTER   %s" % HUNTER_BUILD)
+    print("#" * 60 + "\n")
 
     _BACKEND_ON[0] = not args.no_backend
 
