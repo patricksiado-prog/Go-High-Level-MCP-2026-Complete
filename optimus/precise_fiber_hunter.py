@@ -142,7 +142,7 @@ REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
 # BUILD STAMP -- bumped on every push so you can SEE the code actually changed.
 # It prints a big banner at startup. If the number here matches what your screen
 # shows, you're on the newest code.
-HUNTER_BUILD = "BUILD 2026-07-02  #30  THE 200k MOTION, byte-for-byte from the June build: fast flick drag, no holds, no screenshots"
+HUNTER_BUILD = "BUILD 2026-07-02  #31  the 200k motion + 25-second watchdog: a freeze costs 25s, then it restarts and resumes itself"
 
 VIEWPORT = {"width": 1366, "height": 768}
 
@@ -162,7 +162,11 @@ PAN_INTERVAL = 0.3           # TIMED sweep: brisk but gives the browser room (0.
 FLUSH_INTERVAL = 4.0         # TIMED sweep: how often the background thread writes dots
 SPIRAL_MAX = 5               # TIMED sweep: how far (cells) it may drift from the start
 #                              before snapping back -- stops it wandering into empty edges
-STALL_SECS = 40              # WATCHDOG: browser hung this long -> restart FAST (was 150)
+STALL_SECS = 25              # WATCHDOG: browser hung this long -> restart FAST.
+                             # Legit per-cell work is 1-2s now (no screenshots,
+                             # no sheet I/O on the pan path), so 25s of silence
+                             # = truly stuck. Recovery beats during page reloads
+                             # keep a legit reload from tripping it.
 RESTART_CODE = 42            # exit code the launcher loop watches to relaunch fresh
 _last_beat = [0.0]           # last time the sweep made progress (0 = watchdog not armed)
 SEARCH_CLICK_WAIT = 1.5       # wait after CLICKING the search control for the fetch
@@ -2197,9 +2201,12 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                             open_map_view(page)
                             if off_map >= 5:
                                 print("  (still off the map -- reloading the map page)")
+                                _beat()          # legit recovery, not a freeze
                                 safe_goto(page, MAP_URL)
+                                _beat()
                                 time.sleep(3)
                                 open_map_view(page)
+                                _beat()
                                 off_map = 0
                         else:
                             off_map = 0
