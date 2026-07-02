@@ -121,7 +121,7 @@ REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
 # BUILD STAMP -- bumped on every push so you can SEE the code actually changed.
 # It prints a big banner at startup. If the number here matches what your screen
 # shows, you're on the newest code.
-HUNTER_BUILD = "BUILD 2026-07-02  #17  map.panBy() motion (guaranteed pan, no swallowed drag)"
+HUNTER_BUILD = "BUILD 2026-07-02  #18  panBy motion + 15s sheet-write timeout (no freeze on a hung write)"
 
 VIEWPORT = {"width": 1366, "height": 768}
 
@@ -1095,12 +1095,32 @@ def _sheet_is_full(sh):
                 or "increase the number of cells" in m)
 
 
+def _authorize(creds_file):
+    """gspread.authorize + a HARD HTTP TIMEOUT on every Sheets call. Without this,
+    requests has NO timeout, so a single hung Google API write blocks forever and
+    FREEZES the pan loop (a real 'it stopped' cause). We force ~15s on every HTTP
+    call across gspread 5 (client.session) and gspread 6 (client.http_client.session)."""
+    import gspread
+    from google.oauth2.service_account import Credentials
+    client = gspread.authorize(
+        Credentials.from_service_account_file(creds_file, scopes=SCOPES))
+    for sess in (getattr(client, "session", None),
+                 getattr(getattr(client, "http_client", None), "session", None)):
+        if sess is None or getattr(sess, "_optimus_timeout", False):
+            continue
+        _orig = sess.request
+        def _req(method, url, *a, __o=_orig, **kw):
+            kw.setdefault("timeout", 15)
+            return __o(method, url, *a, **kw)
+        sess.request = _req
+        sess._optimus_timeout = True
+    return client
+
+
 def open_sheet():
     """Open the production sheet and the Precise Fiber tab. We do NOT create a new
     sheet -- if it's full, AUTO-CLEAN this one (delete junk tabs, trim) so it accepts
     writes again, then keep going. Same sheet, same link everyone has."""
-    import gspread
-    from google.oauth2.service_account import Credentials
     creds_file = find_creds()
     if not creds_file:
         print("No valid google_creds.json found among the usual paths; running "
@@ -1109,8 +1129,7 @@ def open_sheet():
         return None
     print("Using creds: %s" % creds_file)
     try:
-        client = gspread.authorize(
-            Credentials.from_service_account_file(creds_file, scopes=SCOPES))
+        client = _authorize(creds_file)
         sh = client.open_by_key(SHEET_ID)
         if _sheet_is_full(sh):
             print("The sheet is FULL -- auto-cleaning the garbage so leads can save...")
@@ -1149,8 +1168,7 @@ def clean_sheet():
     creds = find_creds()
     if not creds:
         print("No google_creds.json found -- can't clean the sheet."); return
-    client = gspread.authorize(
-        Credentials.from_service_account_file(creds, scopes=SCOPES))
+    client = _authorize(creds)
     sh = client.open_by_key(SHEET_ID)
     keep = {t.lower() for t in pipeline_tabs}
     wss = sh.worksheets()
