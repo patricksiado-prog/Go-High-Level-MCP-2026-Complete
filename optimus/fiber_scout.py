@@ -44,8 +44,10 @@ from precise_fiber_hunter import (
     search_this_area,
 )
 from optimus_dot_detect import zone_freshness, FRESH_MIN_ELIGIBLE
+import backend_classifier as bc
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+BUILD_CODES_PATH = os.path.join(HERE, "build_codes.json")
 SHOT_DIR = os.path.join(HERE, "fresh_zones")
 CSV_PATH = os.path.join(HERE, "fresh_zones.csv")
 SCOUT_TAB = "Fiber Scout"
@@ -170,16 +172,80 @@ def write_backend(ws, cap, host):
             lines.append(json.dumps(data)[:3000])
         except Exception:
             pass
+    # BACKEND INSPECT: the cross-tab (build_type x customer) that reveals which
+    # curr_ntwrk_bld_type_cd codes mean GOLD (copper) vs GREY (fiber). Run the
+    # scout over a GREEN area (e.g. 77004), read this block, then put the codes
+    # in optimus/build_codes.json -- that completes the classifier.
+    recs = _wire_records(leads)
+    if not recs and os.path.exists(raw):
+        try:
+            recs = _wire_records(
+                [{"raw": r} for r in bc.load_leads(open(raw).read())])
+        except Exception:
+            recs = []
+    if recs:
+        insp = bc.inspect(recs)
+        lines.append("--- BACKEND INSPECT (fill build_codes.json from this) ---")
+        lines.append(insp)
+        for ln in insp.splitlines()[:15]:
+            if ln.strip():
+                row("INSPECT", ln.strip())
+        s = bc.summarize(recs)
+        row("BACKEND VERDICT", s["verdict"],
+            "green=%d gold=%d grey=%d cust=%d skip=%d" % (
+                s["green"], s["gold"], s["grey"],
+                s["customer_undecoded"], s["skip"]),
+            "grey%%=%.1f" % s["grey_pct"])
     row("DONE", host, "", "%d endpoints" % len(rows))
     gh_put("optimus/_live/backend_capture.txt", "\n".join(lines))
 
 
-def scan_cell(page):
+def load_build_codes():
+    """Once a real inspect() run over a green area (e.g. Third Ward 77004)
+    reveals which curr_ntwrk_bld_type_cd values mean an existing FIBER customer
+    (grey) vs a COPPER customer (gold), drop them into optimus/build_codes.json
+    as {"fiber": [...], "copper": [...]} -- no code edit needed. Until then
+    customers score as CUSTOMER (conservative, never falsely grey)."""
+    try:
+        with open(BUILD_CODES_PATH) as f:
+            d = json.load(f)
+        bc.FIBER_BUILD_CODES = set(str(x).lower() for x in d.get("fiber", []))
+        bc.COPPER_BUILD_CODES = set(str(x).lower() for x in d.get("copper", []))
+        if bc.FIBER_BUILD_CODES or bc.COPPER_BUILD_CODES:
+            print("Build codes loaded: fiber=%s copper=%s"
+                  % (sorted(bc.FIBER_BUILD_CODES), sorted(bc.COPPER_BUILD_CODES)))
+    except Exception:
+        pass
+
+
+def _wire_records(leads):
+    """The raw AT&T records (subscriber_ban / curr_ntwrk_bld_type_cd) riding in
+    the captured leads -- only those that actually carry the backend fields."""
+    out = []
+    for ld in leads or []:
+        r = ld.get("raw")
+        if isinstance(r, dict) and ("curr_ntwrk_bld_type_cd" in r
+                                    or "subscriber_ban" in r):
+            out.append(r)
+    return out
+
+
+def scan_cell(page, wire_leads=None):
+    """Score one view. BACKEND-FIRST: when this cell captured real AT&T records
+    off the wire, classify THOSE (the truth from the dealer-map backend JSON).
+    The pixel path is only the fallback for cells where nothing crossed the
+    wire -- it can misread the map legend as one gold dot every cell."""
+    recs = _wire_records(wire_leads)
+    if recs:
+        s = bc.summarize(recs)
+        return (s["green"], s["gold"], s["grey"], s["grey_pct"] / 100.0,
+                s["verdict"], "backend %d recs (cust-undecoded %d)"
+                % (len(recs), s["customer_undecoded"]))
     dots, gray = find_map_dots(page)
     green = sum(1 for _x, _y, c in dots if c == "GREEN")
     gold = sum(1 for _x, _y, c in dots if c == "GOLD")
     label, gray_share = zone_freshness(green, gold, gray)
-    return green, gold, gray, gray_share, label
+    return green, gold, gray, gray_share, label, "pixel fallback (legend can fake 1 gold)"
 
 
 def main():
@@ -191,6 +257,7 @@ def main():
     ap.add_argument("--no-update", action="store_true", help="skip the GitHub auto-pull on start")
     args = ap.parse_args()
 
+    load_build_codes()
     os.makedirs(SHOT_DIR, exist_ok=True)
     fresh = []
 
@@ -238,10 +305,12 @@ def main():
         while True:
             idx += 1
             try:
+                mark = len(cap.pending)        # wire leads BEFORE this cell
                 if on_map(page):
                     search_this_area(page)     # load the new view's dots first
                 time.sleep(SEARCH_SETTLE)
-                green, gold, gray, gray_share, label = scan_cell(page)
+                green, gold, gray, gray_share, label, via = scan_cell(
+                    page, cap.pending[mark:])
             except Exception as e:
                 if any(k in str(e).lower() for k in ("closed", "crash", "target")):
                     print("\nWindow closed -- stopping."); break
@@ -250,12 +319,12 @@ def main():
             elig = green + gold
             tag = {"FRESH": "*** FRESH (NEW FIBER)", "WORKING": " ~ working",
                    "MATURE": "   mature (skip)", "EMPTY": "   empty"}.get(label, label)
-            print("cell %3d [down %d col %d]  GREEN %3d  GOLD %3d  GREY %3d  grey%%=%.0f%%  -> %s"
-                  % (idx, down, col, green, gold, gray, gray_share * 100, tag))
+            print("cell %3d [down %d col %d]  GREEN %3d  GOLD %3d  GREY %3d  grey%%=%.0f%%  -> %s  [%s]"
+                  % (idx, down, col, green, gold, gray, gray_share * 100, tag, via))
 
             if (green + gold + gray) > 0:
                 _w(sws, [time.strftime("%Y-%m-%d %H:%M:%S"), host, "d%dc%d" % (down, col),
-                         green, gold, gray, "%.0f%%" % (gray_share * 100), label, ""])
+                         green, gold, gray, "%.0f%%" % (gray_share * 100), label, via])
 
             if label in ("FRESH", "WORKING") and elig >= 1:
                 shot = os.path.join(SHOT_DIR, "zone_%03d_%s_g%d_o%d_grey%d.png"

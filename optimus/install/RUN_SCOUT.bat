@@ -24,6 +24,8 @@ curl -L -s -o "fiber_scout.py"          "%RAW%/fiber_scout.py"
 curl -L -s -o "optimus_dot_detect.py"   "%RAW%/optimus_dot_detect.py"
 curl -L -s -o "precise_fiber_hunter.py" "%RAW%/precise_fiber_hunter.py"
 curl -L -s -o "optimus_api_capture.py"  "%RAW%/optimus_api_capture.py"
+curl -L -s -o "hunter_fixes.py"         "%RAW%/hunter_fixes.py"
+curl -L -s -o "backend_classifier.py"   "%RAW%/backend_classifier.py"
 
 echo.
 echo Starting the Fiber Scout. Pan the map to an area, press Enter, and it

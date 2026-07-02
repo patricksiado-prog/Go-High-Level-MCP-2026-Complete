@@ -30,6 +30,8 @@ set "CB=%RANDOM%%RANDOM%"
 curl -L -s -o precise_fiber_hunter.py "%RAW%/precise_fiber_hunter.py?cb=!CB!"
 curl -L -s -o optimus_dot_detect.py   "%RAW%/optimus_dot_detect.py?cb=!CB!"
 curl -L -s -o optimus_api_capture.py  "%RAW%/optimus_api_capture.py?cb=!CB!"
+curl -L -s -o hunter_fixes.py         "%RAW%/hunter_fixes.py?cb=!CB!"
+curl -L -s -o backend_classifier.py   "%RAW%/backend_classifier.py?cb=!CB!"
 findstr /C:"COMBO MATCH ON" precise_fiber_hunter.py >nul 2>&1 && echo   (on the latest version) || echo   (could not refresh -- running the copy you have)
 
 echo.

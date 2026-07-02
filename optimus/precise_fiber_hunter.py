@@ -103,6 +103,27 @@ try:
 except Exception:
     _extract_features = None
 
+# Audited fixes (safe flush / drift-proof dedup / junk-address gate). A launcher
+# that predates hunter_fixes.py only refreshes the 3 old core files, so on
+# ImportError fetch the module once from GitHub raw -- a stale RUN_HUNTER.bat
+# must never crash the new code on import.
+try:
+    from hunter_fixes import Deduper, SafePending, clean_address, is_junk_address
+except ImportError:
+    try:
+        import urllib.request as _ureq
+        _hf_url = ("https://raw.githubusercontent.com/patricksiado-prog/"
+                   "Go-High-Level-MCP-2026-Complete/"
+                   "claude/optimus-map-tools-setup-6dcl6o/optimus/hunter_fixes.py")
+        _hf = _ureq.urlopen(_hf_url, timeout=30).read()
+        if _hf and len(_hf) > 500:
+            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                   "hunter_fixes.py"), "wb") as _f:
+                _f.write(_hf)
+    except Exception:
+        pass
+    from hunter_fixes import Deduper, SafePending, clean_address, is_junk_address
+
 # ----------------------------------------------------------------------------
 # CONFIG
 # ----------------------------------------------------------------------------
@@ -121,7 +142,7 @@ REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
 # BUILD STAMP -- bumped on every push so you can SEE the code actually changed.
 # It prints a big banner at startup. If the number here matches what your screen
 # shows, you're on the newest code.
-HUNTER_BUILD = "BUILD 2026-07-02  #18  panBy motion + 15s sheet-write timeout (no freeze on a hung write)"
+HUNTER_BUILD = "BUILD 2026-07-02  #19  hunter_fixes wired: safe flush (429 loses nothing) + drift-proof dedup + junk-address gate"
 
 VIEWPORT = {"width": 1366, "height": 768}
 
@@ -622,9 +643,11 @@ def lead_from_dict(d):
             lng = lng if lng is not None else _num(coords[0])
             lat = lat if lat is not None else _num(coords[1])
     status = _pick(low, NET_STATUS_KEYS)
+    # "raw" = the record exactly as AT&T sent it (subscriber_ban,
+    # curr_ntwrk_bld_type_cd, ...) so backend_classifier can read the truth.
     return {"address": " ".join(addr.split())[:160], "lat": lat, "lng": lng,
             "status": status if isinstance(status, str) else None,
-            "ban": _pick(low, NET_BAN_KEYS)}
+            "ban": _pick(low, NET_BAN_KEYS), "raw": base}
 
 
 def extract_leads_from_json(obj, out=None, depth=0):
@@ -756,6 +779,8 @@ class NetCapture:
         self.substr = substr        # restrict to URLs containing this, if set
         self.debug = debug
         self.pending = []
+        self.outbox = SafePending()  # rows awaiting a sheet write; a failed
+                                     # write keeps them queued (no 429 loss)
         self.seen = set()
         self.endpoints = {}          # url(no query) -> lead count, for discovery
         self.seen_urls = {}          # base url -> [content_type, hits, max_bytes]
@@ -905,18 +930,23 @@ class NetCapture:
     def flush(self, ws, seen, area_label, dry):
         """Write the new captured addresses. BATCHED -- one append_rows call for
         all of them, not one append_row per address (which blew the Google Sheets
-        'write requests per minute' quota -> 429 errors)."""
+        'write requests per minute' quota -> 429 errors). Rows travel through the
+        SafePending outbox: they are removed ONLY after the write succeeds, so a
+        429/network error keeps them queued for the next flush instead of losing
+        them (the old pop-before-write data-loss bug). Junk placeholder addresses
+        (UNIT DUMMY/CTR/COIN) never reach the sheet, and dedup is drift-proof
+        (canonical core-address key -- 'STE 1800' vs 'UNIT COIN' vs ZIP drift all
+        resolve to the same building)."""
         self.seen = seen
         new_rows, new_records = [], []
         while self.pending:
             ld = self.pending.pop()
             addr = (ld.get("address") or "").strip()
-            if not addr:
-                continue
-            key = addr.upper()
-            if key in seen:
-                continue
-            seen.add(key)
+            if not addr or is_junk_address(addr):
+                continue                 # junk placeholders never reach the sheet
+            addr, _stripped = clean_address(addr)
+            if not seen.is_new(addr):
+                continue                 # same building, any drift/unit spelling
             dot_status = classify_status(text=ld.get("status"), ban=ld.get("ban"))
             if dot_color(dot_status) == "GREY":
                 continue   # GREY = existing fiber customer -> leave out
@@ -931,24 +961,35 @@ class NetCapture:
                                 "zone_label": "WORKING", "popup_status": ld.get("status"),
                                 "ban": ld.get("ban"), "area": area_label, "ts": ts,
                                 "via": "network", "lat": ld.get("lat"), "lng": ld.get("lng")})
-        if not new_rows:
+        if not new_rows and not len(self.outbox):
             return 0
         for rec in new_records:        # local backup (no quota)
             append_jsonl(rec)
-        try:    # sample addresses to the Drive log so Claude can verify accuracy
-            drive_log("ADDRS +%d e.g.: %s" % (
-                len(new_rows), " | ".join(r[0] for r in new_rows[:4])))
-        except Exception:
-            pass
+        if new_rows:
+            try:    # sample addresses to the Drive log so Claude can verify accuracy
+                drive_log("ADDRS +%d e.g.: %s" % (
+                    len(new_rows), " | ".join(r[0] for r in new_rows[:4])))
+            except Exception:
+                pass
         if dry or ws is None:
             for r in new_rows[:20]:
                 print("   + %s | %s" % (r[0], r[1]))
         else:
-            try:
-                for i in range(0, len(new_rows), 500):   # ONE call per 500 rows
-                    ws.append_rows(new_rows[i:i + 500], value_input_option="RAW")
-            except Exception as e:
-                print("   batch write error: %s" % str(e)[:120])
+            for r in new_rows:
+                self.outbox.add(r)
+
+            def _write(batch):
+                try:
+                    ws.append_rows(batch, value_input_option="RAW")
+                except Exception as e:
+                    print("   batch write error (rows kept, will retry): %s"
+                          % str(e)[:120])
+                    raise
+
+            self.outbox.flush(_write, batch_size=500)   # ONE call per 500 rows
+            if len(self.outbox):
+                print("   (write deferred: %d row(s) queued for the next flush)"
+                      % len(self.outbox))
         # COMBO: match these just-captured leads against the scraped businesses and
         # write any hits to the green/gold business tabs -- live, as we sweep.
         try:
@@ -1230,14 +1271,16 @@ def clean_sheet():
 
 
 def already_seen(ws):
-    """Resume: read existing addresses so a re-run skips them (survives crashes)."""
+    """Resume: read existing addresses so a re-run skips them (survives crashes).
+    Returns a Deduper keyed on the canonical CORE address (unit/ZIP/case drift
+    all resolve to the same building), seeded from the sheet's address column."""
     if not ws:
-        return set()
+        return Deduper()
     try:
         rows = ws.get_all_values()
     except Exception:
-        return set()
-    return set(r[0].strip().upper() for r in rows[1:] if r and r[0].strip())
+        return Deduper()
+    return Deduper(r[0] for r in rows[1:] if r and r[0].strip())
 
 
 def backfill_jsonl(ws, seen):
@@ -1258,12 +1301,14 @@ def backfill_jsonl(ws, seen):
                 except Exception:
                     continue
                 addr = (d.get("address") or "").strip()
-                if not addr or addr.upper() in seen:
+                if not addr or is_junk_address(addr):
                     continue
                 ds = d.get("dot_status")
                 if dot_color(ds) == "GREY":
                     continue
-                seen.add(addr.upper())
+                addr, _stripped = clean_address(addr)
+                if not seen.is_new(addr):
+                    continue
                 _bidx = _BIZ.get("index") or {}
                 _b = _bidx.get(_norm_addr(addr)) if _bidx else None
                 rows.append([addr, dot_color(ds), d.get("ts") or "",
@@ -2156,10 +2201,12 @@ def record_capture(ws, seen, area_label, dry, address, popup_status, ban,
     Returns True when a NEW address was recorded. zone_label (FRESH/WORKING/
     MATURE) rides along so business_score weights just-lit zones first;
     lat/lng (when the geo path has them) feed the Places phone enricher."""
-    addr_key = address.strip().upper()
-    if addr_key in seen:
-        return False
-    seen.add(addr_key)
+    address = address.strip()
+    if is_junk_address(address):
+        return False                     # UNIT DUMMY/CTR/COIN etc -> never write
+    address, _stripped = clean_address(address)
+    if not seen.is_new(address):
+        return False                     # same building, any drift/unit spelling
     if dot_color(dot_status) == "GREY":
         return False   # GREY = existing fiber customer -> leave out
     ts = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -2372,7 +2419,8 @@ _RAW_BASE = ("https://raw.githubusercontent.com/patricksiado-prog/"
 # the hunter + the sibling modules it imports -- refresh all so a ZIP install
 # never runs a stale mix.
 _RAW_FILES = ["precise_fiber_hunter.py", "optimus_dot_detect.py",
-              "optimus_api_capture.py"]
+              "optimus_api_capture.py", "hunter_fixes.py",
+              "backend_classifier.py"]
 
 
 def _raw_refresh(here):
@@ -3367,8 +3415,11 @@ def main():
         # the continuous sweep loops internally until you close the browser, so
         # the outer loop is a single pass unless you explicitly pass --loop.
         loop_secs = args.loop if (args.loop and args.loop > 0) else 0
+        # build tag rides in the started row so the SHEET proves which version ran
         report_status(ws, args.zip or "manual", "started",
-                      note="watching every %ss" % loop_secs if loop_secs else "single pass")
+                      note="%s -- %s" % (HUNTER_BUILD,
+                                         ("watching every %ss" % loop_secs)
+                                         if loop_secs else "single pass"))
         if loop_secs and not args.auto:
             print("\n  WATCHING: pan the map by hand to new areas -- it grabs each "
                   "one off the server every %ds. Close the browser to stop.\n" % loop_secs)

@@ -45,6 +45,8 @@ set "CB=%RANDOM%%RANDOM%"
 curl -L -o "%HUNTER%\precise_fiber_hunter.py" "%RAW%/precise_fiber_hunter.py?cb=%CB%"
 curl -L -o "%HUNTER%\optimus_dot_detect.py"   "%RAW%/optimus_dot_detect.py?cb=%CB%"
 curl -L -o "%HUNTER%\optimus_api_capture.py"  "%RAW%/optimus_api_capture.py?cb=%CB%"
+curl -L -o "%HUNTER%\hunter_fixes.py"         "%RAW%/hunter_fixes.py?cb=%CB%"
+curl -L -o "%HUNTER%\backend_classifier.py"   "%RAW%/backend_classifier.py?cb=%CB%"
 REM VERIFY we actually got the new code (the new build says "COMBO MATCH ON").
 findstr /C:"COMBO MATCH ON" "%HUNTER%\precise_fiber_hunter.py" >nul 2>&1
 if errorlevel 1 (
