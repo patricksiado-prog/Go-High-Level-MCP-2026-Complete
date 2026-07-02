@@ -134,6 +134,8 @@ WAIT_AFTER_ZOOM = 0.45
 SEARCH_SETTLE = 0.3           # wait after "Search this area" for dots to load
 PAN_INTERVAL = 0.5           # TIMED sweep: pan on this clock, never waiting on capture
 FLUSH_INTERVAL = 4.0         # TIMED sweep: how often the background thread writes dots
+SPIRAL_MAX = 5               # TIMED sweep: how far (cells) it may drift from the start
+#                              before snapping back -- stops it wandering into empty edges
 STALL_SECS = 150             # WATCHDOG: no progress this long -> assume frozen, restart
 RESTART_CODE = 42            # exit code the launcher loop watches to relaunch fresh
 _last_beat = [0.0]           # last time the sweep made progress (0 = watchdog not armed)
@@ -1919,9 +1921,20 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
     threading.Thread(target=_flusher, daemon=True).start()
 
     dirs = ["right", "down", "left", "up"]
+    delta = {"right": (1, 0), "left": (-1, 0), "down": (0, 1), "up": (0, -1)}
     di, run = 0, 1
+    pos = [0, 0]   # net cell offset from where you positioned the map
+
+    def _recenter():
+        # fast, silent pans back to the start so it works the dense area you chose
+        # instead of drifting out to empty edges.
+        while pos[0] > 0 and mouse_drag(page, "left", quiet=True):  pos[0] -= 1
+        while pos[0] < 0 and mouse_drag(page, "right", quiet=True): pos[0] += 1
+        while pos[1] > 0 and mouse_drag(page, "up", quiet=True):    pos[1] -= 1
+        while pos[1] < 0 and mouse_drag(page, "down", quiet=True):  pos[1] += 1
+
     print("Timed sweep -- PAN -> SEARCH -> (capture in background), on a clock,\n"
-          "  never waiting on the system. Close the browser to stop.\n")
+          "  never waiting on the system, kept near where you set it. Close to stop.\n")
     try:
         while True:
             for _arm in range(2):           # spiral: 2 arms per run-length, then grow
@@ -1941,11 +1954,20 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                         except Exception:
                             pass
                         return tally["total"]
+                    dx, dy = delta[dirs[di]]
+                    pos[0] += dx
+                    pos[1] += dy
                     tally["cells"] += 1
                     _beat()                    # progress -> the watchdog stays happy
                     time.sleep(PAN_INTERVAL)   # <-- the CLOCK: motion cadence
                 di = (di + 1) % 4
             run += 1
+            if run > SPIRAL_MAX:
+                # covered the neighborhood -> snap back to the start and go again,
+                # instead of spiralling off into empty ground far from the dots.
+                print("  (covered this area -- returning to the start, not drifting off)")
+                _recenter()
+                di, run = 0, 1
     except Exception as e:
         stop["v"] = True
         msg = str(e).lower()
