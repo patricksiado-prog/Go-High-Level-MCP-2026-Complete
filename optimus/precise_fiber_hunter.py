@@ -1893,6 +1893,8 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
     you closing the window) stops it. Returns the total captured."""
     dirs = ["right", "down", "left", "up"]
     di, run, cell, total, zeros = 0, 1, 0, 0, 0
+    FLUSH_EVERY = 3   # write to the sheet only every few cells -> the pan doesn't
+    #                   pause on a sheet write each cell = the motion keeps going.
     print("Continuous sweep -- panning outward until you close the browser.\n")
     try:
         while True:
@@ -1906,18 +1908,21 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                         print("  (view flipped to portal -- re-opening the map)")
                         open_map_view(page)
                     time.sleep(SEARCH_SETTLE)
-                    n = capture.flush(ws, seen, area_label, dry)
-                    total += n
                     cell += 1
-                    zeros = zeros + 1 if n == 0 else 0
-                    print("  [cell %d] +%d  (total %d)" % (cell, n, total))
-                    if cell == 4 or cell % 15 == 0:
-                        report_status(ws, area_label, "watching", found=total,
-                                      note="continuous: %d cells, %d leads" % (cell, total))
-                        dump_backend(ws, capture)   # F12/network snapshot to the sheet
-                    # FAST pan normally; only screenshot-VERIFY when a run of empty
-                    # cells suggests we might be stuck (not just a sparse area).
-                    if not mouse_drag(page, dirs[di], verify=(zeros >= 3)):
+                    # captures accumulate in the capture buffer; write them in a batch
+                    # every few cells so the map keeps panning between writes.
+                    if cell % FLUSH_EVERY == 0:
+                        n = capture.flush(ws, seen, area_label, dry)
+                        total += n
+                        zeros = zeros + 1 if n == 0 else 0
+                        print("  [cell %d] +%d  (total %d)" % (cell, n, total))
+                        if cell % 15 == 0:
+                            report_status(ws, area_label, "watching", found=total,
+                                          note="continuous: %d cells, %d leads" % (cell, total))
+                            dump_backend(ws, capture)   # F12/network snapshot to the sheet
+                    # FAST pan every cell; only screenshot-VERIFY when a couple of
+                    # empty writes suggest we're stuck (not just a sparse area).
+                    if not mouse_drag(page, dirs[di], verify=(zeros >= 2)):
                         return total        # canvas gone -> stop
                 di = (di + 1) % 4
             run += 1
