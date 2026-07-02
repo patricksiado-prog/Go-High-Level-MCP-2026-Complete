@@ -2899,13 +2899,9 @@ def _backend_rows(cap):
 # process, so the motion process never waits on Google for anything.
 # ----------------------------------------------------------------------------
 def _ulog(msg):
-    line = "%s  %s" % (time.strftime("%H:%M:%S"), msg)
-    print(line)
-    try:
-        with open(UPLOADER_LOG, "a") as f:
-            f.write(line + "\n")
-    except OSError:
-        pass
+    # stdout is redirected to uploader_log.txt by the parent's spawn, so one
+    # print reaches the log; a manual --uploader run prints to the console.
+    print("%s  %s" % (time.strftime("%H:%M:%S"), msg), flush=True)
 
 
 def uploader_main():
@@ -2917,12 +2913,20 @@ def uploader_main():
     _ulog("uploader up (pid %d) -- all sheet work happens here" % os.getpid())
     ws = None
     delay = 5
+    tries = 0
     while ws is None:
         try:
             ws = open_sheet()
         except Exception as e:
             _ulog("sheet connect failed: %s -- retrying" % str(e)[:80])
         if ws is None:
+            tries += 1
+            if tries >= 12:      # ~10 min of failures -> give up gracefully;
+                                 # leads are safe in the JSONL and the next
+                                 # hunter start backfills them to the sheet.
+                _ulog("no sheet after %d tries -- exiting (leads stay in the "
+                      "local JSONL; next start backfills them)" % tries)
+                return
             time.sleep(delay)
             delay = min(delay * 2, 120)
     seen = already_seen(ws)
