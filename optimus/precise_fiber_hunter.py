@@ -1898,69 +1898,48 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
     backend, until the browser is closed -- no fixed grid. Set it on a spot/ZIP
     and it covers that area and keeps expanding past it until the computer (or
     you closing the window) stops it. Returns the total captured."""
-    import threading
-    stop = {"v": False}
-    tally = {"total": 0, "cells": 0}
-
-    def _flusher():
-        # BACKGROUND capture: the pan loop never waits on a sheet write. The
-        # NetCapture handler collects dots off the wire as the map fetches during
-        # pans; this thread writes them to the sheet on its own clock.
-        while not stop["v"]:
-            time.sleep(FLUSH_INTERVAL)
-            try:
-                n = capture.flush(ws, seen, area_label, dry)
-                tally["total"] += n
-                if n:
-                    print("  [captured +%d  (total %d)]" % (n, tally["total"]))
-                report_status(ws, area_label, "watching", found=tally["total"],
-                              note="timed: %d cells, %d leads" % (tally["cells"], tally["total"]))
-                dump_backend(ws, capture)
-            except Exception:
-                pass
-    threading.Thread(target=_flusher, daemon=True).start()
-
+    # SINGLE-THREADED on purpose. Playwright's sync API is NOT thread-safe (it runs
+    # on a greenlet loop bound to this thread); the old "background flush thread" this
+    # session added was destabilizing the browser and freezing the pan mid-run. So
+    # everything is sequential here, like the version that ran stable: SEARCH (now and
+    # then) -> capture -> PAN, spiralling outward until the browser is closed. The only
+    # other thread is the watchdog, which just reads a timestamp (never touches the page).
     dirs = ["right", "down", "left", "up"]
-    di, run = 0, 1
-    print("Timed sweep -- PAN -> SEARCH -> (capture in background), an ever-larger\n"
-          "  spiral on a clock. It NEVER stops until you close the browser.\n")
+    di, run, cell, total = 0, 1, 0, 0
+    print("Sweep -- SEARCH -> capture -> PAN, spiralling outward. Runs until you\n"
+          "  close the browser; auto-restarts itself if it ever hangs.\n")
     try:
         while True:
             for _arm in range(2):           # spiral: 2 arms per run-length, then grow
                 for _ in range(run):
-                    # 1) SEARCH only every few cells -- the click is the slow part, and
-                    #    panning also triggers the fetch, so we don't pause on it every
-                    #    cell (that stop-start is what looked like "stopping").
                     if not on_map(page):
-                        open_map_view(page)   # flipped to portal -> flip back, keep going
-                    elif tally["cells"] % 4 == 0:
-                        search_this_area(page)
-                    # 2) PAN on the clock. Nothing pauses it; only a closed browser
-                    #    ends it. Empty ground is fine -- it just keeps spiralling out.
-                    if not mouse_drag(page, dirs[di]):
-                        stop["v"] = True
-                        try:
-                            capture.flush(ws, seen, area_label, dry)   # final drain
-                        except Exception:
-                            pass
-                        return tally["total"]
-                    tally["cells"] += 1
-                    _beat()                    # progress -> the watchdog stays happy
-                    time.sleep(PAN_INTERVAL)   # <-- the CLOCK: motion cadence
+                        open_map_view(page)          # flipped to portal -> flip back
+                    elif cell % 3 == 0:
+                        search_this_area(page)       # nudge the fetch every few cells
+                    total += capture.flush(ws, seen, area_label, dry)
+                    cell += 1
+                    if cell % 12 == 0:
+                        report_status(ws, area_label, "watching", found=total,
+                                      note="%d cells, %d leads" % (cell, total))
+                        dump_backend(ws, capture)
+                    _beat()                          # tell the watchdog we're alive
+                    if not mouse_drag(page, dirs[di]):   # PAN; False = browser closed
+                        capture.flush(ws, seen, area_label, dry)
+                        return total
+                    time.sleep(PAN_INTERVAL)
                 di = (di + 1) % 4
             run += 1                            # spiral grows -> larger and larger area
     except Exception as e:
-        stop["v"] = True
         msg = str(e).lower()
         if "closed" in msg or "target" in msg:
-            print("\nBrowser closed -- stopping. (%d leads this run.)" % tally["total"])
+            print("\nBrowser closed -- stopping. (%d leads this run.)" % total)
         else:
             print("\nSweep stopped: %s" % str(e)[:100])
         try:
             capture.flush(ws, seen, area_label, dry)
         except Exception:
             pass
-        return tally["total"]
+        return total
 
 
 def safe_goto(page, url):
@@ -2533,28 +2512,19 @@ def _backend_sheet(ws):
 
 def dump_backend(ws, cap):
     """Snapshot the network capture (F12 view) to the 'Backend Capture' tab so the
-    backend is readable remotely. SPEED: runs in a BACKGROUND THREAD and skips if a
-    prior dump is still in flight, so the sweep NEVER waits on a sheet write.
-    Best-effort; never breaks a run."""
-    if cap is None or not _BACKEND_ON[0] or _backend_busy[0]:
+    backend is readable remotely. SYNCHRONOUS now -- NO background thread. Playwright's
+    sync API is greenlet-bound and background threads doing I/O alongside it were
+    destabilizing the browser; this is a brief, infrequent sheet write on the main
+    thread instead. Best-effort; never breaks a run."""
+    if cap is None or not _BACKEND_ON[0]:
         return
     t = _backend_sheet(ws)
     if t is None:
         return
-    import threading
-    # snapshot the numbers on the hot path (cheap), do the sheet write off-thread
-    _backend_busy[0] = True
-    th = threading.Thread(target=_dump_backend_worker, args=(t, cap), daemon=True)
-    th.start()
-
-
-def _dump_backend_worker(t, cap):
     try:
         _dump_backend_write(t, cap)
     except Exception as e:
         print("  (backend monitor skipped: %s)" % str(e)[:60])
-    finally:
-        _backend_busy[0] = False
 
 
 def _dump_backend_write(t, cap):
