@@ -142,7 +142,7 @@ REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
 # BUILD STAMP -- bumped on every push so you can SEE the code actually changed.
 # It prints a big banner at startup. If the number here matches what your screen
 # shows, you're on the newest code.
-HUNTER_BUILD = "BUILD 2026-07-02  #24  SPLIT: motion process NEVER touches Google -- a separate uploader process does all sheet work"
+HUNTER_BUILD = "BUILD 2026-07-02  #25  SPLIT + lost-view recovery: off the map 5 cells -> reload the map page and keep sweeping"
 
 VIEWPORT = {"width": 1366, "height": 768}
 
@@ -2174,6 +2174,7 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
     di, run, cell, total = 0, 1, 0, 0
     dry_flushes = 0      # consecutive flushes with 0 new leads -> DRY AREA alarm
     last_flush = 0.0     # MOTION IS SACRED: sheet writes only every FLUSH_GAP_SECS
+    off_map = 0          # consecutive cells where the map view is LOST
     print("Sweep -- SEARCH -> capture -> PAN, spiralling outward. Runs until you\n"
           "  close the browser; auto-restarts itself if it ever hangs.\n"
           "  Motion never waits on the sheet: captures queue in memory and write\n"
@@ -2183,10 +2184,29 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
         try:
             for _arm in range(2):           # spiral: 2 arms per run-length, then grow
                 for _ in range(run):
-                    if not on_map(page):
-                        open_map_view(page)          # flipped to portal -> flip back
-                    elif cell % 3 == 0:
-                        search_this_area(page)       # nudge the fetch every few cells
+                    # LOST-VIEW RECOVERY: if the view flips off the map (portal/
+                    # nav), drags land on a dead page and Search never appears --
+                    # looks exactly like "it stopped". Flip back; if that keeps
+                    # failing, RELOAD the map page outright and carry on.
+                    try:
+                        if not on_map(page):
+                            off_map += 1
+                            print("  (map view lost -- re-opening the map, try %d)"
+                                  % off_map)
+                            open_map_view(page)
+                            if off_map >= 5:
+                                print("  (still off the map -- reloading the map page)")
+                                safe_goto(page, MAP_URL)
+                                time.sleep(3)
+                                open_map_view(page)
+                                off_map = 0
+                        else:
+                            off_map = 0
+                            if cell % 3 == 0:
+                                search_this_area(page)   # nudge the fetch
+                    except Exception as e:
+                        # a mid-navigation hiccup must never end the sweep
+                        print("  (view check hiccup: %s -- panning on)" % str(e)[:60])
                     # PAN PATH RULE: nothing heavy between pans. Split mode
                     # (default): flush = a local disk append (microseconds), the
                     # uploader process does ALL sheet work. Legacy mode: one
