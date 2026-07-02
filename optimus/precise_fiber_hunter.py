@@ -2184,6 +2184,34 @@ def _find_git():
     return "git"   # last resort -- subprocess will raise, caught upstream
 
 
+_RAW_BASE = ("https://raw.githubusercontent.com/patricksiado-prog/"
+             "Go-High-Level-MCP-2026-Complete/" + REPO_BRANCH + "/optimus")
+# the hunter + the sibling modules it imports -- refresh all so a ZIP install
+# never runs a stale mix.
+_RAW_FILES = ["precise_fiber_hunter.py", "optimus_dot_detect.py",
+              "optimus_api_capture.py"]
+
+
+def _raw_refresh(here):
+    """For a NON-git (ZIP) install: re-download the code files from GitHub raw so a
+    restart runs the latest. Best-effort; a cache-buster query dodges GitHub's raw
+    CDN cache. Overwrites in place (Python already read this file into memory, so
+    replacing it on disk is safe; self_update re-execs into the new code)."""
+    import urllib.request
+    d = os.path.dirname(here)
+    for i, fn in enumerate(_RAW_FILES):
+        try:
+            url = _RAW_BASE + "/" + fn + "?_cb=" + str(len(here) + i)
+            req = urllib.request.Request(url, headers={"Cache-Control": "no-cache",
+                                                       "Pragma": "no-cache"})
+            data = urllib.request.urlopen(req, timeout=60).read()
+            if data and len(data) > 500:      # sanity: not an error page
+                with open(os.path.join(d, fn), "wb") as f:
+                    f.write(data)
+        except Exception:
+            pass
+
+
 def self_update():
     """On launch, pull the newest code from GitHub so a restart always runs the
     latest version. If THIS file actually changed, relaunch once with the new
@@ -2197,15 +2225,23 @@ def self_update():
     repo_root = os.path.dirname(os.path.dirname(here))
     env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
     git = _find_git()           # works even when git isn't on this shell's PATH
+    is_git = os.path.isdir(os.path.join(repo_root, ".git"))
     try:
         before = open(here, "rb").read()
-        # fetch + hard reset to origin so a local edit / conflict / divergence
-        # can NEVER leave us stuck on old code (a plain pull silently fails then).
-        subprocess.run([git, "-C", repo_root, "fetch", "origin", REPO_BRANCH],
-                       env=env, timeout=90, capture_output=True, text=True)
-        subprocess.run([git, "-C", repo_root, "reset", "--hard",
-                        "origin/" + REPO_BRANCH],
-                       env=env, timeout=60, capture_output=True, text=True)
+        if git and is_git:
+            # GIT INSTALL: fetch + hard reset to origin so a local edit / conflict /
+            # divergence can NEVER leave us stuck on old code.
+            subprocess.run([git, "-C", repo_root, "fetch", "origin", REPO_BRANCH],
+                           env=env, timeout=90, capture_output=True, text=True)
+            subprocess.run([git, "-C", repo_root, "reset", "--hard",
+                            "origin/" + REPO_BRANCH],
+                           env=env, timeout=60, capture_output=True, text=True)
+        else:
+            # NON-GIT INSTALL (the ZIP-download layout, e.g. %USERPROFILE%\optimus_hunter):
+            # git can't update it, so RE-DOWNLOAD the code from GitHub raw. Without
+            # this the ZIP install runs stale FOREVER (the bug that kept old code
+            # running -- old "business match" wording, enrichment on, etc.).
+            _raw_refresh(here)
         after = open(here, "rb").read()
     except Exception as e:
         print("(auto-update skipped: %s -- run START OPTIMUS.bat to force the "
