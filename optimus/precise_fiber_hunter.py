@@ -142,7 +142,7 @@ REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
 # BUILD STAMP -- bumped on every push so you can SEE the code actually changed.
 # It prints a big banner at startup. If the number here matches what your screen
 # shows, you're on the newest code.
-HUNTER_BUILD = "BUILD 2026-07-02  #25  SPLIT + lost-view recovery: off the map 5 cells -> reload the map page and keep sweeping"
+HUNTER_BUILD = "BUILD 2026-07-02  #26  TICKER: a timestamped line every cell -- if the clock advances, it's working"
 
 VIEWPORT = {"width": 1366, "height": 768}
 
@@ -2242,6 +2242,10 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                     # sweep circling a dry ring forever -- same reason the old
                     # recenter was removed). Dry ground only prints the banner.
                     cell += 1
+                    # TICKER: one timestamped line per cell so you can SEE it's
+                    # alive at a glance -- if the clock advances, it's working.
+                    print("  [%s]  cell %d  |  %d leads this run  |  panning %s"
+                          % (time.strftime("%H:%M:%S"), cell, total, dirs[di]))
                     if cell % 12 == 0:
                         report_status(ws, area_label, "watching", found=total,
                                       note="%d cells, %d leads" % (cell, total))
