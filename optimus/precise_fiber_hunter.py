@@ -142,7 +142,7 @@ REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
 # BUILD STAMP -- bumped on every push so you can SEE the code actually changed.
 # It prints a big banner at startup. If the number here matches what your screen
 # shows, you're on the newest code.
-HUNTER_BUILD = "BUILD 2026-07-02  #20  search-button found in frames/aria + DRY AREA alarm (empty ground is not a freeze)"
+HUNTER_BUILD = "BUILD 2026-07-02  #21  MOTION IS SACRED: 18k-row biz re-read OFF the pan path; one batched write per 4s; nothing heavy between pans"
 
 VIEWPORT = {"width": 1366, "height": 768}
 
@@ -996,17 +996,14 @@ class NetCapture:
             match_leads_to_biz(new_records)
         except Exception as e:
             print("   (biz match skipped: %s)" % str(e)[:80])
-        # REAL-TIME MATCH: periodically reload the business list so a scrape running
-        # ALONGSIDE the hunter gets matched live. If new businesses showed up, also
-        # re-scan ALL captured addresses so leads grabbed BEFORE their business was
-        # scraped get matched the moment it appears (true real-time, both directions).
-        _BIZ_RELOAD[0] += 1
-        if _BIZ_RELOAD[0] % 20 == 0:
-            try:
-                if reload_biz_index():
-                    _backlog_match()
-            except Exception:
-                pass
+        # MOTION IS SACRED: the old periodic reload_biz_index()+_backlog_match()
+        # that lived HERE re-read the whole 18k-row Maps Businesses tab and
+        # re-scanned every prior capture ON THE PAN PATH -- a 10-30s read between
+        # two pans, i.e. exactly "the motion stopped because it was reading
+        # something." REMOVED from the hot path. Live cross-matching is NOT lost:
+        # the scraper matches every business it adds against Precise Fiber from
+        # ITS side (unified matching), and the hunter re-matches everything at
+        # the next startup (_backlog_match). Nothing heavy runs between pans.
         return len(new_rows)
 
 # --- popup parsing (canonical regexes from optimus_dot_detect) ---
@@ -1649,7 +1646,9 @@ SEARCH_LABELS = ["Search this area", "Search area", "Search this map",
                  "Redo search in map", "Redo search here", "Search here",
                  "Search as I move the map", "Update results", "Search nearby"]
 
-DRY_WARN_CELLS = 25   # this many 0-lead cells in a row -> DRY AREA alarm
+DRY_WARN_FLUSHES = 25   # this many 0-lead writes in a row -> DRY AREA alarm
+FLUSH_GAP_SECS = 4      # MOTION IS SACRED: sheet writes at most this often; the
+                        # pans in between never touch the network
 
 
 # CSS/aria candidates for the search-area control (label text isn't the only
@@ -2115,9 +2114,12 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
     # other thread is the watchdog, which just reads a timestamp (never touches the page).
     dirs = ["right", "down", "left", "up"]
     di, run, cell, total = 0, 1, 0, 0
-    dry_cells = 0        # consecutive cells with 0 new leads -> DRY AREA alarm
+    dry_flushes = 0      # consecutive flushes with 0 new leads -> DRY AREA alarm
+    last_flush = 0.0     # MOTION IS SACRED: sheet writes only every FLUSH_GAP_SECS
     print("Sweep -- SEARCH -> capture -> PAN, spiralling outward. Runs until you\n"
-          "  close the browser; auto-restarts itself if it ever hangs.\n")
+          "  close the browser; auto-restarts itself if it ever hangs.\n"
+          "  Motion never waits on the sheet: captures queue in memory and write\n"
+          "  in ONE batch every %ds.\n" % FLUSH_GAP_SECS)
     try:
         while True:
             for _arm in range(2):           # spiral: 2 arms per run-length, then grow
@@ -2126,28 +2128,36 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                         open_map_view(page)          # flipped to portal -> flip back
                     elif cell % 3 == 0:
                         search_this_area(page)       # nudge the fetch every few cells
-                    n_cell = capture.flush(ws, seen, area_label, dry)
-                    total += n_cell
-                    # DRY-AREA ALARM: sweeping empty ground (golf course / all-grey)
-                    # looks exactly like a freeze -- say so LOUDLY instead. The
-                    # program is fine; the GROUND is empty. Keeps sweeping (the
-                    # spiral grows outward and will exit the dead patch).
-                    dry_cells = 0 if n_cell else dry_cells + 1
-                    if dry_cells and dry_cells % DRY_WARN_CELLS == 0:
-                        print("\n  " + "*" * 60)
-                        print("  DRY AREA: %d cells in a row with 0 new leads." % dry_cells)
-                        print("  The hunter is RUNNING FINE -- this ground is empty")
-                        print("  (golf course / all-grey / no dots). PAN THE MAP to a")
-                        print("  denser neighborhood and it picks up instantly.")
-                        print("  " + "*" * 60 + "\n")
-                        report_status(ws, area_label, "dry-area", found=total,
-                                      note="%d cells with 0 leads -- move the map "
-                                           "to denser dots" % dry_cells)
+                    # PAN PATH RULE: nothing heavy between pans. The flush (one
+                    # batched sheet write, 15s-capped, keeps rows on failure) runs
+                    # at most every FLUSH_GAP_SECS -- most cells are pure motion.
+                    now = time.time()
+                    if now - last_flush >= FLUSH_GAP_SECS:
+                        n_flush = capture.flush(ws, seen, area_label, dry)
+                        total += n_flush
+                        last_flush = now
+                        # DRY-AREA ALARM: sweeping empty ground (golf course /
+                        # all-grey) looks exactly like a freeze -- say so LOUDLY.
+                        # The program is fine; the GROUND is empty. Keeps sweeping
+                        # (the spiral grows outward and exits the dead patch).
+                        dry_flushes = 0 if n_flush else dry_flushes + 1
+                        if dry_flushes and dry_flushes % DRY_WARN_FLUSHES == 0:
+                            print("\n  " + "*" * 60)
+                            print("  DRY AREA: %d writes in a row with 0 new leads."
+                                  % dry_flushes)
+                            print("  The hunter is RUNNING FINE -- this ground is empty")
+                            print("  (golf course / all-grey / no dots). PAN THE MAP to a")
+                            print("  denser neighborhood and it picks up instantly.")
+                            print("  " + "*" * 60 + "\n")
+                            report_status(ws, area_label, "dry-area", found=total,
+                                          note="%d dry writes -- move the map "
+                                               "to denser dots" % dry_flushes)
                     cell += 1
                     if cell % 12 == 0:
                         report_status(ws, area_label, "watching", found=total,
                                       note="%d cells, %d leads" % (cell, total))
-                        dump_backend(ws, capture)
+                    if cell % 60 == 0:
+                        dump_backend(ws, capture)    # rare snapshot, off the hot cadence
                     _beat()                          # tell the watchdog we're alive
                     if not pan_next(page, dirs[di]):     # PAN; False = browser closed
                         capture.flush(ws, seen, area_label, dry)
@@ -2816,7 +2826,8 @@ _BIZ_UNIT_RE = re.compile(r"\b(APT|APARTMENT|UNIT|STE|SUITE|#|BLDG|BUILDING|FL|"
 # live state: business index + the two output tabs + the Maps Businesses worksheet
 _BIZ = {"index": None, "green_ws": None, "orange_ws": None, "maps_ws": None,
         "green_seen": set(), "orange_seen": set()}
-_BIZ_RELOAD = [0]   # flush counter -> reload the business index every 20 flushes
+_BIZ_RELOAD = [0]   # (unused since BUILD #21 -- the periodic mid-run biz reload
+                    # was a huge read ON THE PAN PATH and froze the motion)
 
 
 def _norm_addr(addr):
