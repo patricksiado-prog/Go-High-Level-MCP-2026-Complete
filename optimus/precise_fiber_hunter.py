@@ -121,7 +121,7 @@ REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
 # BUILD STAMP -- bumped on every push so you can SEE the code actually changed.
 # It prints a big banner at startup. If the number here matches what your screen
 # shows, you're on the newest code.
-HUNTER_BUILD = "BUILD 2026-07-02  #16  single-threaded (no background thread)"
+HUNTER_BUILD = "BUILD 2026-07-02  #17  map.panBy() motion (guaranteed pan, no swallowed drag)"
 
 VIEWPORT = {"width": 1366, "height": 768}
 
@@ -207,7 +207,66 @@ MAPBOX_HOOK_JS = """
   // after page load, and the map is created THEN -- a short window misses it.
   const t = setInterval(hook, 200);
   setTimeout(() => clearInterval(t), 1800000);   // 30 minutes
+
+  // AT&T's bundle sets NO mapboxgl/maplibregl global, so the constructor wrap
+  // above never fires and __optimusMaps stays empty (that's why panBy() never
+  // worked and we were stuck dragging). Escape hatch: catch the WebGL canvas the
+  // instant Mapbox creates it; its DOM/React-fiber chain leads to the live map
+  // object, which recover_map() then walks to. (See the mapbox-extraction skill.)
+  try {
+    const origGC = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type, ...rest) {
+      if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+        (window.__glCanvases = window.__glCanvases || []).push(this);
+      }
+      return origGC.call(this, type, ...rest);
+    };
+  } catch (e) {}
 })();
+"""
+
+# Recover the HIDDEN Mapbox map object (AT&T sets no global): from the WebGL
+# canvases we caught (or any .mapboxgl-map node), walk the React fiber tree for
+# the object that has queryRenderedFeatures + getStyle + panBy, and register it
+# to window.__optimusMaps so pan_map_js()/the dot reader can use it. Returns true
+# if a live map was found. Safe to call repeatedly.
+MAP_RECOVER_JS = """
+() => {
+  if ((window.__optimusMaps || []).length &&
+      window.__optimusMaps[0] && window.__optimusMaps[0].panBy) return true;
+  const isMap = (o) => o && typeof o.queryRenderedFeatures === 'function'
+                    && typeof o.getStyle === 'function'
+                    && typeof o.panBy === 'function';
+  const tag = (m) => { (window.__optimusMaps = window.__optimusMaps || []).unshift(m); return true; };
+  const nodes = new Set();
+  for (const c of (window.__glCanvases || [])) {
+    let n = c;
+    for (let i = 0; i < 8 && n; i++) { nodes.add(n); n = n.parentElement; }
+  }
+  document.querySelectorAll('.mapboxgl-map, .maplibregl-map, canvas')
+          .forEach(n => nodes.add(n));
+  const q = []; const seen = new Set();
+  for (const n of nodes) {
+    for (const k in n) {
+      if (k.startsWith('__react')) q.push(n[k]);       // React fiber roots
+      try { if (isMap(n[k])) return tag(n[k]); } catch (e) {}   // map stashed on the node
+    }
+  }
+  let steps = 0;
+  while (q.length && steps++ < 8000) {
+    const f = q.shift();
+    if (!f || seen.has(f)) continue; seen.add(f);
+    for (const key of ['memoizedProps','memoizedState','stateNode','pendingProps']) {
+      let v; try { v = f[key]; } catch (e) { continue; }
+      if (isMap(v)) return tag(v);
+      if (v && typeof v === 'object') {
+        for (const kk in v) { try { if (isMap(v[kk])) return tag(v[kk]); } catch (e) {} }
+      }
+    }
+    for (const key of ['child','sibling','return']) { try { if (f[key]) q.push(f[key]); } catch (e) {} }
+  }
+  return false;
+}
 """
 
 MAPBOX_QUERY_JS = """
@@ -1626,24 +1685,61 @@ def open_map_view(page):
     return _click_map_button(page)
 
 
+_MAP_OBJ = [None]     # tri-state: None=untried, True=recovered, False=gave up
+_MAP_TRIES = [0]      # how many recovery attempts so far
+_MAP_MAX_TRIES = 15   # after this many misses, stop walking the fiber tree every pan
+
+
+def recover_map(page):
+    """Try to recover the HIDDEN Mapbox map object (getContext + React-fiber walk,
+    see MAP_RECOVER_JS). Populates window.__optimusMaps so pan_map_js() can use
+    the guaranteed map.panBy() motion. Returns True if a live map is reachable.
+    Remembers success; after a bounded number of misses it gives up (returns
+    False without re-walking) so a site where the object truly isn't reachable
+    falls straight through to the drag with no per-pan cost."""
+    if _MAP_OBJ[0] is True:
+        return True
+    if _MAP_OBJ[0] is False:
+        return False
+    _MAP_TRIES[0] += 1
+    for ctx in [page] + list(page.frames):
+        try:
+            if ctx.evaluate(MAP_RECOVER_JS):
+                _MAP_OBJ[0] = True
+                print("  [motion] recovered the map object -- panning with "
+                      "map.panBy() now (guaranteed movement).")
+                return True
+        except Exception:
+            pass
+    if _MAP_TRIES[0] >= _MAP_MAX_TRIES:
+        _MAP_OBJ[0] = False
+        print("  [motion] map object not reachable on this site -- using the "
+              "verified drag from here on.")
+    return False
+
+
 def pan_map_js(page, direction):
-    """Pan the Mapbox map PROGRAMMATICALLY (no mouse click, no keyboard focus) --
-    a click can land on nav and flip to the portal, so we move the map directly.
-    Shifts ~70% of a viewport so adjacent cells overlap a little."""
+    """Pan the Mapbox map PROGRAMMATICALLY via map.panBy() -- GUARANTEED movement,
+    immune to the drag being swallowed by the map (the #1 'it stopped' cause). Only
+    works once recover_map() has grabbed the hidden map object. Shifts ~70% of a
+    viewport so adjacent cells overlap a little. Returns True only if it panned."""
     dx = {"left": -1, "right": 1, "up": 0, "down": 0}[direction]
     dy = {"left": 0, "right": 0, "up": -1, "down": 1}[direction]
-    try:
-        ok = page.evaluate(
-            """([dx, dy]) => {
-                const m = (window.__optimusMaps || [])[0];
-                if (!m || !m.panBy) return false;
-                const c = m.getContainer().getBoundingClientRect();
-                m.panBy([dx * c.width * 0.7, dy * c.height * 0.7], {duration: 0});
-                return true;
-            }""", [dx, dy])
-        return bool(ok)
-    except Exception:
-        return False
+    for ctx in [page] + list(page.frames):
+        try:
+            ok = ctx.evaluate(
+                """([dx, dy]) => {
+                    const m = (window.__optimusMaps || [])[0];
+                    if (!m || !m.panBy) return false;
+                    const c = m.getContainer().getBoundingClientRect();
+                    m.panBy([dx * c.width * 0.7, dy * c.height * 0.7], {duration: 0});
+                    return true;
+                }""", [dx, dy])
+            if ok:
+                return True
+        except Exception:
+            pass
+    return False
 
 
 def pan(page, direction):
@@ -1793,6 +1889,23 @@ def mouse_drag(page, direction, quiet=False, verify=False):
     return True
 
 
+def pan_next(page, direction):
+    """Move to the next cell, PREFERRING the guaranteed map-object pan.
+      1) recover the hidden map object (once) and pan with map.panBy() -- this
+         cannot be 'swallowed' the way a drag can, so the map always moves.
+      2) if the object isn't reachable here, fall back to the hardened drag with
+         movement-verification (bigger drag -> arrow keys) so a swallowed drag
+         still escalates instead of silently doing nothing.
+    Returns False ONLY when the browser is gone (so the sweep stops cleanly)."""
+    if recover_map(page):
+        if pan_map_js(page, direction):
+            time.sleep(WAIT_AFTER_PAN)
+            return True
+        # object was there but panBy failed this once -> fall through to drag
+    # no map object on this site -> verified drag (escalates if it didn't move)
+    return mouse_drag(page, direction, verify=True)
+
+
 def sweep_backend(page, ws, seen, area_label, dry, cols, rows, capture):
     """FAST auto-sweep with the proven mouse-drag motion. Per cell: nudge the
     serviceability fetch, then FLUSH the backend capture (no clicking) to the
@@ -1928,7 +2041,7 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                                       note="%d cells, %d leads" % (cell, total))
                         dump_backend(ws, capture)
                     _beat()                          # tell the watchdog we're alive
-                    if not mouse_drag(page, dirs[di]):   # PAN; False = browser closed
+                    if not pan_next(page, dirs[di]):     # PAN; False = browser closed
                         capture.flush(ws, seen, area_label, dry)
                         return total
                     time.sleep(PAN_INTERVAL)
