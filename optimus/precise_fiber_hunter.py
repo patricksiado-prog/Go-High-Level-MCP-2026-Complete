@@ -1567,14 +1567,9 @@ def on_map(page):
     return False
 
 
-def open_map_view(page):
-    """A fresh load of /yourefer/fiber lands on the PORTAL page; the dot map is
-    revealed by clicking 'Fiber Availability Map'. ONLY click it when we're on
-    the portal -- if the map is already showing, do nothing (clicking again was
-    flipping the view map<->portal every scan cycle). Confirmed live 2026-06-13:
-    the map renders in-page at the same URL."""
-    if on_map(page):
-        return False   # already on the map -- never re-click (no flip)
+def _click_map_button(page):
+    """Click the 'Fiber Availability Map' button if it's on the page. Returns
+    True if clicked."""
     for t in MAP_VIEW_TEXTS:
         try:
             el = page.get_by_text(t, exact=False)
@@ -1585,6 +1580,38 @@ def open_map_view(page):
         except Exception:
             pass
     return False
+
+
+def open_map_view(page):
+    """Reach the dot map from wherever login dropped us. The path Patrick walks by
+    hand: the 'you Refer' HOME -> click the 'AT&T Fiber' tile -> the /yourefer/fiber
+    page -> click 'Fiber Availability Map' -> the map. So: (1) if already on the map,
+    do nothing (re-clicking flips map<->portal). (2) try the map button directly.
+    (3) if it's not here, we're probably on the home page -> click 'AT&T Fiber' (or
+    just navigate to the fiber URL), then click the map button. Confirmed layout
+    live 2026-07-01 from Patrick's screenshots."""
+    if on_map(page):
+        return False   # already on the map -- never re-click (no flip)
+    if _click_map_button(page):
+        return True
+    # not on the fiber page yet -> get there. First the 'AT&T Fiber' tile...
+    try:
+        fib = page.get_by_text("AT&T Fiber", exact=False)
+        if fib.count() > 0:
+            fib.first.click(timeout=3000)
+            time.sleep(2.5)
+            if _click_map_button(page):
+                return True
+    except Exception:
+        pass
+    # ...else just navigate straight to the fiber page URL, then click the map.
+    try:
+        if "/yourefer/fiber" not in (page.url or ""):
+            page.goto(MAP_URL, timeout=30000)
+            time.sleep(3)
+    except Exception:
+        pass
+    return _click_map_button(page)
 
 
 def pan_map_js(page, direction):
