@@ -142,7 +142,7 @@ REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
 # BUILD STAMP -- bumped on every push so you can SEE the code actually changed.
 # It prints a big banner at startup. If the number here matches what your screen
 # shows, you're on the newest code.
-HUNTER_BUILD = "BUILD 2026-07-02  #22  NEVER ENDS ON ITS OWN: sweep auto-resumes while the browser is open + boomerangs home off dry ground"
+HUNTER_BUILD = "BUILD 2026-07-02  #23  NEVER ENDS ON ITS OWN: sweep auto-resumes while the browser is open; pure ever-expanding spiral (boomerang removed per Patrick)"
 
 VIEWPORT = {"width": 1366, "height": 768}
 
@@ -1647,8 +1647,8 @@ SEARCH_LABELS = ["Search this area", "Search area", "Search this map",
                  "Search as I move the map", "Update results", "Search nearby"]
 
 DRY_WARN_FLUSHES = 25   # this many 0-lead writes in a row -> DRY AREA alarm
-DRY_BOOMERANG_FLUSHES = 50  # ...and at this many, walk back to the start and
-                            # restart the spiral (don't wander into the void)
+                        # (info only -- dry ground is NORMAL, the spiral keeps
+                        # expanding through it; Patrick 2026-07-02: no correcting)
 FLUSH_GAP_SECS = 4      # MOTION IS SACRED: sheet writes at most this often; the
                         # pans in between never touch the network
 
@@ -2123,7 +2123,6 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
     di, run, cell, total = 0, 1, 0, 0
     dry_flushes = 0      # consecutive flushes with 0 new leads -> DRY AREA alarm
     last_flush = 0.0     # MOTION IS SACRED: sheet writes only every FLUSH_GAP_SECS
-    pos_x = pos_y = 0    # net cells from the start -- so the boomerang can walk home
     print("Sweep -- SEARCH -> capture -> PAN, spiralling outward. Runs until you\n"
           "  close the browser; auto-restarts itself if it ever hangs.\n"
           "  Motion never waits on the sheet: captures queue in memory and write\n"
@@ -2161,35 +2160,12 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                             report_status(ws, area_label, "dry-area", found=total,
                                           note="%d dry writes -- move the map "
                                                "to denser dots" % dry_flushes)
-                    # BOOMERANG: after 2 dry alarms the spiral is deep in dead
-                    # ground (blank/all-grey) and getting deeper. Walk back to
-                    # the start with fast quiet drags and restart the spiral
-                    # tight -- never wander off into the void forever.
-                    if dry_flushes >= DRY_BOOMERANG_FLUSHES:
-                        print("\n  >> BOOMERANG: dry ground for a while -- walking "
-                              "back to the start and restarting the spiral.\n")
-                        steps = 0
-                        while (pos_x or pos_y) and steps < 80:
-                            if pos_x > 0:
-                                d, pos_x = "left", pos_x - 1
-                            elif pos_x < 0:
-                                d, pos_x = "right", pos_x + 1
-                            elif pos_y > 0:
-                                d, pos_y = "up", pos_y - 1
-                            else:
-                                d, pos_y = "down", pos_y + 1
-                            if not mouse_drag(page, d, quiet=True):
-                                capture.flush(ws, seen, area_label, dry)
-                                return total       # browser really gone
-                            _beat()
-                            steps += 1
-                            time.sleep(0.12)
-                        pos_x = pos_y = 0
-                        dry_flushes = 0
-                        report_status(ws, area_label, "boomerang", found=total,
-                                      note="dry ground -- returned to start, "
-                                           "spiral reset")
-                        raise _RestartSpiral()
+                    # NOTE (Patrick, 2026-07-02): drifting across blank/dead
+                    # ground is NORMAL and needs no correcting -- the spiral just
+                    # keeps expanding and exits the other side. A "boomerang back
+                    # to start" was tried here and REMOVED (it could trap the
+                    # sweep circling a dry ring forever -- same reason the old
+                    # recenter was removed). Dry ground only prints the banner.
                     cell += 1
                     if cell % 12 == 0:
                         report_status(ws, area_label, "watching", found=total,
@@ -2200,8 +2176,6 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                     if not pan_next(page, dirs[di]):     # PAN; False = browser closed
                         capture.flush(ws, seen, area_label, dry)
                         return total
-                    pos_x += {"right": 1, "left": -1}.get(dirs[di], 0)
-                    pos_y += {"down": 1, "up": -1}.get(dirs[di], 0)
                     time.sleep(PAN_INTERVAL)
                 di = (di + 1) % 4
             run += 1                            # spiral grows -> larger and larger area
