@@ -134,6 +134,9 @@ WAIT_AFTER_ZOOM = 0.45
 SEARCH_SETTLE = 0.3           # wait after "Search this area" for dots to load
 PAN_INTERVAL = 0.5           # TIMED sweep: pan on this clock, never waiting on capture
 FLUSH_INTERVAL = 4.0         # TIMED sweep: how often the background thread writes dots
+STALL_SECS = 150             # WATCHDOG: no progress this long -> assume frozen, restart
+RESTART_CODE = 42            # exit code the launcher loop watches to relaunch fresh
+_last_beat = [0.0]           # last time the sweep made progress (0 = watchdog not armed)
 SEARCH_CLICK_WAIT = 1.5       # wait after CLICKING the search control for the fetch
 PAN_PRESSES = 6
 # fiber_hunter's proven motion is a MOUSE DRAG across the canvas (the original
@@ -1939,6 +1942,7 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                             pass
                         return tally["total"]
                     tally["cells"] += 1
+                    _beat()                    # progress -> the watchdog stays happy
                     time.sleep(PAN_INTERVAL)   # <-- the CLOCK: motion cadence
                 di = (di + 1) % 4
             run += 1
@@ -2902,6 +2906,44 @@ def match_leads_to_biz(new_records):
         print("    (biz write hiccup: %s)" % str(e)[:60])
 
 
+def _clear_profile_lock():
+    """Remove the Chromium single-instance lock files so a relaunch after a crash
+    or a watchdog restart doesn't fail with 'profile appears to be in use'. Safe --
+    Chromium recreates them on launch."""
+    for name in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
+        try:
+            p = os.path.join(PROFILE_DIR, name)
+            if os.path.islink(p) or os.path.exists(p):
+                os.remove(p)
+        except Exception:
+            pass
+
+
+def _beat():
+    """Mark progress -- the watchdog resets its clock on each of these."""
+    _last_beat[0] = time.time()
+
+
+def _start_watchdog():
+    """If the sweep makes NO progress for STALL_SECS (browser hang / stuck), the
+    hunter is frozen -> hard-exit with RESTART_CODE so the launcher loop relaunches
+    it fresh (cleared profile lock, new browser). Runs in a daemon thread, so it can
+    force the exit even when the MAIN thread is blocked on a hung browser call."""
+    _beat()
+    def _run():
+        while True:
+            time.sleep(20)
+            if _last_beat[0] and (time.time() - _last_beat[0]) > STALL_SECS:
+                print("\n[watchdog] no progress for %ds -- looks frozen. "
+                      "Restarting fresh...\n" % STALL_SECS)
+                try:
+                    report_status(None, "watchdog", "restart", note="stalled -> auto-restart")
+                except Exception:
+                    pass
+                os._exit(RESTART_CODE)
+    threading.Thread(target=_run, daemon=True).start()
+
+
 def main():
     self_update()
     ap = argparse.ArgumentParser()
@@ -3020,6 +3062,7 @@ def main():
         print("FAST pacing (default). Use --slow if leads come back 0.")
 
     os.makedirs(PROFILE_DIR, exist_ok=True)
+    _clear_profile_lock()   # so a relaunch after a freeze/crash can open the profile
 
     with sync_playwright() as pw:
         ctx = pw.chromium.launch_persistent_context(
@@ -3166,6 +3209,7 @@ def main():
             print("Continuous sweep of %s (backend read)...\n" % (args.zip or "this area"))
             if cap is None:
                 return 0
+            _start_watchdog()   # arm the freeze-detector now that scanning starts
             _sweep = sweep_grid if args.grid else sweep_continuous
             return _sweep(page, ws, seen, args.zip or "manual", args.dry, cap)
 

@@ -23,6 +23,8 @@ if not exist "%APP%\precise_fiber_hunter.py" (
 )
 
 cd /d "%APP%"
+
+:runloop
 echo Checking for the latest version...
 set "CB=%RANDOM%%RANDOM%"
 curl -L -s -o precise_fiber_hunter.py "%RAW%/precise_fiber_hunter.py?cb=!CB!"
@@ -32,3 +34,10 @@ findstr /C:"COMBO MATCH ON" precise_fiber_hunter.py >nul 2>&1 && echo   (on the 
 
 echo.
 py precise_fiber_hunter.py 2>nul || python precise_fiber_hunter.py
+REM exit code 42 = the watchdog decided it froze -> relaunch fresh automatically.
+if errorlevel 42 (
+  echo.
+  echo   It locked up -- restarting the hunter automatically...
+  timeout /t 3 >nul
+  goto runloop
+)
