@@ -826,6 +826,19 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
 > `map.panBy()`, guaranteed movement immune to layout shifts). Do NOT re-debug motion until he's
 > confirmed on new code — you'd be chasing a ghost (old code) like this whole session did.
 
+> **★★ ROOT CAUSE OF THE "MOTION KEEPS STOPPING" SAGA — FOUND 2026-07-01 (fable-5). Playwright sync
+> API is NOT thread-safe.** The last STABLE hunter was `02ba61a` (2026-06-18), single-threaded. This
+> session I piled on motion "fixes" and the breaking one was `ad7bfe2` ("capture in a BACKGROUND
+> thread") — a daemon thread doing Google Sheets writes CONCURRENTLY with the main thread driving the
+> browser. Playwright's sync API runs on a greenlet loop bound to ONE thread; concurrent I/O from
+> another thread destabilized Chromium and FROZE the pan loop mid-run. The tell was Patrick's
+> screenshot: pan count stuck at "8 cells" while the background writer kept logging status every 4s.
+> FIX (`f72076a`): `sweep_continuous` is SINGLE-THREADED again (sequential SEARCH→capture→PAN spiral,
+> like the stable version); `dump_backend` is synchronous too. The ONLY remaining thread is the
+> watchdog, which just reads a timestamp + `os._exit(42)` — it never touches Playwright. **LESSON:
+> never run a background thread that touches gspread/network alongside the sync-Playwright main loop.
+> Keep the sweep single-threaded. Don't re-add "background capture."**
+
 > **SPEED IS ALSO CRITICAL (Patrick, 2026-07-01) — motion must be FAST *and* sturdy, not one or the
 > other.** So: (a) the pan-gesture holds I added are only ~100ms/pan — keep them (they're what makes
 > the drag land) but don't add more. (b) The backend monitor now writes in a BACKGROUND THREAD
