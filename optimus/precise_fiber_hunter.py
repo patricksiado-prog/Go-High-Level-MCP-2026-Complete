@@ -142,7 +142,7 @@ REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
 # BUILD STAMP -- bumped on every push so you can SEE the code actually changed.
 # It prints a big banner at startup. If the number here matches what your screen
 # shows, you're on the newest code.
-HUNTER_BUILD = "BUILD 2026-07-02  #28  the 200k-dot motion, plain: drag -> capture -> text-find Search press -- no calibration, nothing extra"
+HUNTER_BUILD = "BUILD 2026-07-02  #29  NO screenshots on the pan path (the real 200k motion) + freezes self-diagnose (last_freeze.txt shows the exact line)"
 
 VIEWPORT = {"width": 1366, "height": 768}
 
@@ -206,6 +206,8 @@ BACKEND_LOCAL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                   "backend_capture_local.json")
 UPLOADER_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             "uploader_log.txt")
+FREEZE_DUMP_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "last_freeze.txt")
 
 JSONL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           "precise_addresses.jsonl")
@@ -1937,7 +1939,8 @@ def _view_sig(page):
     """A cheap fingerprint of the current view -- used to tell if a pan actually
     MOVED the map (different pixels = it moved). Returns a hash or None."""
     try:
-        return hashlib.md5(page.screenshot(type="png")).hexdigest()
+        # bounded: a busy renderer can otherwise block a screenshot ~30s
+        return hashlib.md5(page.screenshot(type="png", timeout=3000)).hexdigest()
     except Exception:
         return None
 
@@ -2042,8 +2045,12 @@ def pan_next(page, direction):
             time.sleep(WAIT_AFTER_PAN)
             return True
         # object was there but panBy failed this once -> fall through to drag
-    # no map object on this site -> verified drag (escalates if it didn't move)
-    return mouse_drag(page, direction, verify=True)
+    # no map object on this site -> the PLAIN 200k-dot drag. NO screenshot
+    # verification here (Patrick 2026-07-02): the verify layer shot 2 renderer
+    # screenshots per pan, and on a busy map a screenshot can block for many
+    # seconds -- reading as "it stopped". Swallowed drags are already covered
+    # by the DRY alarm + off-map recovery + watchdog, without screenshots.
+    return mouse_drag(page, direction)
 
 
 def sweep_backend(page, ws, seen, area_label, dry, cols, rows, capture):
@@ -3413,6 +3420,17 @@ def _start_watchdog():
             if _last_beat[0] and (time.time() - _last_beat[0]) > STALL_SECS:
                 print("\n[watchdog] no progress for %ds -- looks frozen. "
                       "Restarting fresh...\n" % STALL_SECS)
+                # SELF-DIAGNOSIS: dump every thread's stack (works even with
+                # the main thread hung on a browser call) so the NEXT start
+                # can print the exact line it froze on. No more guessing why.
+                try:
+                    import faulthandler
+                    with open(FREEZE_DUMP_PATH, "w") as f:
+                        f.write("FROZE %s -- no progress for %ds. Stacks:\n"
+                                % (time.strftime("%Y-%m-%d %H:%M:%S"), STALL_SECS))
+                        faulthandler.dump_traceback(file=f)
+                except Exception:
+                    pass
                 try:
                     report_status(None, "watchdog", "restart", note="stalled -> auto-restart")
                 except Exception:
@@ -3516,6 +3534,21 @@ def main():
     print("\n" + "#" * 60)
     print("#  OPTIMUS FIBER HUNTER   %s" % HUNTER_BUILD)
     print("#" * 60 + "\n")
+
+    # if the last run froze, say exactly WHERE it was stuck (the watchdog dumps
+    # every thread's stack at freeze time) -- photograph this block for Claude
+    # and the cause is pinned in one shot, no guessing.
+    try:
+        if os.path.exists(FREEZE_DUMP_PATH):
+            _fd = open(FREEZE_DUMP_PATH).read().splitlines()
+            print(">> THE LAST RUN FROZE. This is the exact spot (top of stack):")
+            for _ln in _fd[:22]:
+                print("   " + _ln)
+            print(">> (full dump saved in last_freeze.txt -- send a photo of "
+                  "this block)\n")
+            os.replace(FREEZE_DUMP_PATH, FREEZE_DUMP_PATH + ".prev")
+    except Exception:
+        pass
 
     _BACKEND_ON[0] = not args.no_backend
 
