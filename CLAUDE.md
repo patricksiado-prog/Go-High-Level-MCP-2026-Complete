@@ -30,6 +30,17 @@
 > team. Never tell Patrick or the team to hand-run curl commands as the normal path — "reinstall" is
 > the one instruction.
 
+> **RULE — AUTO-UPDATE IS PREFERRED; NEVER BUILD SOMETHING THAT CAN'T AUTO-UPDATE (Patrick, 2026-07-01,
+> emphasized REPEATEDLY — "I've put this in the brain a lot").** Every design/rewrite decision MUST
+> preserve the "checks for updates every run" property. Keep code in files the program pulls from
+> GitHub (self_update / raw-refresh / git-pull), keep launchers thin, keep the installer able to
+> refresh everything. Do NOT choose an architecture, packaging, or rewrite that would freeze code on
+> the user's machine (e.g. a compiled .exe, a bundled one-off, a copy that can't re-fetch itself). If a
+> change would break auto-update, pick a different approach or add the update path FIRST. The whole
+> point: when we fix something, Patrick + the team get it automatically by just running the program.
+> Auto-update beats any other convenience — when in doubt, favor the option that keeps the program
+> self-updating.
+
 > Operator: Patrick William Siado (AT&T Fiber dealer).
 > This repo IS the "busybee" — the GoHighLevel MCP server (834 tools) deployed on Railway.
 > Companion brain: Google Drive doc "AT&T Outreach Bot — Master Handoff & GHL Brain"
