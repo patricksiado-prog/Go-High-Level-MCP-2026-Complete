@@ -34,6 +34,30 @@
 > self-updating (pull from GitHub / self_update) so fixes reach everyone by just running the program.
 > A preference to keep in mind, not a hard gate — use judgment.
 
+> **★★★ HARD RULE — MOTION IS SACRED. DO NOT BREAK THE HUNTER'S MOTION (Patrick, 2026-07-02).**
+> The #1 recurring failure of this project ("it keeps stopping" — 4+ separate sagas) has ALWAYS been
+> something getting put between two pans. The pan loop pans, presses Search, and captures in memory —
+> NOTHING ELSE. Check ANY change to `precise_fiber_hunter.py` against this list:
+> 1. **NOTHING heavy between pans.** No sheet READS on the pan path, ever. (The June-18 "live biz
+>    re-match" re-read the whole Maps Businesses tab every ~20 cells — invisible at 3.6k rows, then a
+>    10-30s motion freeze as the tab grew to 18k. That was the entire "worked 5 days ago, keeps
+>    stopping this week" mystery: same code, growing data.) Sheet WRITES only via the time-gated
+>    batched flush (one 15s-capped `append_rows` per `FLUSH_GAP_SECS`); captures queue in memory.
+> 2. **No background threads touching gspread/network** next to sync-Playwright (froze Chromium,
+>    2026-07-01). The watchdog (timestamp + `os._exit(42)`) is the only allowed extra thread.
+> 3. **The sweep NEVER ends on its own.** If a pass returns for ANY reason with the browser still
+>    open, main starts a new sweep (BUILD #22). Closing the browser is the ONLY off switch. Never
+>    re-add a code path that ends the run while the browser lives.
+> 4. **Dry/blank ground needs NO correcting** (Patrick, 2026-07-02): the ever-expanding spiral just
+>    crosses it — keep panning + Searching whether or not dots come back. The DRY AREA banner is
+>    info-only. Do NOT re-add a boomerang/recenter (tried twice, removed twice — it can trap the
+>    sweep circling a dry ring). Blank-white map = normal (the automated browser never renders the
+>    basemap); screenshot-hash pan-verification is BLIND there — it must never be a stop condition.
+> 5. **Capture rides the motion, never steers it.** Missing "Search this area" button, 0 leads,
+>    failed writes, failed matches — none of these may pause, slow, or end the pan loop.
+> Verify any hunter change by the Hunter Status heartbeats (cells must climb steadily, ~25 cells/min)
+> and bump `HUNTER_BUILD` on every push so the sheet's "started" row proves what's running.
+
 > Operator: Patrick William Siado (AT&T Fiber dealer).
 > This repo IS the "busybee" — the GoHighLevel MCP server (834 tools) deployed on Railway.
 > Companion brain: Google Drive doc "AT&T Outreach Bot — Master Handoff & GHL Brain"
