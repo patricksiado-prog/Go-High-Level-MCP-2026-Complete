@@ -132,6 +132,8 @@ MAP_RIGHT_FRAC = 0.98
 WAIT_AFTER_PAN = 0.2
 WAIT_AFTER_ZOOM = 0.45
 SEARCH_SETTLE = 0.3           # wait after "Search this area" for dots to load
+PAN_INTERVAL = 0.5           # TIMED sweep: pan on this clock, never waiting on capture
+FLUSH_INTERVAL = 4.0         # TIMED sweep: how often the background thread writes dots
 SEARCH_CLICK_WAIT = 1.5       # wait after CLICKING the search control for the fetch
 PAN_PRESSES = 6
 # fiber_hunter's proven motion is a MOUSE DRAG across the canvas (the original
@@ -1891,48 +1893,67 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
     backend, until the browser is closed -- no fixed grid. Set it on a spot/ZIP
     and it covers that area and keeps expanding past it until the computer (or
     you closing the window) stops it. Returns the total captured."""
+    import threading
+    stop = {"v": False}
+    tally = {"total": 0, "cells": 0}
+
+    def _flusher():
+        # BACKGROUND capture: the pan loop never waits on a sheet write. The
+        # NetCapture handler collects dots off the wire as the map fetches during
+        # pans; this thread writes them to the sheet on its own clock.
+        while not stop["v"]:
+            time.sleep(FLUSH_INTERVAL)
+            try:
+                n = capture.flush(ws, seen, area_label, dry)
+                tally["total"] += n
+                if n:
+                    print("  [captured +%d  (total %d)]" % (n, tally["total"]))
+                report_status(ws, area_label, "watching", found=tally["total"],
+                              note="timed: %d cells, %d leads" % (tally["cells"], tally["total"]))
+                dump_backend(ws, capture)
+            except Exception:
+                pass
+    threading.Thread(target=_flusher, daemon=True).start()
+
     dirs = ["right", "down", "left", "up"]
-    di, run, cell, total, zeros = 0, 1, 0, 0, 0
-    FLUSH_EVERY = 3   # write to the sheet only every few cells -> the pan doesn't
-    #                   pause on a sheet write each cell = the motion keeps going.
-    print("Continuous sweep -- panning outward until you close the browser.\n")
+    di, run = 0, 1
+    print("Timed sweep -- PAN -> SEARCH -> (capture in background), on a clock,\n"
+          "  never waiting on the system. Close the browser to stop.\n")
     try:
         while True:
             for _arm in range(2):           # spiral: 2 arms per run-length, then grow
                 for _ in range(run):
+                    # 1) SEARCH: trigger the dot fetch (fire-and-forget -- the
+                    #    response handler grabs the dots; we DON'T wait for them).
                     if on_map(page):
                         search_this_area(page)
                     else:
-                        # view flipped to the portal -> flip back, else every drag
-                        # from here on hits the portal and nothing pans
                         print("  (view flipped to portal -- re-opening the map)")
                         open_map_view(page)
-                    time.sleep(SEARCH_SETTLE)
-                    cell += 1
-                    # captures accumulate in the capture buffer; write them in a batch
-                    # every few cells so the map keeps panning between writes.
-                    if cell % FLUSH_EVERY == 0:
-                        n = capture.flush(ws, seen, area_label, dry)
-                        total += n
-                        zeros = zeros + 1 if n == 0 else 0
-                        print("  [cell %d] +%d  (total %d)" % (cell, n, total))
-                        if cell % 15 == 0:
-                            report_status(ws, area_label, "watching", found=total,
-                                          note="continuous: %d cells, %d leads" % (cell, total))
-                            dump_backend(ws, capture)   # F12/network snapshot to the sheet
-                    # FAST pan every cell; only screenshot-VERIFY when a couple of
-                    # empty writes suggest we're stuck (not just a sparse area).
-                    if not mouse_drag(page, dirs[di], verify=(zeros >= 2)):
-                        return total        # canvas gone -> stop
+                    # 2) PAN: move on the clock. Only a closed browser stops it.
+                    if not mouse_drag(page, dirs[di]):
+                        stop["v"] = True
+                        try:
+                            capture.flush(ws, seen, area_label, dry)   # final drain
+                        except Exception:
+                            pass
+                        return tally["total"]
+                    tally["cells"] += 1
+                    time.sleep(PAN_INTERVAL)   # <-- the CLOCK: motion cadence
                 di = (di + 1) % 4
             run += 1
     except Exception as e:
+        stop["v"] = True
         msg = str(e).lower()
         if "closed" in msg or "target" in msg:
-            print("\nBrowser closed -- stopping the sweep. (%d leads this run.)" % total)
+            print("\nBrowser closed -- stopping. (%d leads this run.)" % tally["total"])
         else:
             print("\nSweep stopped: %s" % str(e)[:100])
-        return total
+        try:
+            capture.flush(ws, seen, area_label, dry)
+        except Exception:
+            pass
+        return tally["total"]
 
 
 def safe_goto(page, url):
