@@ -142,7 +142,7 @@ REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
 # BUILD STAMP -- bumped on every push so you can SEE the code actually changed.
 # It prints a big banner at startup. If the number here matches what your screen
 # shows, you're on the newest code.
-HUNTER_BUILD = "BUILD 2026-07-02  #21  MOTION IS SACRED: 18k-row biz re-read OFF the pan path; one batched write per 4s; nothing heavy between pans"
+HUNTER_BUILD = "BUILD 2026-07-02  #22  NEVER ENDS ON ITS OWN: sweep auto-resumes while the browser is open + boomerangs home off dry ground"
 
 VIEWPORT = {"width": 1366, "height": 768}
 
@@ -1647,6 +1647,8 @@ SEARCH_LABELS = ["Search this area", "Search area", "Search this map",
                  "Search as I move the map", "Update results", "Search nearby"]
 
 DRY_WARN_FLUSHES = 25   # this many 0-lead writes in a row -> DRY AREA alarm
+DRY_BOOMERANG_FLUSHES = 50  # ...and at this many, walk back to the start and
+                            # restart the spiral (don't wander into the void)
 FLUSH_GAP_SECS = 4      # MOTION IS SACRED: sheet writes at most this often; the
                         # pans in between never touch the network
 
@@ -2101,6 +2103,11 @@ def sweep_grid(page, ws, seen, area_label, dry, capture):
         return tally["total"]
 
 
+class _RestartSpiral(Exception):
+    """Internal: boomerang home + restart the spiral (dry ground). Never leaves
+    sweep_continuous."""
+
+
 def sweep_continuous(page, ws, seen, area_label, dry, capture):
     """Keep sweeping OUTWARD in a spiral, capturing each viewport off the
     backend, until the browser is closed -- no fixed grid. Set it on a spot/ZIP
@@ -2116,12 +2123,14 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
     di, run, cell, total = 0, 1, 0, 0
     dry_flushes = 0      # consecutive flushes with 0 new leads -> DRY AREA alarm
     last_flush = 0.0     # MOTION IS SACRED: sheet writes only every FLUSH_GAP_SECS
+    pos_x = pos_y = 0    # net cells from the start -- so the boomerang can walk home
     print("Sweep -- SEARCH -> capture -> PAN, spiralling outward. Runs until you\n"
           "  close the browser; auto-restarts itself if it ever hangs.\n"
           "  Motion never waits on the sheet: captures queue in memory and write\n"
           "  in ONE batch every %ds.\n" % FLUSH_GAP_SECS)
     try:
-        while True:
+      while True:
+        try:
             for _arm in range(2):           # spiral: 2 arms per run-length, then grow
                 for _ in range(run):
                     if not on_map(page):
@@ -2152,6 +2161,35 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                             report_status(ws, area_label, "dry-area", found=total,
                                           note="%d dry writes -- move the map "
                                                "to denser dots" % dry_flushes)
+                    # BOOMERANG: after 2 dry alarms the spiral is deep in dead
+                    # ground (blank/all-grey) and getting deeper. Walk back to
+                    # the start with fast quiet drags and restart the spiral
+                    # tight -- never wander off into the void forever.
+                    if dry_flushes >= DRY_BOOMERANG_FLUSHES:
+                        print("\n  >> BOOMERANG: dry ground for a while -- walking "
+                              "back to the start and restarting the spiral.\n")
+                        steps = 0
+                        while (pos_x or pos_y) and steps < 80:
+                            if pos_x > 0:
+                                d, pos_x = "left", pos_x - 1
+                            elif pos_x < 0:
+                                d, pos_x = "right", pos_x + 1
+                            elif pos_y > 0:
+                                d, pos_y = "up", pos_y - 1
+                            else:
+                                d, pos_y = "down", pos_y + 1
+                            if not mouse_drag(page, d, quiet=True):
+                                capture.flush(ws, seen, area_label, dry)
+                                return total       # browser really gone
+                            _beat()
+                            steps += 1
+                            time.sleep(0.12)
+                        pos_x = pos_y = 0
+                        dry_flushes = 0
+                        report_status(ws, area_label, "boomerang", found=total,
+                                      note="dry ground -- returned to start, "
+                                           "spiral reset")
+                        raise _RestartSpiral()
                     cell += 1
                     if cell % 12 == 0:
                         report_status(ws, area_label, "watching", found=total,
@@ -2162,9 +2200,13 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                     if not pan_next(page, dirs[di]):     # PAN; False = browser closed
                         capture.flush(ws, seen, area_label, dry)
                         return total
+                    pos_x += {"right": 1, "left": -1}.get(dirs[di], 0)
+                    pos_y += {"down": 1, "up": -1}.get(dirs[di], 0)
                     time.sleep(PAN_INTERVAL)
                 di = (di + 1) % 4
             run += 1                            # spiral grows -> larger and larger area
+        except _RestartSpiral:
+            di, run = 0, 1                      # tight spiral again, from the start
     except Exception as e:
         msg = str(e).lower()
         if "closed" in msg or "target" in msg:
@@ -3505,6 +3547,23 @@ def main():
                 report_status(ws, args.zip or "manual", "watching",
                               found=n, note="pass %d; +%d this pass" % (passno, n))
                 time.sleep(loop_secs)
+                continue
+            # NEVER STOPS ON ITS OWN: if the browser is still open, whatever made
+            # the sweep return was transient (blank view, hiccup, false 'closed')
+            # -- start a NEW sweep instead of ending. Closing the browser is the
+            # only off switch.
+            _alive = False
+            try:
+                _alive = not page.is_closed()
+            except Exception:
+                _alive = False
+            if _alive and not args.auto:
+                print("\n(the browser is still open -- the sweep never ends on its"
+                      " own; starting a new sweep)")
+                report_status(ws, args.zip or "manual", "watching", found=n,
+                              note="pass %d ended with the browser open -- "
+                                   "auto-resuming" % passno)
+                time.sleep(2)
                 continue
             print("\nDONE. Captured %d new fiber-eligible addresses." % n)
             print(("They're in the '%s' tab." % OUT_TAB) if ws else "(dry run, nothing written)")
