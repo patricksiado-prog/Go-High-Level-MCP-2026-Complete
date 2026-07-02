@@ -1921,20 +1921,9 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
     threading.Thread(target=_flusher, daemon=True).start()
 
     dirs = ["right", "down", "left", "up"]
-    delta = {"right": (1, 0), "left": (-1, 0), "down": (0, 1), "up": (0, -1)}
     di, run = 0, 1
-    pos = [0, 0]   # net cell offset from where you positioned the map
-
-    def _recenter():
-        # fast, silent pans back to the start so it works the dense area you chose
-        # instead of drifting out to empty edges.
-        while pos[0] > 0 and mouse_drag(page, "left", quiet=True):  pos[0] -= 1
-        while pos[0] < 0 and mouse_drag(page, "right", quiet=True): pos[0] += 1
-        while pos[1] > 0 and mouse_drag(page, "up", quiet=True):    pos[1] -= 1
-        while pos[1] < 0 and mouse_drag(page, "down", quiet=True):  pos[1] += 1
-
-    print("Timed sweep -- PAN -> SEARCH -> (capture in background), on a clock,\n"
-          "  never waiting on the system, kept near where you set it. Close to stop.\n")
+    print("Timed sweep -- PAN -> SEARCH -> (capture in background), an ever-larger\n"
+          "  spiral on a clock. It NEVER stops until you close the browser.\n")
     try:
         while True:
             for _arm in range(2):           # spiral: 2 arms per run-length, then grow
@@ -1944,9 +1933,9 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                     if on_map(page):
                         search_this_area(page)
                     else:
-                        print("  (view flipped to portal -- re-opening the map)")
-                        open_map_view(page)
-                    # 2) PAN: move on the clock. Only a closed browser stops it.
+                        open_map_view(page)   # flipped to portal -> flip back, keep going
+                    # 2) PAN on the clock. Nothing pauses it; only a closed browser
+                    #    ends it. Empty ground is fine -- it just keeps spiralling out.
                     if not mouse_drag(page, dirs[di]):
                         stop["v"] = True
                         try:
@@ -1954,20 +1943,11 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                         except Exception:
                             pass
                         return tally["total"]
-                    dx, dy = delta[dirs[di]]
-                    pos[0] += dx
-                    pos[1] += dy
                     tally["cells"] += 1
                     _beat()                    # progress -> the watchdog stays happy
                     time.sleep(PAN_INTERVAL)   # <-- the CLOCK: motion cadence
                 di = (di + 1) % 4
-            run += 1
-            if run > SPIRAL_MAX:
-                # covered the neighborhood -> snap back to the start and go again,
-                # instead of spiralling off into empty ground far from the dots.
-                print("  (covered this area -- returning to the start, not drifting off)")
-                _recenter()
-                di, run = 0, 1
+            run += 1                            # spiral grows -> larger and larger area
     except Exception as e:
         stop["v"] = True
         msg = str(e).lower()
