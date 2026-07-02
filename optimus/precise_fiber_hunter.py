@@ -132,7 +132,7 @@ MAP_RIGHT_FRAC = 0.98
 WAIT_AFTER_PAN = 0.2
 WAIT_AFTER_ZOOM = 0.45
 SEARCH_SETTLE = 0.3           # wait after "Search this area" for dots to load
-PAN_INTERVAL = 0.5           # TIMED sweep: pan on this clock, never waiting on capture
+PAN_INTERVAL = 0.05          # TIMED sweep: near-continuous panning (tiny gap between drags)
 FLUSH_INTERVAL = 4.0         # TIMED sweep: how often the background thread writes dots
 SPIRAL_MAX = 5               # TIMED sweep: how far (cells) it may drift from the start
 #                              before snapping back -- stops it wandering into empty edges
@@ -1928,12 +1928,13 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
         while True:
             for _arm in range(2):           # spiral: 2 arms per run-length, then grow
                 for _ in range(run):
-                    # 1) SEARCH: trigger the dot fetch (fire-and-forget -- the
-                    #    response handler grabs the dots; we DON'T wait for them).
-                    if on_map(page):
-                        search_this_area(page)
-                    else:
+                    # 1) SEARCH only every few cells -- the click is the slow part, and
+                    #    panning also triggers the fetch, so we don't pause on it every
+                    #    cell (that stop-start is what looked like "stopping").
+                    if not on_map(page):
                         open_map_view(page)   # flipped to portal -> flip back, keep going
+                    elif tally["cells"] % 4 == 0:
+                        search_this_area(page)
                     # 2) PAN on the clock. Nothing pauses it; only a closed browser
                     #    ends it. Empty ground is fine -- it just keeps spiralling out.
                     if not mouse_drag(page, dirs[di]):
