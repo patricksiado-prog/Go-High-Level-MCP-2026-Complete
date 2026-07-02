@@ -802,6 +802,30 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
 > 4. Researched + added the `mapbox-extraction` skill (recover the hidden map object) as the path to
 >    retire pixel/tile guessing entirely.
 >
+> **★ MOTION — CURRENT STATUS & PLAN (for the next chat, 2026-07-01 end-of-session).** The motion is
+> ALREADY FIXED in the code; the whole saga was that Patrick's hunter was STUCK ON OLD CODE and my
+> fixes never reached his machine. Sequence of truth:
+> 1. **Root cause of "not moving" = the OLD enrichment** (on by default in old code) writes to the
+>    Google Sheet at the same time as the sweep → hits the 60/min write quota → 429 → the sweep's
+>    flush BLOCKS waiting to write → the map stops panning → looks "stuck/frozen." NOT an AT&T change,
+>    NOT the drag. When Patrick briefly got new code, he said **"motion is fast"** — confirming it.
+> 2. **Fixes already pushed:** enrichment OFF by default (`--enrich` to re-enable); self-verifying pan
+>    (`mouse_drag` screenshots before/after, escalates bigger-drag → arrow-keys if the map didn't move,
+>    only stops on a closed browser); portal auto-recovery; hardened drag gesture; full AT&T nav
+>    (AT&T Fiber tile → Fiber Availability Map).
+> 3. **The real blocker was the UPDATER** — the ZIP-install desktop icon couldn't git-update, so it ran
+>    old code forever. Fixed 3 ways: RUN_HUNTER.bat now re-downloads the 3 core files every click
+>    (cache-busted); `self_update()` has a raw-download fallback for non-git installs; the installer
+>    cache-busts + verifies (`findstr "COMBO MATCH ON"`). New code shows startup line **"COMBO MATCH
+>    ON:"** and NO "Enrichment running" line — that's the on/off tell.
+> **PLAN for next chat:** (a) get Patrick CONFIRMED on new code (COMBO MATCH ON) — reinstall via the
+> release link or he clicks the now-self-refreshing icon. (b) THEN watch a sweep: with enrichment off
+> + self-verifying pan, it should pan fast and capture. (c) If motion STILL fails on confirmed-new
+> code, it's AT&T's layout → run `att_test.py` (RUN_TEST.bat) PAN-MOVES check → then build the parked
+> deterministic fix: map-object recovery (`mapbox-extraction` skill: getContext+React-fiber hook →
+> `map.panBy()`, guaranteed movement immune to layout shifts). Do NOT re-debug motion until he's
+> confirmed on new code — you'd be chasing a ghost (old code) like this whole session did.
+
 > **SPEED IS ALSO CRITICAL (Patrick, 2026-07-01) — motion must be FAST *and* sturdy, not one or the
 > other.** So: (a) the pan-gesture holds I added are only ~100ms/pan — keep them (they're what makes
 > the drag land) but don't add more. (b) The backend monitor now writes in a BACKGROUND THREAD
