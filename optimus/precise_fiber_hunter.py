@@ -762,17 +762,15 @@ class NetCapture:
                     except Exception:
                         pass
             elif _is_vector_tile(url, ct):
-                try:
-                    body = response.body()
-                except Exception:
-                    return
-                if not body:
-                    return
-                leads, keys, note = decode_vector_tile(url, body)
-                if keys:
-                    self.tile_keys.update(keys)
-                base = url.split("?")[0]
-                self.tile_status[base] = note
+                # THE 3-5-CELLS-THEN-STOP GLITCH (found 2026-07-02): do NOT read
+                # tile bodies. Mapbox CANCELS in-flight tile fetches on every pan;
+                # reading a cancelled reply's body is a wait that never returns,
+                # and it lands mid-drag -- the exact "PAN ... drag canvas" freeze.
+                # The old browser errored instantly (harmless); the upgraded one
+                # waits forever. Addresses never came from tiles anyway (geometry
+                # only -- every sheet address comes from the serviceability JSON),
+                # so skipping tile bodies changes nothing in the output.
+                return
             else:
                 return
             if leads:
