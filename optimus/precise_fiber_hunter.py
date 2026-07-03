@@ -2756,8 +2756,33 @@ def match_leads_to_biz(new_records):
         print("    (biz write hiccup: %s)" % str(e)[:60])
 
 
+def _disable_quickedit():
+    """Windows: one stray click inside the console window starts a text
+    selection (QuickEdit mode) and the OS then FREEZES this program on its
+    very next print -- silently, no error -- until a key is pressed. That is
+    indistinguishable from 'the hunter stopped'. Turn QuickEdit off for this
+    window so touching/clicking the console can never pause the motion."""
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        h = k32.GetStdHandle(-10)                 # STD_INPUT_HANDLE
+        mode = ctypes.c_uint32()
+        if not k32.GetConsoleMode(h, ctypes.byref(mode)):
+            return
+        # clear ENABLE_QUICK_EDIT_MODE (0x40); ENABLE_EXTENDED_FLAGS (0x80)
+        # must be set for the change to stick
+        k32.SetConsoleMode(h, (mode.value & ~0x40) | 0x80)
+        print("  (console click-freeze protection ON -- clicking this window "
+              "can't pause the hunter)")
+    except Exception:
+        pass
+
+
 def main():
     self_update()
+    _disable_quickedit()
     ap = argparse.ArgumentParser()
     ap.add_argument("--login", action="store_true", help="open browser to log in once, then quit")
     ap.add_argument("--zip", default=None, help="ZIP/area to search before scanning")
