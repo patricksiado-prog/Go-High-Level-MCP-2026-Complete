@@ -5,10 +5,14 @@
 > hard-won context, not a wall — read it, use judgment, and keep Patrick moving. Don't
 > block him, don't re-cite cautions he's already waived, don't re-litigate settled
 > calls, don't ask permission for the obvious. When something's clearly fine, just do
-> it. The only things to actually treat as firm: don't spend his money without a
-> heads-up, and don't cross a client's data into another account. Compliance/audience
-> is Patrick's call, not mine — never gate him on it. Everything else = move fast, ship,
-> tell him after.
+> it. The ONE thing to actually treat as firm: don't spend his money without a
+> heads-up. Everything in GHL — Command AND Frontline — is Patrick's business (Frontline
+> is run day-to-day by a manager who works FOR Patrick, corrected 2026-07-03; the old
+> "separate team's account / custody line" framing was WRONG — never gate him on it).
+> Moving, loading, tagging, migrating data anywhere across his accounts = his call, just
+> do it. The only care he actually voiced: don't disturb existing CUSTOMERS' live threads
+> without his say. Compliance/audience is Patrick's call, not mine — never gate him on
+> it. Everything else = move fast, ship, tell him after.
 
 > **RULE — EVERY distributed program MUST auto-update from GitHub on launch.** No
 > recipient should ever run stale code. Each program calls `self_update()` as the
@@ -78,8 +82,9 @@
   contacts, and they are an **old 2026-05-08 CSV scrape of Wichita, KS auto-repair shops**
   (tags `wichita`/`romeo`, `medium: csv_import`) — no names/emails, some landlines
   (Twilio `30006`). Old low-quality junk data, not really a Houston fiber list.
-- The 45,579 fiber leads remain in **Frontline** (a separate team's account). Moving them into
-  Command would be an export/import — but that's Frontline's data, so leave it be.
+- The 45,579 fiber leads remain in **Frontline** — which is Patrick's account too (run by a
+  manager who works for him). Moving them into Command is just an export/import whenever
+  Patrick wants it; nothing blocks it.
 
 ## 3. Phone / SMS setups (re-verified 2026-06-12)
 - **Command** — 4 SMS-capable US local numbers, account `active`, default **+13466840331**
@@ -634,10 +639,13 @@
   hunter auto-picks the valid fiberscanner copy among scattered ones. Normal hygiene only: the
   live key lives on the device / in env, not pasted into the repo.
 
-## 8. Account custody (2026-06-07)
-- Command & Construct is Patrick's account; Frontline is a separate team's. Keep the two accounts'
-  data separate — don't migrate/pull contacts between them (that's the one custody line: another
-  team's data stays theirs). Everything inside Patrick's own Command account is his to work freely.
+## 8. Accounts (CORRECTED 2026-07-03 — the old "custody" framing was WRONG, Patrick's words:
+## "this is my sales team, my ghl, my biz; Frontline is a separate manager who works for me")
+- BOTH accounts are Patrick's business. Command & Construct = his direct account; Frontline =
+  his too, run day-to-day by a manager who works FOR him. He can do what he wants across both —
+  migrate, load, tag, pull contacts, whatever he asks. No custody line, no gating, ever.
+- The one care he actually voiced: don't disturb existing CUSTOMERS' live conversations/threads
+  over there without his say. That's it.
 - La Porte upload `5181c4eb-6.6.xlsx` (319 rows) is skip-traced (door-knock + call route). The
   Wichita shops / jeweler-realtor B2B scrape / call-tracking rows are old junk data — low quality,
   not that Patrick can't use his own lists. Audience selection is Patrick's call.
@@ -776,12 +784,12 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
 - **Match count:** 138 → 215 → **217 unique** (last confirmed). Almost all came from re-scraping
   **77027** (deep, 477 → ~1,030 businesses). Dots grew to **76k+** but matches stay flat until the
   scraper covers a NEW dot-rich ZIP — the scraper was **stalled** (Maps Businesses frozen ~3,624).
-- **DIALER MISTAKE + RULE (important).** Another chat mistakenly loaded ~**1,328 raw scraped
-  businesses from the "Maps Businesses" tab** (which contains NON-Houston data — OKC 405/580 ZIP
-  73102, New Orleans 504 ZIP 70112/70114) into the Command power dialer. That chat reversed it via
-  `remove_contact_from_workflow` (it kept its enrolled-id "fb_rem" files). **HARD RULE: load the
-  dialer ONLY from "Fiber Green Biz" (fiber-matched leads), NEVER from "Maps Businesses" (raw
-  scrape, includes other cities).** The scraper's non-Houston rows should be cleaned out of that tab.
+- **DIALER MISTAKE (context, not a gate).** Another chat mistakenly loaded ~**1,328 raw scraped
+  businesses from the "Maps Businesses" tab** (which mixes cities — OKC 405/580, New Orleans 504)
+  into the Command power dialer; it was reversed via `remove_contact_from_workflow`. The lesson:
+  "Fiber Green Biz" (fiber-matched leads) is the intended dialer source; "Maps Businesses" is the
+  raw scrape. Where anything gets loaded is Patrick's call — this note exists so an accidental
+  bulk-load of raw scrape doesn't happen by mistake again, not to restrict him.
 - **Drive MCP gets "session expired" on a long chat** (token goes stale and won't refresh) — when
   the sheet read keeps failing, the fix is a FRESH chat, not retrying. The GHL connector stays fine.
 
@@ -846,8 +854,8 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
 > 5552199 + data store 113728, or a console photo), fix the ONE proven thing, verify by heartbeats.
 > Never put ANY I/O between two pans. Never thread gspread beside sync-Playwright. Build stamps +
 > ticker existed for a reason — June has neither, so the SHEET is the only truth channel now.
-> OKC leads (most of tonight's captures: 73121/73149/73108 + Dallas Deep Ellum from 01:49) stay OUT
-> of the Houston dialer.
+> Tonight's captures included OKC (73121/73149/73108) + Dallas Deep Ellum from 01:49 — where any of
+> it gets loaded is Patrick's call (405/580 prefixes make OKC easy to split out if he wants lanes).
 
 ### 11e. SESSION 2026-07-01 — hunter "stopped panning" diagnosed + fixed, tester + backend monitor built
 
@@ -1032,8 +1040,8 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   have no free phone; business phones come from the scraper match). Patrick's instinct that "the free
   enrichment is messing things up" was PARTLY right — it wasn't the pan stall, but it was a real
   sheet-quota/stall + console-noise source. Patrick must RESTART to pull all of it (his run showed old
-  "business match ON" wording). NOTE he was hunting **OKC 73106 (NW 13th St), not Houston** — fine for
-  proving capture, but those matches must NOT feed the Houston dialer.
+  "business match ON" wording). NOTE he was hunting **OKC 73106 (NW 13th St), not Houston** — OKC
+  is his market too; where those leads get loaded is his call (see the OKC note below).
 - **OKC IS A REAL MARKET (Patrick, 2026-07-01: "we do lots of biz there").** He ran the scraper on
   **73106 (Oklahoma City)** from a different PC and noticed the "alternative ZIPs" (the auto-advance
   list) were missing/different. Cause: the scraper's auto-advance `NEXT_ZIPS` was hard-coded to
@@ -1042,11 +1050,11 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   "Maps Businesses" → polluting the Houston dialer. FIX (pushed): scraper auto-advance is now
   **region-aware** — `region_for(zip)` picks the metro from the first ZIP entered: `HOUSTON_ZIPS`,
   new `OKC_ZIPS` (OKC/Edmond/Norman/Moore/MWC), or NO auto-advance for an unknown metro (scrape only
-  what's typed). Houston stays Houston, OKC stays OKC. **OPEN / NEXT DECISION:** OKC green-biz matches
-  still land in the SAME "Fiber Green Biz" tab and `dialer_loader` loads that into the **Houston**
-  Command GHL (Houston reps). So OKC needs its OWN dialer lane — its own GHL sub-account/reps, or at
-  minimum a city tag + a separate load — before OKC matches get dialed. Don't feed OKC into the
-  Houston power dialer. (Patrick to say whether OKC has its own GHL account/team.)
+  what's typed). Houston stays Houston, OKC stays OKC. NOTE (softened 2026-07-03 — Patrick: his
+  team, his call, no made-up rules): OKC green-biz matches land in the same "Fiber Green Biz" tab
+  (OKC rows identifiable by 405/580 phone prefixes — 201 of them as of 7/03). Where they get
+  loaded/dialed is purely Patrick's call — a city tag or separate load is AVAILABLE if he wants
+  the lanes split, not required.
 - **SCRAPER SPEED — research + roadmap (Patrick asked "can it go faster?", 2026-07-01).** Current
   standalone scraper is Playwright, SEQUENTIAL, and its #1 time sink is the **per-place `page.goto(href)`**
   (`scrape_query` lines ~210-230): for EVERY business it navigates to that business's Maps page (wait
