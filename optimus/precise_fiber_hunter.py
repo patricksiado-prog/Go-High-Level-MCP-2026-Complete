@@ -1710,7 +1710,7 @@ def _viewport_map_box(page):
 # code 42; the launcher relaunches fresh and the run resumes BY ITSELF -- no
 # clicks, no Enter, no user. It never touches the browser or the sheet.
 # ---------------------------------------------------------------------------
-WATCHDOG_STALL_SECS = 120
+WATCHDOG_STALL_SECS = 45   # healthy pans are ~1s apart; 45s dead = truly dead
 _WD = [False]
 _BEAT = [0.0]
 
