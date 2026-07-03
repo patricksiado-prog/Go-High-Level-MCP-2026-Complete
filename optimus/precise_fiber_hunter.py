@@ -1714,7 +1714,9 @@ def _viewport_map_box(page):
 # code 42; the launcher relaunches fresh and the run resumes BY ITSELF -- no
 # clicks, no Enter, no user. It never touches the browser or the sheet.
 # ---------------------------------------------------------------------------
-WATCHDOG_STALL_SECS = 45   # healthy pans are ~1s apart; 45s dead = truly dead
+WATCHDOG_STALL_SECS = 300  # LAST resort only (restarts cost a re-login, so the
+                           # fuse is long) -- with the real-mouse motion the
+                           # pans always land and this should never fire.
 _WD = [False]
 _BEAT = [0.0]
 
@@ -1743,6 +1745,81 @@ def _start_watchdog():
     threading.Thread(target=_watch, daemon=True).start()
 
 
+# ---------------------------------------------------------------------------
+# THE ORIGINAL FIBER HUNTER MOTION (ported 2026-07-02 on Patrick's call --
+# "use the motion from the old program that worked"). fiber_hunter.py's pan():
+# move the REAL Windows mouse to the map and physically drag it 150px. The OS
+# injects the input directly -- it never asks the browser for a receipt, so
+# THIS PAN CANNOT HANG no matter what the page is doing. The console minimizes
+# itself so the drag always lands on the map, never on a window in front.
+# ---------------------------------------------------------------------------
+REAL_PAN_PIXELS = 150          # fiber_hunter.py: PAN_PIXELS = 150
+_REAL = {"ok": None}
+_CONSOLE_MIN = [False]
+
+
+def _real_mouse_ready(install=False):
+    """True when pyautogui (the original's mouse driver) is importable.
+    With install=True, pip-install it once if missing (Windows only)."""
+    if _REAL["ok"] is None or (install and _REAL["ok"] is False):
+        _REAL["ok"] = False
+        if os.name == "nt":
+            try:
+                import pyautogui  # noqa: F401
+                _REAL["ok"] = True
+            except Exception:
+                if install:
+                    try:
+                        import subprocess
+                        subprocess.run([sys.executable, "-m", "pip", "install",
+                                        "pyautogui"],
+                                       capture_output=True, timeout=300)
+                        import pyautogui  # noqa: F401
+                        _REAL["ok"] = True
+                    except Exception:
+                        _REAL["ok"] = False
+    return bool(_REAL["ok"])
+
+
+def _minimize_console_once():
+    """Drop this console out of the way so the real-mouse drag can only land
+    on the map. (The program keeps running and logging -- watch the map/sheet.)"""
+    if _CONSOLE_MIN[0] or os.name != "nt":
+        return
+    _CONSOLE_MIN[0] = True
+    print("  (minimizing this window so the map stays in front -- still "
+          "running; watch the map)")
+    try:
+        import ctypes
+        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+        if hwnd:
+            ctypes.windll.user32.ShowWindow(hwnd, 6)   # SW_MINIMIZE
+    except Exception:
+        pass
+
+
+def _drag_real(direction, quiet=False):
+    """fiber_hunter.py pan(), verbatim semantics: drag the content the OPPOSITE
+    way the viewport should move. Never touches the browser connection."""
+    import pyautogui
+    _minimize_console_once()
+    w, h = pyautogui.size()
+    cx, cy = int(w * 0.5), int(h * 0.52)     # centre of the maximized map
+    dx, dy = {"right": (-REAL_PAN_PIXELS, 0), "left": (REAL_PAN_PIXELS, 0),
+              "down": (0, -REAL_PAN_PIXELS), "up": (0, REAL_PAN_PIXELS)}[direction]
+    if not quiet:
+        print("  -> PAN %s: REAL mouse drag (the original motion)" % direction)
+    try:
+        pyautogui.moveTo(cx, cy)
+        pyautogui.dragRel(dx, dy, duration=0.2, button="left")
+    except Exception as e:
+        # (e.g. the fail-safe when a hand bumps the cursor into a corner --
+        #  skip this one pan and keep moving; motion never stops)
+        print("     (real drag interrupted: %s -- panning on)" % str(e)[:50])
+    time.sleep(0.05 if quiet else WAIT_AFTER_PAN)
+    return True
+
+
 def mouse_drag(page, direction, quiet=False):
     """PROVEN fiber_hunter motion: DRAG to pan (the original used
     pyautogui.dragRel, ~150px serpentine). A drag is a map gesture, so it pans
@@ -1753,6 +1830,8 @@ def mouse_drag(page, direction, quiet=False):
     pass-through pan (used to skate across cells already scanned)."""
     _BEAT[0] = time.time()   # heartbeat: the reviver only acts if these stop
     _start_watchdog()
+    if _real_mouse_ready():
+        return _drag_real(direction, quiet)   # the unhangable original motion
     box = _map_canvas_box(page)
     src = "canvas"
     if not box:
@@ -2919,6 +2998,13 @@ def main():
     if args.uploader:
         uploader_main()          # write worker: no browser, no Playwright
         return
+
+    # THE ORIGINAL MOTION needs its mouse driver -- install once if missing.
+    if _real_mouse_ready(install=True):
+        print("  REAL-MOUSE MOTION ON: the original fiber hunter gesture "
+              "(the pan physically cannot hang).")
+    else:
+        print("  (real-mouse driver unavailable -- using the in-browser drag)")
 
     if args.clean_sheet:
         clean_sheet()
