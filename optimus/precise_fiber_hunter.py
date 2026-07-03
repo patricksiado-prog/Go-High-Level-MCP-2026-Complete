@@ -2749,7 +2749,12 @@ def main():
         # OSM first; paid Places only with --paid + a key). It tails
         # precise_addresses.jsonl, so every address the hunter writes gets a
         # name/phone attached while the scan keeps going. Daemon = dies with us.
-        if not args.no_enrich and not args.dry:
+        # -- OFF BY DEFAULT (June's 2nd landmine, found 2026-07-02): this
+        # background thread writes to the SAME sheet while the hunter writes,
+        # colliding on the 60/min quota -> the flush stalls -> 'the map froze.'
+        # Houses have no free public phone anyway; business phones come from
+        # the scraper match. Re-enable with OPTIMUS_ENRICH=1 if ever wanted.
+        if os.environ.get("OPTIMUS_ENRICH") == "1" and not args.no_enrich and not args.dry:
             _start_enrichment(args.paid)
 
         def one_pass():
