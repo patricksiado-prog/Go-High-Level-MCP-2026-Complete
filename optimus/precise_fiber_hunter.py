@@ -1828,8 +1828,11 @@ def mouse_drag(page, direction, quiet=False):
     of the screen -- either way page.mouse moves the map. Drag the content the
     OPPOSITE way you want the viewport to move. quiet=True is a fast, silent
     pass-through pan (used to skate across cells already scanned)."""
-    _BEAT[0] = time.time()   # heartbeat: the reviver only acts if these stop
-    _start_watchdog()
+    _BEAT[0] = time.time()
+    # (auto-restart REMOVED for good, Patrick 2026-07-02: a relaunch can't get
+    #  itself back to the right screen -- login/portal need button presses. So
+    #  nothing here ever exits or restarts anything. The cure is motion that
+    #  can't hang, not restarts.)
     if _real_mouse_ready():
         return _drag_real(direction, quiet)   # the unhangable original motion
     box = _map_canvas_box(page)
@@ -3216,20 +3219,15 @@ def main():
             # MANUAL mode: let the user get the map where they want it, then
             # scan THAT view (don't auto-jump to a ZIP). They press Enter to go.
             searched[0] = True
-            if os.environ.get("OPTIMUS_AUTORESUME") == "1":
-                # relaunched by the freeze reviver -- resume with NO user action
-                print("\n  AUTO-RESUME: picking up after a freeze -- scanning "
-                      "the current view. (No Enter needed.)")
-            else:
-                print("\n  " + "=" * 56)
-                print("  Get the AT&T Fiber Map showing the area you want to scan.")
-                print("  (Log in if needed; pan/zoom to your spot.)")
-                print("  Then come back here and press Enter to START scanning.")
-                print("  " + "=" * 56)
-                try:
-                    input("  Press Enter to start... ")
-                except EOFError:
-                    pass
+            print("\n  " + "=" * 56)
+            print("  Get the AT&T Fiber Map showing the area you want to scan.")
+            print("  (Log in if needed; pan/zoom to your spot.)")
+            print("  Then come back here and press Enter to START scanning.")
+            print("  " + "=" * 56)
+            try:
+                input("  Press Enter to start... ")
+            except EOFError:
+                pass
 
         # Manual mode keeps watching by default: you pan the map by hand and it
         # collects the backend dots from each view, every few seconds, until you
