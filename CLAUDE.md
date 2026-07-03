@@ -783,6 +783,47 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
 - **Drive MCP gets "session expired" on a long chat** (token goes stale and won't refresh) — when
   the sheet read keeps failing, the fix is a FRESH chat, not retrying. The GHL connector stays fine.
 
+### 11f. SESSION 2026-07-02 — the "it keeps stopping" war, ENDED. Read this before touching the hunter.
+
+> **THE STATE (end of 2026-07-02, what's LIVE):** `optimus/precise_fiber_hunter.py` **IS THE JUNE 18
+> BUILD (02ba61a) again** — the "v200k" program that banked the 200k dots — restored byte-for-byte at
+> Patrick's explicit repeated demand, with exactly TWO surgical changes (June's own two landmines):
+> 1. the periodic mid-motion `reload_biz_index()+_backlog_match()` (re-read the whole Maps Businesses
+>    tab every 20 flushes; instant at June's 3.6k rows, a 10-30s MOTION FREEZE at today's 18k+) — REMOVED;
+> 2. the enrichment background thread auto-start (writes to the SAME sheet beside the hunter → 60/min
+>    quota collision → flush stalls → "the map froze") — now opt-in via `OPTIMUS_ENRICH=1`.
+> Everything else in the file is June, untouched: no BUILD banner, no ticker, no split, no watchdog.
+> June's console is QUIET (long silences are normal); judge runs by the sheet, not the console.
+> The July rebuilds #19–#32 live in git history (last full one: `bd4d75f`) — including the good ideas:
+> uploader-process split (motion never touches Google), SafePending (429 loses nothing), drift-proof
+> Deduper, junk-address gate, per-cell timestamped ticker, 25s watchdog + faulthandler freeze dumps,
+> auto-resume-while-browser-open, lost-view page reload. Cherry-pick from there ONLY if Patrick asks.
+> A separate frozen copy also exists: `optimus/v200k/precise_fiber_hunter_v200k.py` + `RUN_V200K.bat`
+> (+ a 3rd desktop icon via the installer) — now redundant since the MAIN file is the June build.
+
+> **WHY IT "KEPT STOPPING" — six different causes, one identical symptom (the full post-mortem):**
+> 1. **The June landmine #1:** biz-tab re-read ON THE PAN PATH — grew with the data until it froze
+>    motion (this is what ended the "worked 5 days ago" streak; code untouched, data outgrew it).
+> 2. **The June landmine #2:** enrichment thread quota collision (see above).
+> 3. **My bad fix #1:** self-verifying pan = 2 renderer screenshots EVERY pan (blockable ~30s each on
+>    a busy map). The 200k motion never had screenshots. Removed.
+> 4. **My bad fix #2:** background gspread thread beside sync-Playwright → froze Chromium (reverted same day).
+> 5. **My process leak:** every #24-era relaunch spawned a NEW uploader; the old ones never exited —
+>    FIVE at once hammering the sheet (status rows duplicated 2x→4x→5x = the fingerprint) + CPU. A
+>    laptop REBOOT is the only thing that clears already-leaked ones.
+> 6. **The perception gap:** empty/dry ground, the never-rendering white basemap, and a quiet console
+>    are VISUALLY IDENTICAL to a freeze — several healthy runs got killed by hand (incl. a run at
+>    1 cell/sec + 521 leads, and the all-time record 2,509 leads in <5 min at 21:32-21:37, both called
+>    "stopped" while running). ALWAYS check Hunter Status heartbeats / the sheet before believing a stop.
+>
+> **LESSONS (operational, not gates):** patch-don't-rewrite cuts both ways — 10 blind rebuilds in one
+> day was the anti-pattern; get EVIDENCE first (sheet heartbeats via the Make tail-reader scenario
+> 5552199 + data store 113728, or a console photo), fix the ONE proven thing, verify by heartbeats.
+> Never put ANY I/O between two pans. Never thread gspread beside sync-Playwright. Build stamps +
+> ticker existed for a reason — June has neither, so the SHEET is the only truth channel now.
+> OKC leads (most of tonight's captures: 73121/73149/73108 + Dallas Deep Ellum from 01:49) stay OUT
+> of the Houston dialer.
+
 ### 11e. SESSION 2026-07-01 — hunter "stopped panning" diagnosed + fixed, tester + backend monitor built
 
 > **TODAY'S PROBLEM (2026-07-01):** the precise hunter "stopped / won't pan / motion feels slower"
