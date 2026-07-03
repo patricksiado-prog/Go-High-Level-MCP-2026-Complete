@@ -818,6 +818,23 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
 >    1 cell/sec + 521 leads, and the all-time record 2,509 leads in <5 min at 21:32-21:37, both called
 >    "stopped" while running). ALWAYS check Hunter Status heartbeats / the sheet before believing a stop.
 >
+> **7. ★ THE ACTUAL GLITCH — FOUND 2026-07-02 LATE NIGHT (Patrick called it: "there is a glitch to
+>    make it stop after 5 instructions"). Cancelled-tile body reads.** `NetCapture.handle` read
+>    `response.body()` for every Mapbox vector tile; Mapbox CANCELS in-flight tile fetches on every
+>    pan; reading a cancelled reply's body = a wait that never returns, and since the handler runs
+>    re-entrantly inside the pan's own CDP call, the console's last line is ALWAYS "PAN … drag
+>    canvas…" (all 5 of the night's freeze photos). Fast pacing + tile churn ⇒ collision within
+>    ~3-5 cells, every run. WHY JUNE NEVER HIT IT: the reinstalls upgraded Playwright/Chromium
+>    (installer runs `pip install --upgrade playwright` every time); June's browser errored
+>    instantly on a cancelled body (caught + ignored), the new one waits forever — code identical,
+>    browser swapped. Visible corroboration: June's automated browser showed a WHITE basemap; the
+>    new one renders the full basemap. FIX (`9f9cdb7`): never read tile bodies (addresses never
+>    came from tiles — all sheet addresses come from the serviceability JSON). Plus two guards that
+>    stay: `_disable_quickedit()` (a console click silently pauses the process on its next print —
+>    Windows QuickEdit; disarmed at startup, `ba358d6`) and the FREEZE REVIVER (`d4e833c`/`81c28f2`:
+>    watchdog thread, 45s of no pans ⇒ exit 42 ⇒ launcher relaunches ⇒ OPTIMUS_AUTORESUME=1 skips
+>    the Enter prompt and resumes by itself; can never fire on a moving run).
+>
 > **LESSONS (operational, not gates):** patch-don't-rewrite cuts both ways — 10 blind rebuilds in one
 > day was the anti-pattern; get EVIDENCE first (sheet heartbeats via the Make tail-reader scenario
 > 5552199 + data store 113728, or a console photo), fix the ONE proven thing, verify by heartbeats.
