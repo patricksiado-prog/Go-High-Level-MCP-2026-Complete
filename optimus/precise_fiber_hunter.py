@@ -725,7 +725,13 @@ class NetCapture:
             data_url = ("serviceability" in low or "serviceab" in low
                         or "/api/" in low or "graphql" in low or "availab" in low
                         or "fiber" in low or low.endswith(".json"))
-            if "json" in ctl or data_url:
+            if data_url:
+                # (was: any json-labeled reply too -- narrowed 2026-07-02: only
+                # read bodies that look like the dot/data feed. A pan can cancel
+                # ANY in-flight reply, and reading a cancelled body waits forever
+                # on the upgraded browser. The serviceability feed matches these
+                # keywords, so capture is unchanged; random page JSON no longer
+                # gets read at all.)
                 try:
                     body = response.body()
                     if not body or len(body) > 8 * 1024 * 1024:
@@ -2793,6 +2799,26 @@ def match_leads_to_biz(new_records):
         print("    (biz write hiccup: %s)" % str(e)[:60])
 
 
+def _kill_stale_browser():
+    """A frozen/killed run can leave its Chromium alive; a leftover holding
+    att_profile blocks the next launch (the reviver's relaunch included).
+    Clear ONLY browser processes using OUR profile -- normal Chrome untouched."""
+    if os.name != "nt":
+        return
+    try:
+        import subprocess
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             "Get-CimInstance Win32_Process | Where-Object { "
+             "$_.Name -match 'chrome|chromium|msedge' -and "
+             "$_.CommandLine -like '*att_profile*' } | "
+             "ForEach-Object { Stop-Process -Id $_.ProcessId -Force "
+             "-ErrorAction SilentlyContinue }"],
+            capture_output=True, timeout=30)
+    except Exception:
+        pass
+
+
 def _disable_quickedit():
     """Windows: one stray click inside the console window starts a text
     selection (QuickEdit mode) and the OS then FREEZES this program on its
@@ -2920,6 +2946,7 @@ def main():
     os.makedirs(PROFILE_DIR, exist_ok=True)
 
     with sync_playwright() as pw:
+        _kill_stale_browser()   # a frozen run's leftover Chromium would block
         ctx = pw.chromium.launch_persistent_context(
             PROFILE_DIR, headless=False,
             viewport=VIEWPORT,
