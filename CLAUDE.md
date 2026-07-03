@@ -37,6 +37,8 @@
 > **★★★ RULE — DON'T BREAK MOTION (Patrick, 2026-07-02).** The hunter's pan loop keeps moving no
 > matter what — nothing (sheet reads/writes, matching, verification, empty ground, missing buttons)
 > gets to pause, slow, or end it; closing the browser is the only off switch. That's the whole rule.
+> Priority is absolute (Patrick, 2026-07-02): it's OK if dots get SKIPPED; it's NOT OK if the motion
+> stops — when data and motion ever conflict, drop the data and keep panning.
 > Context if needed: every "it keeps stopping" saga traced to something inserted between two pans.
 
 > Operator: Patrick William Siado (AT&T Fiber dealer).
