@@ -161,6 +161,19 @@ _NET_CAPTURE = [None]    # the always-on network capture (set in main)
 JSONL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           "precise_addresses.jsonl")
 
+# WRITES NEVER TOUCH THE MOTION (Patrick, 2026-07-02 "once and for all"):
+# the browser process pans/searches/captures ONLY -- every capture goes to the
+# local JSONL (microseconds) and a separate UPLOADER process (this same file,
+# --uploader) does ALL Google work: sheet writes, biz matching, status rows.
+# While it's writing, the map is still panning, because they are two programs.
+_SPLIT = [False]
+RUN_STATUS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "run_status.json")
+UPLOADER_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "uploader_log.txt")
+UPLOADER_LOCK = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "uploader.lock")
+
 # ----------------------------------------------------------------------------
 # Mapbox GL fast path: hook the map object at page init, then query the dots
 # as GeoJSON features instead of hunting pixels.
@@ -834,6 +847,10 @@ class NetCapture:
         """Write the new captured addresses. BATCHED -- one append_rows call for
         all of them, not one append_row per address (which blew the Google Sheets
         'write requests per minute' quota -> 429 errors)."""
+        if _SPLIT[0]:
+            # split mode: motion never touches Google -- captures go to disk and
+            # the uploader process ships them. A write CANNOT pause a pan.
+            return self.flush_local(seen, area_label, dry)
         self.seen = seen
         new_rows, new_records = [], []
         while self.pending:
@@ -891,6 +908,38 @@ class NetCapture:
         # scraper's side. Everything else in this file is June 18, untouched.
         # (COMBO MATCH ON -- launcher version-check marker.)
         return len(new_rows)
+
+    def flush_local(self, seen, area_label, dry):
+        """SPLIT-MODE flush: June's exact skip logic, but captures go to the
+        local JSONL only (a disk append, microseconds). The uploader process
+        ships them to the sheet. The pan loop never waits on Google."""
+        new_records = []
+        while self.pending:
+            ld = self.pending.pop()
+            addr = (ld.get("address") or "").strip()
+            if not addr:
+                continue
+            key = addr.upper()
+            if key in seen:
+                continue
+            seen.add(key)
+            dot_status = classify_status(text=ld.get("status"), ban=ld.get("ban"))
+            if dot_color(dot_status) == "GREY":
+                continue
+            ts = time.strftime("%Y-%m-%d %H:%M:%S")
+            new_records.append({"address": addr, "dot_status": dot_status,
+                                "zone_label": "WORKING", "popup_status": ld.get("status"),
+                                "ban": ld.get("ban"), "area": area_label, "ts": ts,
+                                "via": "network", "lat": ld.get("lat"), "lng": ld.get("lng")})
+        if not new_records:
+            return 0
+        if dry:
+            for r in new_records[:20]:
+                print("   + %s | %s" % (r["address"], dot_color(r["dot_status"])))
+            return len(new_records)
+        for rec in new_records:
+            append_jsonl(rec)          # the uploader tails this file
+        return len(new_records)
 
 # --- popup parsing (canonical regexes from optimus_dot_detect) ---
 POPUP_KEYS = {
@@ -2300,6 +2349,135 @@ def drive_log(msg):
         pass
 
 
+def _ulog(msg):
+    print("%s  %s" % (time.strftime("%H:%M:%S"), msg), flush=True)
+
+
+def uploader_main():
+    """THE WRITE WORKER (split mode). Tails precise_addresses.jsonl from the
+    offset the hunter handed us and does ALL Google work: batched sheet writes
+    (failed batches stay queued and retry), live biz matching, Hunter Status
+    mirroring. SINGLETON: exactly one, ever. Exits itself when the hunter has
+    been silent a long while and everything is shipped."""
+    try:
+        if os.path.exists(UPLOADER_LOCK) and                 time.time() - os.path.getmtime(UPLOADER_LOCK) < 60:
+            print("another uploader is live -- standing down (pid %d)" % os.getpid())
+            return
+    except OSError:
+        pass
+    _ulog("uploader up (pid %d) -- all sheet work happens here" % os.getpid())
+    ws = None
+    delay, tries = 5, 0
+    while ws is None:
+        try:
+            ws = open_sheet()
+        except Exception as e:
+            _ulog("sheet connect failed: %s -- retrying" % str(e)[:80])
+        if ws is None:
+            tries += 1
+            if tries >= 12:
+                _ulog("no sheet after %d tries -- exiting (leads stay in the "
+                      "local JSONL; next start backfills them)" % tries)
+                return
+            time.sleep(delay)
+            delay = min(delay * 2, 120)
+    seen = already_seen(ws)
+    _ulog("seeded %d known addresses from the sheet" % len(seen))
+    try:
+        init_bizmatch(ws)
+    except Exception as e:
+        _ulog("biz match init skipped: %s" % str(e)[:80])
+    try:
+        offset = int(os.environ.get("OPTIMUS_OUTBOX_OFFSET", "0") or 0)
+    except ValueError:
+        offset = 0
+    queued_rows = []          # rows that failed to write stay here and retry
+    remainder = b""
+    last_status = ""
+    idle_since = time.time()
+    while True:
+        new_records = []
+        try:
+            size = os.path.getsize(JSONL_PATH) if os.path.exists(JSONL_PATH) else 0
+            if size < offset:
+                offset = 0
+            if size > offset:
+                with open(JSONL_PATH, "rb") as f:
+                    f.seek(offset)
+                    data = f.read()
+                offset += len(data)
+                data = remainder + data
+                lines = data.split(b"\n")
+                remainder = lines.pop()
+                for raw in lines:
+                    raw = raw.strip()
+                    if not raw:
+                        continue
+                    try:
+                        d = json.loads(raw.decode("utf-8", "replace"))
+                    except Exception:
+                        continue
+                    addr = (d.get("address") or "").strip()
+                    if not addr or addr.upper() in seen:
+                        continue
+                    seen.add(addr.upper())
+                    ds = d.get("dot_status")
+                    if dot_color(ds) == "GREY":
+                        continue
+                    # June's exact Precise Fiber shape: Address | Dot Color |
+                    # Captured At | Business | Phone (biz merged like the flush)
+                    _bidx = _BIZ.get("index") or {}
+                    _b = _bidx.get(_norm_addr(addr)) if _bidx else None
+                    queued_rows.append([addr, dot_color(ds), d.get("ts") or "",
+                                        (_b or {}).get("name", ""),
+                                        (_b or {}).get("phone", "")])
+                    new_records.append(d)
+        except Exception as e:
+            _ulog("outbox read error: %s" % str(e)[:80])
+        if queued_rows:
+            idle_since = time.time()
+            try:
+                for i in range(0, len(queued_rows), 500):
+                    ws.append_rows(queued_rows[i:i + 500], value_input_option="RAW")
+                _ulog("shipped %d rows to the sheet" % len(queued_rows))
+                queued_rows = []
+            except Exception as e:
+                _ulog("write failed (%s) -- %d rows stay queued for retry"
+                      % (str(e)[:60], len(queued_rows)))
+            if new_records:
+                try:
+                    match_leads_to_biz(new_records)
+                except Exception as e:
+                    _ulog("biz match error: %s" % str(e)[:60])
+        try:
+            if os.path.exists(RUN_STATUS_PATH):
+                s = open(RUN_STATUS_PATH).read()
+                if s and s != last_status:
+                    last_status = s
+                    rec = json.loads(s)
+                    sws = _status_sheet(ws)
+                    if sws is not None:
+                        sws.append_row([rec.get("time", ""), rec.get("host", ""),
+                                        str(rec.get("area", "")), rec.get("state", ""),
+                                        str(rec.get("found", "")), str(rec.get("note", ""))])
+                    idle_since = time.time()
+        except Exception:
+            pass
+        try:
+            with open(UPLOADER_LOCK, "w") as f:
+                f.write(str(os.getpid()))
+        except OSError:
+            pass
+        if not queued_rows and time.time() - idle_since > 900:
+            _ulog("hunter silent 15 min and everything shipped -- uploader done")
+            try:
+                os.remove(UPLOADER_LOCK)
+            except OSError:
+                pass
+            return
+        time.sleep(2)
+
+
 def report_status(ws, area, state, found="", note=""):
     """Write one heartbeat line: always to a local run_status.json, and to the
     Drive sheet's status tab when we have one. Never crashes the run."""
@@ -2316,6 +2494,8 @@ def report_status(ws, area, state, found="", note=""):
         pass
     print("[status] %s  %s  area=%s  %s %s" % (stamp, state, area, found, note))
     drive_log("STATUS %s host=%s area=%s found=%s %s" % (state, host, area, found, note))
+    if _SPLIT[0]:
+        return   # split mode: the uploader mirrors run_status.json to the sheet
     sws = _status_sheet(ws)
     if sws is not None:
         try:
@@ -2641,7 +2821,16 @@ def main():
     ap.add_argument("--paid", action="store_true",
                     help="let the background enricher use paid Google Places on "
                          "OSM misses (needs GOOGLE_PLACES_API_KEY). Default is FREE.")
+    ap.add_argument("--uploader", action="store_true",
+                    help=argparse.SUPPRESS)   # internal: the write worker
+    ap.add_argument("--no-split", action="store_true",
+                    help="write to the sheet in-process (June's original way) "
+                         "instead of the separate write worker")
     args = ap.parse_args()
+
+    if args.uploader:
+        uploader_main()          # write worker: no browser, no Playwright
+        return
 
     if args.clean_sheet:
         clean_sheet()
@@ -2708,6 +2897,33 @@ def main():
         # old sheet was full) -- write them into the active sheet now (with biz merge).
         if not args.dry and ws is not None:
             backfill_jsonl(ws, seen)
+
+        # WRITES NEVER TOUCH THE MOTION: spawn the write worker. From here on
+        # this process pans/searches/captures only -- captures go to disk and
+        # the worker ships them. A sheet write CANNOT pause a pan anymore.
+        if not args.dry and ws is not None and not args.no_split:
+            try:
+                import subprocess as _sp
+                _env = dict(os.environ)
+                _env["OPTIMUS_NO_UPDATE"] = "1"
+                _env["OPTIMUS_OUTBOX_OFFSET"] = str(
+                    os.path.getsize(JSONL_PATH) if os.path.exists(JSONL_PATH) else 0)
+                _logf = open(UPLOADER_LOG, "a")
+                _kw = {"cwd": os.path.dirname(os.path.abspath(__file__)),
+                       "env": _env, "stdout": _logf, "stderr": _logf,
+                       "stdin": _sp.DEVNULL}
+                if os.name == "nt":
+                    _kw["creationflags"] = 0x00000008 | 0x08000000
+                else:
+                    _kw["start_new_session"] = True
+                _sp.Popen([sys.executable, os.path.abspath(__file__),
+                           "--uploader"], **_kw)
+                _SPLIT[0] = True
+                print("  WRITES OFF THE MOTION: a separate worker ships leads to "
+                      "the sheet (log: uploader_log.txt). Panning never waits.")
+            except Exception as e:
+                print("  (write worker spawn failed: %s -- writing in-process)"
+                      % str(e)[:80])
 
         if args.net_debug:
             # RESEARCH short-circuit: load the map, trigger a few data loads by
