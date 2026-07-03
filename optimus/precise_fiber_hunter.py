@@ -1794,6 +1794,40 @@ def _minimize_console_once():
         pass
 
 
+def _browser_under(x, y):
+    """True if the window at screen point (x,y) belongs to the browser -- so a
+    real-mouse drag can NEVER grab the desktop, the console, or another app.
+    Best-effort: unknown = assume it's fine (never block the motion on this)."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        u = ctypes.windll.user32
+        k = ctypes.windll.kernel32
+        pt = wintypes.POINT(x, y)
+        u.WindowFromPoint.restype = wintypes.HWND
+        u.WindowFromPoint.argtypes = [wintypes.POINT]
+        hwnd = u.WindowFromPoint(pt)
+        if not hwnd:
+            return True
+        root = u.GetAncestor(hwnd, 2)   # GA_ROOT
+        pid = wintypes.DWORD()
+        u.GetWindowThreadProcessId(root, ctypes.byref(pid))
+        h = k.OpenProcess(0x1000, False, pid.value)   # QUERY_LIMITED_INFORMATION
+        if not h:
+            return True
+        try:
+            buf = ctypes.create_unicode_buffer(512)
+            size = wintypes.DWORD(512)
+            if not k.QueryFullProcessImageNameW(h, 0, buf, ctypes.byref(size)):
+                return True
+            exe = os.path.basename(buf.value).lower()
+            return ("chrome" in exe or "chromium" in exe or "msedge" in exe)
+        finally:
+            k.CloseHandle(h)
+    except Exception:
+        return True
+
+
 def _drag_real(direction, quiet=False):
     """fiber_hunter.py pan(), verbatim semantics: drag the content the OPPOSITE
     way the viewport should move. Raw OS input (SetCursorPos + mouse_event) --
@@ -1806,6 +1840,13 @@ def _drag_real(direction, quiet=False):
     cx, cy = int(w * 0.5), int(h * 0.52)     # centre of the maximized map
     dx, dy = {"right": (-REAL_PAN_PIXELS, 0), "left": (REAL_PAN_PIXELS, 0),
               "down": (0, -REAL_PAN_PIXELS), "up": (0, REAL_PAN_PIXELS)}[direction]
+    if not _browser_under(cx, cy):
+        # something covers the map (or it's gone) -- skip this pan rather than
+        # drag the wrong window; the loop keeps moving and tries again next cell
+        print("  -> PAN %s: map window not in front -- skipping this pan"
+              % direction)
+        time.sleep(1.0)
+        return True
     if not quiet:
         print("  -> PAN %s: REAL mouse drag (the original motion)" % direction)
     try:
@@ -1980,12 +2021,27 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
     dirs = ["right", "down", "left", "up"]
     di, run, cell, total = 0, 1, 0, 0
     print("Continuous sweep -- panning outward until you close the browser.\n")
+    real = _real_mouse_ready()
+    if real:
+        print("  (page-free loop: the sweep never talks to the browser -- the "
+              "real drag itself triggers the dot fetch; nothing can stall it)\n")
     try:
         while True:
             for _arm in range(2):           # spiral: 2 arms per run-length, then grow
                 for _ in range(run):
-                    if on_map(page):
-                        search_this_area(page)
+                    if real:
+                        # ZERO browser calls in the loop. is_closed() is a local
+                        # flag (no round-trip) -- the one clean exit: you closing
+                        # the browser window.
+                        try:
+                            if page.is_closed():
+                                print("\nBrowser closed -- stopping. (%d leads.)" % total)
+                                return total
+                        except Exception:
+                            pass
+                    else:
+                        if on_map(page):
+                            search_this_area(page)
                     time.sleep(SEARCH_SETTLE)
                     n = capture.flush(ws, seen, area_label, dry)
                     total += n
