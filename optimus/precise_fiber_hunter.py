@@ -1702,6 +1702,43 @@ def _viewport_map_box(page):
             "height": vp["height"] * (MAP_BOTTOM_FRAC - MAP_TOP_FRAC)}
 
 
+# ---------------------------------------------------------------------------
+# FREEZE REVIVER: if the pan loop goes silent for WATCHDOG_STALL_SECS (a
+# healthy sweep pans every ~1 second, so this is a 100x margin -- it can NEVER
+# fire on a moving run), the run is already dead: a hung browser, a blocked
+# console, anything. A daemon thread that only reads a timestamp exits with
+# code 42; the launcher relaunches fresh and the run resumes BY ITSELF -- no
+# clicks, no Enter, no user. It never touches the browser or the sheet.
+# ---------------------------------------------------------------------------
+WATCHDOG_STALL_SECS = 120
+_WD = [False]
+_BEAT = [0.0]
+
+
+def _start_watchdog():
+    if _WD[0]:
+        return
+    _WD[0] = True
+    import threading
+
+    def _watch():
+        while True:
+            time.sleep(5)
+            b = _BEAT[0]
+            if b and time.time() - b > WATCHDOG_STALL_SECS:
+                try:   # a file note, not print (a blocked console can't stop this)
+                    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                           "watchdog_fired.txt"), "a") as f:
+                        f.write("%s  frozen %ds -- relaunching itself\n"
+                                % (time.strftime("%Y-%m-%d %H:%M:%S"),
+                                   int(time.time() - b)))
+                except Exception:
+                    pass
+                os._exit(42)   # the launcher loop relaunches + auto-resumes
+
+    threading.Thread(target=_watch, daemon=True).start()
+
+
 def mouse_drag(page, direction, quiet=False):
     """PROVEN fiber_hunter motion: DRAG to pan (the original used
     pyautogui.dragRel, ~150px serpentine). A drag is a map gesture, so it pans
@@ -1710,6 +1747,8 @@ def mouse_drag(page, direction, quiet=False):
     of the screen -- either way page.mouse moves the map. Drag the content the
     OPPOSITE way you want the viewport to move. quiet=True is a fast, silent
     pass-through pan (used to skate across cells already scanned)."""
+    _BEAT[0] = time.time()   # heartbeat: the reviver only acts if these stop
+    _start_watchdog()
     box = _map_canvas_box(page)
     src = "canvas"
     if not box:
@@ -3066,15 +3105,20 @@ def main():
             # MANUAL mode: let the user get the map where they want it, then
             # scan THAT view (don't auto-jump to a ZIP). They press Enter to go.
             searched[0] = True
-            print("\n  " + "=" * 56)
-            print("  Get the AT&T Fiber Map showing the area you want to scan.")
-            print("  (Log in if needed; pan/zoom to your spot.)")
-            print("  Then come back here and press Enter to START scanning.")
-            print("  " + "=" * 56)
-            try:
-                input("  Press Enter to start... ")
-            except EOFError:
-                pass
+            if os.environ.get("OPTIMUS_AUTORESUME") == "1":
+                # relaunched by the freeze reviver -- resume with NO user action
+                print("\n  AUTO-RESUME: picking up after a freeze -- scanning "
+                      "the current view. (No Enter needed.)")
+            else:
+                print("\n  " + "=" * 56)
+                print("  Get the AT&T Fiber Map showing the area you want to scan.")
+                print("  (Log in if needed; pan/zoom to your spot.)")
+                print("  Then come back here and press Enter to START scanning.")
+                print("  " + "=" * 56)
+                try:
+                    input("  Press Enter to start... ")
+                except EOFError:
+                    pass
 
         # Manual mode keeps watching by default: you pan the map by hand and it
         # collects the backend dots from each view, every few seconds, until you
