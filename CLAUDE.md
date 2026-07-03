@@ -829,11 +829,17 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
 >    instantly on a cancelled body (caught + ignored), the new one waits forever — code identical,
 >    browser swapped. Visible corroboration: June's automated browser showed a WHITE basemap; the
 >    new one renders the full basemap. FIX (`9f9cdb7`): never read tile bodies (addresses never
->    came from tiles — all sheet addresses come from the serviceability JSON). Plus two guards that
->    stay: `_disable_quickedit()` (a console click silently pauses the process on its next print —
->    Windows QuickEdit; disarmed at startup, `ba358d6`) and the FREEZE REVIVER (`d4e833c`/`81c28f2`:
->    watchdog thread, 45s of no pans ⇒ exit 42 ⇒ launcher relaunches ⇒ OPTIMUS_AUTORESUME=1 skips
->    the Enter prompt and resumes by itself; can never fire on a moving run).
+>    came from tiles — all sheet addresses come from the serviceability JSON). What ENDED the night
+>    (context, not gates — change any of it if it helps): motion moved OFF the browser entirely —
+>    real-mouse drag via raw Windows input (ctypes SetCursorPos/mouse_event, no pyautogui, nothing
+>    to install) + a page-free sweep loop (drag → sleep → flush_local; zero page calls; is_closed()
+>    as the only exit; wrong-window guard so the cursor only drags the map). Confirmed live 143+
+>    cells / 555 leads through dense ground where every waiting-motion build died at cells 3-16.
+>    Freezes tracked DATA VOLUME, not cell count — empty ground ran 225 cells, dot floods died in
+>    a few. Also disarmed along the way: Windows QuickEdit (a console click silently pauses the
+>    process on its next print — off at startup, `ba358d6`). Auto-restart/reviver was tried and
+>    REMOVED at Patrick's call — a relaunch can't navigate back to the right screen (login needs
+>    button presses), so restarts are not a cure he accepts; motion that doesn't stop is.
 >
 > **LESSONS (operational, not gates):** patch-don't-rewrite cuts both ways — 10 blind rebuilds in one
 > day was the anti-pattern; get EVIDENCE first (sheet heartbeats via the Make tail-reader scenario
