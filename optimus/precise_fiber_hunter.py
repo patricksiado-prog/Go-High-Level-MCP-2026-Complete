@@ -1759,25 +1759,21 @@ _CONSOLE_MIN = [False]
 
 
 def _real_mouse_ready(install=False):
-    """True when pyautogui (the original's mouse driver) is importable.
-    With install=True, pip-install it once if missing (Windows only)."""
-    if _REAL["ok"] is None or (install and _REAL["ok"] is False):
+    """The real-mouse drive uses raw Windows system calls (ctypes user32) --
+    built into every Windows Python, NOTHING to install, no fallback needed."""
+    if _REAL["ok"] is None:
         _REAL["ok"] = False
         if os.name == "nt":
             try:
-                import pyautogui  # noqa: F401
+                import ctypes
+                ctypes.windll.user32.GetSystemMetrics(0)
+                try:   # real pixel coords even on scaled displays
+                    ctypes.windll.user32.SetProcessDPIAware()
+                except Exception:
+                    pass
                 _REAL["ok"] = True
             except Exception:
-                if install:
-                    try:
-                        import subprocess
-                        subprocess.run([sys.executable, "-m", "pip", "install",
-                                        "pyautogui"],
-                                       capture_output=True, timeout=300)
-                        import pyautogui  # noqa: F401
-                        _REAL["ok"] = True
-                    except Exception:
-                        _REAL["ok"] = False
+                _REAL["ok"] = False
     return bool(_REAL["ok"])
 
 
@@ -1800,22 +1796,35 @@ def _minimize_console_once():
 
 def _drag_real(direction, quiet=False):
     """fiber_hunter.py pan(), verbatim semantics: drag the content the OPPOSITE
-    way the viewport should move. Never touches the browser connection."""
-    import pyautogui
+    way the viewport should move. Raw OS input (SetCursorPos + mouse_event) --
+    the same calls pyautogui wraps, with no package needed. Never touches the
+    browser connection, so it cannot wait on anything."""
+    import ctypes
+    u = ctypes.windll.user32
     _minimize_console_once()
-    w, h = pyautogui.size()
+    w, h = u.GetSystemMetrics(0), u.GetSystemMetrics(1)
     cx, cy = int(w * 0.5), int(h * 0.52)     # centre of the maximized map
     dx, dy = {"right": (-REAL_PAN_PIXELS, 0), "left": (REAL_PAN_PIXELS, 0),
               "down": (0, -REAL_PAN_PIXELS), "up": (0, REAL_PAN_PIXELS)}[direction]
     if not quiet:
         print("  -> PAN %s: REAL mouse drag (the original motion)" % direction)
     try:
-        pyautogui.moveTo(cx, cy)
-        pyautogui.dragRel(dx, dy, duration=0.2, button="left")
+        u.SetCursorPos(cx, cy)
+        time.sleep(0.03)
+        u.mouse_event(0x0002, 0, 0, 0, 0)          # left button DOWN (real)
+        time.sleep(0.06)                           # let the grab register
+        steps = 8
+        for i in range(1, steps + 1):              # glide, like a human drag
+            u.SetCursorPos(cx + dx * i // steps, cy + dy * i // steps)
+            time.sleep(0.02)
+        time.sleep(0.05)                           # settle before release
+        u.mouse_event(0x0004, 0, 0, 0, 0)          # left button UP
     except Exception as e:
-        # (e.g. the fail-safe when a hand bumps the cursor into a corner --
-        #  skip this one pan and keep moving; motion never stops)
         print("     (real drag interrupted: %s -- panning on)" % str(e)[:50])
+        try:
+            u.mouse_event(0x0004, 0, 0, 0, 0)      # never leave the button down
+        except Exception:
+            pass
     time.sleep(0.05 if quiet else WAIT_AFTER_PAN)
     return True
 
@@ -3002,12 +3011,10 @@ def main():
         uploader_main()          # write worker: no browser, no Playwright
         return
 
-    # THE ORIGINAL MOTION needs its mouse driver -- install once if missing.
-    if _real_mouse_ready(install=True):
+    # THE ORIGINAL MOTION -- raw Windows input, nothing to install, no fallback.
+    if _real_mouse_ready():
         print("  REAL-MOUSE MOTION ON: the original fiber hunter gesture "
               "(the pan physically cannot hang).")
-    else:
-        print("  (real-mouse driver unavailable -- using the in-browser drag)")
 
     if args.clean_sheet:
         clean_sheet()
