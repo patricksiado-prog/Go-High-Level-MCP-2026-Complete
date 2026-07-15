@@ -1,0 +1,5 @@
+{
+  "_comment": "curr_ntwrk_bld_type_cd -> customer dot color. Decoded from a live 3300 CUMMINS ST capture 2026-07-01: fttp-gpon customers = existing FIBER (grey). Add copper/DSL codes here as they appear in a customer-area capture.",
+  "fiber": ["fttp-gpon", "fttp", "gpon", "ftth"],
+  "copper": ["copper", "ipbb", "adsl", "vdsl", "dsl"]
+}
