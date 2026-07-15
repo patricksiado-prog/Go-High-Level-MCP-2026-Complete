@@ -1,16 +1,16 @@
-OPTIMUS NET ENDPOINTS  2026-07-15 04:22:54  host=LAPTOP-TB1L669N
+OPTIMUS NET ENDPOINTS  2026-07-15 04:47:43  host=LAPTOP-TB1L669N
 SERVICEABILITY FEED URL: https://youachieve.att.com/yourefer/api/fiberMap.cfc
 
 All non-asset endpoints (biggest first) -- the feed is in here:
-    482296B    1x  application/javascript     blob:https://youachieve.att.com/8f9dfde3-a5f6-4ca5-baa5-cb6f21ec59f9
-    482296B    1x  application/javascript     blob:https://youachieve.att.com/9a34b68b-9dd3-4dec-88c5-d617759912c1
-    151424B    2x  application/javascript; ch https://www.googletagmanager.com/gtag/js
+    482296B    1x  application/javascript     blob:https://youachieve.att.com/0b240b68-71df-4134-9c88-1a48e28f214f
+    482296B    1x  application/javascript     blob:https://youachieve.att.com/d67ec697-1439-4ef6-a369-96f5d74b4b81
+    151428B    2x  application/javascript; ch https://www.googletagmanager.com/gtag/js
      60889B    2x  application/javascript     https://youachieve.att.com/resources/59d4152c9d328741d98ac6233c9dc954522001624dcc5
      28076B    2x  application/javascript     https://youachieve.att.com/ylN1qNN_cEo0/E1V-Lo/E90lS5/Xb/Yh0DP2YC/NVcUAm/ZhA20p
-      9700B    1x  application/javascript     blob:https://youachieve.att.com/6006a016-d00c-41d8-bf7e-8951efb8f5e8
-      9700B    1x  application/javascript     blob:https://youachieve.att.com/c8d532f2-928f-4627-be78-ac3fbcfbab43
-      6618B   14x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/api/fiberMap.cfc
-      4174B    1x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/index.cfm
+      9700B    1x  application/javascript     blob:https://youachieve.att.com/880a82c2-fc10-48fc-a832-54636f20914a
+      9700B    1x  application/javascript     blob:https://youachieve.att.com/cf145301-de81-4e64-95d0-21f8fcf446f4
+      6884B   14x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/api/fiberMap.cfc
+      4176B    1x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/index.cfm
       4002B    1x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/fiber
       3162B    2x  text/html                  https://saml.e-access.att.com/isam/sps/attsamlidp_mfaia/saml20/logininitial
       2519B    1x  text/html                  https://oidc.idp.elogin.att.com/mga/sps/oauth/oauth20/authorize
