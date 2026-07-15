@@ -1329,3 +1329,12 @@ slightly different address string piled up. FIX: `write_fiber_biz` now dedupes b
 OR phone already exists, in-tab or emitted this run) -> one row per phone = dialer-ready. Strictly additive
 (only skips more dups; distinct phones still written). Cleans going FORWARD; the existing 180k is cleaned
 once by dedupe_sheet.py --by-phone (the cleanup .bat). Rows with no phone still dedupe by address.
+
+### 11h-fix6b — TWO scrapers exist; the TEAM runs the standalone one
+GOTCHA: `RUN_SCRAPER.bat` launches `standalone/maps_scraper_standalone.py` (installed to
+`%USERPROFILE%\maps_scraper` by INSTALL_SCRAPER), NOT `maps_scraper.py`+`commercial_split.py`. The
+standalone writes Maps Businesses AND Fiber Green/Upgrade Orange Biz itself (COMBO MATCH ON). Its green/
+orange dedup was ADDRESS-only -> the real source of the 180k dups. Fixed there too: green_ph/orange_ph
+phone sets, skip a match if address OR phone already present. BOTH scrapers (pipeline `commercial_split.
+write_fiber_biz` AND `standalone/maps_scraper_standalone.py`) now dedupe by phone+address. When editing
+"the scraper", edit the STANDALONE one for anything the team runs.
