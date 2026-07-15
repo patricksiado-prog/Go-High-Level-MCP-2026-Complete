@@ -702,6 +702,7 @@ class NetCapture:
         self.substr = substr        # restrict to URLs containing this, if set
         self.debug = debug
         self.pending = []
+        self.req_capture = None      # exact AT&T serviceability request (secrets redacted)
         self.seen = set()
         self.endpoints = {}          # url(no query) -> lead count, for discovery
         self.seen_urls = {}          # base url -> [content_type, hits, max_bytes]
@@ -770,6 +771,47 @@ class NetCapture:
                     try:
                         drive_log("RAW %s :: %s" % (url.split("?")[0][:55],
                                                     json.dumps(data)[:480]))
+                    except Exception:
+                        pass
+                # capture the EXACT request once (method, full URL, POST body,
+                # header names) so a direct backend reader can replicate AT&T's
+                # serviceability call. SECRETS (auth/cookie/token) are redacted
+                # before anything is exposed; the full request is saved locally
+                # only (serviceability_request_FULL.json, gitignored).
+                if leads and self.req_capture is None:
+                    try:
+                        here = os.path.dirname(os.path.abspath(__file__))
+                        rq = response.request
+                        try:
+                            hdrs = dict(rq.all_headers())
+                        except Exception:
+                            hdrs = dict(getattr(rq, "headers", {}) or {})
+                        SECRET = ("authorization", "cookie", "token", "auth",
+                                  "bearer", "session", "apikey", "api-key",
+                                  "x-api", "secret", "csrf", "set-cookie")
+                        red = {}
+                        for k, v in hdrs.items():
+                            if any(s in k.lower() for s in SECRET):
+                                red[k] = "<redacted %d chars>" % len(str(v))
+                            else:
+                                red[k] = v
+                        try:
+                            post = rq.post_data
+                        except Exception:
+                            post = None
+                        self.req_capture = {
+                            "url": rq.url, "method": rq.method,
+                            "post_data": post, "headers_redacted": red,
+                            "header_names": sorted(hdrs.keys()),
+                            "resp_status": getattr(response, "status", None),
+                            "resp_content_type": ct,
+                        }
+                        with open(os.path.join(here,
+                                  "serviceability_request_FULL.json"), "w") as f:
+                            json.dump({"url": rq.url, "method": rq.method,
+                                       "post_data": post, "headers": hdrs}, f, indent=2)
+                        print("  (captured AT&T request shape -> _live/backend_exchange.txt; "
+                              "full+secrets kept local only)")
                     except Exception:
                         pass
             elif _is_vector_tile(url, ct):

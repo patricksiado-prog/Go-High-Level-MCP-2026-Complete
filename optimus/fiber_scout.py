@@ -188,6 +188,31 @@ def push_capture_extras(cap, host):
     return feed
 
 
+def push_backend_exchange(cap, host):
+    """Push AT&T's captured serviceability request SHAPE (method, URL, POST
+    params, header names) so a direct reader can replicate the call. Auth
+    secrets are already redacted in cap.req_capture; the full request stays
+    local only (serviceability_request_FULL.json)."""
+    ex = getattr(cap, "req_capture", None)
+    if not ex:
+        return
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    lines = ["OPTIMUS BACKEND EXCHANGE (AT&T serviceability request)  %s  host=%s" % (ts, host),
+             "", "METHOD : %s" % ex.get("method"),
+             "URL    : %s" % ex.get("url"),
+             "RESP   : %s  %s" % (ex.get("resp_status"), ex.get("resp_content_type")),
+             "", "POST BODY (the params AT&T needs -- lat/lng/radius/etc.):",
+             str(ex.get("post_data") or "(none: GET request, params are in the URL above)"),
+             "", "REQUEST HEADERS (auth/cookie/token values REDACTED):"]
+    for k, v in (ex.get("headers_redacted") or {}).items():
+        lines.append("   %s: %s" % (k, v))
+    lines += ["", "Secrets are redacted here. The full request (with your session "
+              "auth) is saved LOCAL ONLY as serviceability_request_FULL.json and "
+              "is gitignored -- never commit it."]
+    gh_put("optimus/_live/backend_exchange.txt", "\n".join(lines))
+    print("  -> backend exchange (request shape, secrets redacted) pushed.")
+
+
 def write_full_analysis(ws, cap, host):
     """UPGRADE #1: run the FULL backend analysis over ALL captured records (not
     the 250-sample) and push it, so the whole feed's schema + codes can be
@@ -454,6 +479,7 @@ def main():
         if not backend_done:
             write_backend(ws, cap, host)
         write_full_analysis(ws, cap, host)
+        push_backend_exchange(cap, host)
         gh_put("optimus/_live/scout_findings.txt", "\n".join(flines))
 
         print("\n=========== NEW-FIBER SCOUT RESULTS ===========")

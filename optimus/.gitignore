@@ -5,3 +5,6 @@ google_creds.json
 att_profile/
 __pycache__/
 *.pyc
+
+# never commit the raw AT&T request (contains session auth/cookies)
+serviceability_request_FULL.json
