@@ -1264,3 +1264,16 @@ from the repo raw. Since every launcher (even old ones) fetches the main script,
 own deps and runs regardless of which launcher/copy started it. Only acts when a file is missing
 (offline-safe, no regression). LESSON for future scripts: put the dependency-download safety inside the
 entry script, not only in the .bat launcher, because scattered old launchers persist on the user's PC.
+
+### 11h-fix2 (2026-07-01) — zip_reader must ZOOM IN; it's a freshness SAMPLE, not full coverage (Patrick caught it)
+Patrick: "that zip reader logic isn't sound cuz u gotta zoom in to get the dots." CORRECT. The dealer
+map only loads per-address dots at street-level zoom, and one "Search this area" fetch covers just a
+small radius (~250 addresses near center, miles_from_claim ~0.1) -- NOT a whole ZIP. Original zip_reader
+searched a ZIP and read one fetch -> could land zoomed-out and read little/nothing.
+FIX: `read_zip` now search_zip -> `zoom(page, --zoom, "in")` to street level -> search_this_area -> a few
+short `mouse_drag` sweeps to sample a wider slice, accumulating all leads before classifying.
+REFRAME: zip_reader is a freshness TRIAGE tool (green+gold-vs-grey sample per ZIP to RANK fresh vs
+mature), NOT full address coverage -- send the HUNTER to the ZIPs it flags fresh for the actual leads.
+STATUS: EXPERIMENTAL -- `--zoom`/`--sweeps` are tunable; the exact zoom level was not verifiable offline,
+so tune on the first live run (watch the GREEN/GOLD/GREY counts per ZIP; if 0 everywhere over a known-
+green ZIP, increase --zoom). The SCOUT remains the proven tool; zip_reader is the fast triage layer.

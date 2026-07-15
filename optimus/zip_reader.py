@@ -53,6 +53,7 @@ _self_heal_deps()
 from precise_fiber_hunter import (
     self_update, PROFILE_DIR, MAP_URL, VIEWPORT, SEARCH_SETTLE,
     open_map_view, on_map, search_zip, search_this_area, NetCapture, open_sheet,
+    zoom, mouse_drag,
 )
 import backend_classifier as bc
 
@@ -158,13 +159,37 @@ def _tab(ws, title, header):
         return None
 
 
-def read_zip(page, cap, zipc):
-    """Search one ZIP, fetch its area once, classify the batch."""
+def read_zip(page, cap, zipc, zoom_in=4, sweeps=4):
+    """Sample one ZIP's freshness.
+
+    The dots only load when zoomed to street level, and one fetch covers only a
+    small radius (~the 250 addresses near the center, miles_from_claim ~0.1). So
+    per ZIP: search it, ZOOM IN to street level so dots load, "Search this area",
+    then do a few short pans to sample a wider slice -- accumulate all those
+    leads and classify them together. This is a freshness SAMPLE (green+gold vs
+    grey ratio near the ZIP), enough to RANK fresh-vs-mature; it is NOT full
+    coverage of every address (send the hunter to the ZIPs this flags fresh).
+    zoom_in/sweeps are tunable -- adjust on the first live run.
+    """
     mark = len(cap.pending)
     search_zip(page, zipc)
+    # zoom to street level so the per-address dots actually load
+    try:
+        zoom(page, zoom_in, "in")
+    except Exception:
+        pass
     if on_map(page):
         search_this_area(page)
     time.sleep(max(SEARCH_SETTLE, 1.5))
+    # short sweep to sample a wider slice of the ZIP, not just the center point
+    for i in range(max(0, sweeps)):
+        try:
+            mouse_drag(page, ["right", "down", "left", "down"][i % 4])
+        except Exception:
+            break
+        if on_map(page):
+            search_this_area(page)
+        time.sleep(SEARCH_SETTLE)
     recs = _wire_records(cap.pending[mark:])
     s = bc.summarize(recs)
     return s, recs
@@ -175,6 +200,8 @@ def main():
     ap = argparse.ArgumentParser(description="Direct reader: ZIPs -> fresh green+gold list.")
     ap.add_argument("zips", nargs="*", help="ZIP codes (default: Houston metro-edge list)")
     ap.add_argument("--file", help="file with one ZIP per line")
+    ap.add_argument("--zoom", type=int, default=4, help="zoom-in presses per ZIP so dots load (tune live)")
+    ap.add_argument("--sweeps", type=int, default=4, help="short pans per ZIP to widen the sample")
     ap.add_argument("--no-update", action="store_true")
     args = ap.parse_args()
 
@@ -207,7 +234,7 @@ def main():
         print("  %-7s %6s %5s %5s %6s  %s" % ("ZIP", "GREEN", "GOLD", "GREY", "grey%", "verdict"))
         for zc in zips:
             try:
-                s, recs = read_zip(page, cap, zc)
+                s, recs = read_zip(page, cap, zc, zoom_in=args.zoom, sweeps=args.sweeps)
             except Exception as e:
                 if any(k in str(e).lower() for k in ("closed", "crash", "target")):
                     print("\nWindow closed -- stopping."); break
