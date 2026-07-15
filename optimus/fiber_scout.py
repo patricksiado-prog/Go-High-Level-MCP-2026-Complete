@@ -185,6 +185,12 @@ def push_capture_extras(cap, host):
             gh_put("optimus/_live/serviceability_raw.json", body[:900000])
         except Exception:
             pass
+    # push the request recipe on the SAME reliable trigger as net_endpoints, so
+    # backend_exchange.txt can't get lost when a run stops early.
+    try:
+        push_backend_exchange(cap, host)
+    except Exception:
+        pass
     return feed
 
 
