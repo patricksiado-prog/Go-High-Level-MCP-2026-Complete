@@ -1,64 +1,64 @@
-OPTIMUS FULL BACKEND ANALYSIS  2026-07-15 12:27:30  host=LAPTOP-RS9EHSLO  records=1000
+OPTIMUS FULL BACKEND ANALYSIS  2026-07-15 12:28:18  host=LAPTOP-RS9EHSLO  records=2500
 
-=== FULL BACKEND ANALYSIS ===  records: 1000
+=== FULL BACKEND ANALYSIS ===  records: 2500
 
 FIELDS present (fill rate):
-   zip                          1000/1000
-   longitude                    1000/1000
-   subscriber_ban               1000/1000
-   state                        1000/1000
-   curr_ntwrk_bld_type_cd       1000/1000
-   speed                        1000/1000
-   city                         1000/1000
-   miles_from_claim             1000/1000
-   address                      1000/1000
-   subscriber_ban_masked        1000/1000
-   missing_supl                 1000/1000
-   latitude                     1000/1000
+   zip                          2500/2500
+   longitude                    2500/2500
+   subscriber_ban               2500/2500
+   state                        2500/2500
+   curr_ntwrk_bld_type_cd       2500/2500
+   speed                        2500/2500
+   city                         2500/2500
+   miles_from_claim             2500/2500
+   address                      2500/2500
+   subscriber_ban_masked        2500/2500
+   missing_supl                 2500/2500
+   latitude                     2500/2500
 
 curr_ntwrk_bld_type_cd -- distinct values:
-   FTTP-GPON                    552
-   unavailable                  448
+   FTTP-GPON                    1274
+   unavailable                  1226
 
 subscriber_ban -- distinct values:
-   customer                     552
-   non-cust                     448
+   customer                     1274
+   non-cust                     1226
 
 speed -- distinct values:
-   (empty)                      448
-   1000                         257
-   300                          145
-   Hsia500g                     119
-   Hsia2000g                    21
-   100                          6
-   50                           3
-   500                          1
+   (empty)                      1226
+   1000                         574
+   300                          344
+   Hsia500g                     284
+   Hsia2000g                    48
+   100                          13
+   50                           9
+   500                          2
 
 missing_supl -- distinct values:
-   0                            998
+   0                            2498
    1                            2
 
 state -- distinct values:
-   TX                           1000
+   TX                           2500
 
 city -- distinct values:
-   HOUSTON                      1000
+   HOUSTON                      2500
 
 zip -- distinct values:
-   77070                        1000
+   77070                        2500
 
 CROSS-TAB  build_type x ban  -> sample address:
-   fttp-gpon              customer     552   e.g. 118 VINTAGE PARK BLVD STE A
-   unavailable            non-cust     448   e.g. 114 VINTAGE PARK BLVD
+   fttp-gpon              customer    1274   e.g. 118 VINTAGE PARK BLVD STE A
+   unavailable            non-cust    1226   e.g. 114 VINTAGE PARK BLVD
 
 CROSS-TAB  build_type x speed:
-   unavailable            (none)            448
-   fttp-gpon              1000              257
-   fttp-gpon              300               145
-   fttp-gpon              Hsia500g          119
-   fttp-gpon              Hsia2000g          21
-   fttp-gpon              100                 6
-   fttp-gpon              50                  3
-   fttp-gpon              500                 1
+   unavailable            (none)           1226
+   fttp-gpon              1000              574
+   fttp-gpon              300               344
+   fttp-gpon              Hsia500g          284
+   fttp-gpon              Hsia2000g          48
+   fttp-gpon              100                13
+   fttp-gpon              50                  9
+   fttp-gpon              500                 2
 
-CLASSIFICATION (full set): green=448 gold=0 grey=552 cust-undecoded=0 skip=0  grey%=55.2  -> MATURE
+CLASSIFICATION (full set): green=1226 gold=0 grey=1274 cust-undecoded=0 skip=0  grey%=51.0  -> MATURE
