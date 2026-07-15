@@ -26,14 +26,22 @@ Dependencies: numpy, pillow, scipy (no OpenCV needed).
 import numpy as np
 
 # ---------------------------------------------------------------------------
-# CANONICAL color windows (RGB, inclusive). Confirmed live 77070 2026-05-31.
+# CANONICAL color windows (RGB, inclusive).
+# GREEN widened 2026-07-01: a live capture (Richmond/Newcastle, west Houston)
+# showed the map FULL of green while the scout read GREEN 0 on pixel fallback.
+# AT&T's eligible dot is a LIME green -- high red, near-zero blue -- which fell
+# outside the old (30,130,30)-(100,210,80) box (red capped at 100, blue floor
+# 30). Widened to cover dark-green through lime while staying clear of GOLD
+# (red >=220) and GRAY (blue >=140). Old box was "confirmed 77070 2026-05-31";
+# the map's green shade changed since.
 # ---------------------------------------------------------------------------
-GREEN_MIN = (30, 130, 30)
-GREEN_MAX = (100, 210, 80)
+GREEN_MIN = (40, 120, 0)
+GREEN_MAX = (180, 225, 130)
 GOLD_MIN = (220, 160, 0)      # copper-upgrade dots (existing copper customer)
-GOLD_MAX = (255, 200, 60)
-GRAY_MIN = (150, 150, 150)    # existing fiber customer dots
-GRAY_MAX = (205, 205, 205)
+GOLD_MAX = (255, 205, 90)
+GRAY_MIN = (140, 140, 150)    # existing fiber customer dots (slightly bluish)
+GRAY_MAX = (205, 205, 222)    # blue ceiling high (bluish dot), R/G capped so
+                              # bright neutral road-grey (210,210,210) drops out
 
 # ---------------------------------------------------------------------------
 # LEGEND -- confirmed from the map's own on-screen key (west Houston /
