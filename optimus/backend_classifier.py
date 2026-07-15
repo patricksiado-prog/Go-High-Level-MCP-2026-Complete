@@ -97,9 +97,15 @@ def classify_lead(rec):
 
 
 # ── VIEW SUMMARY + FRESH VERDICT ───────────────────────────────────────────
-# A "fresh / just-lit" area = lots of green, a few gold, almost no grey.
-FRESH_MIN_GREEN   = 8       # need at least this many green dots in the view
+# Operator rule (Patrick, 2026-07-01): a JUST-LIT area = LOTS of GREEN + LOTS of
+# GOLD together, with little grey. "the gold+green is key -- if you see a lot,
+# that's how you know it's new fiber." Gold (copper customers not yet upgraded)
+# is a POSITIVE freshness signal, not just an upgrade target. As a zone matures,
+# green+gold both convert to grey. So FRESH keys on GREEN+GOLD (eligible), not
+# green alone, and grey SHARE is the age signal.
+FRESH_MIN_ELIGIBLE = 8      # green + gold together in one view -> greenfield
 FRESH_MAX_GREY_PCT = 15.0   # ...and grey must be under this % of all dots
+FRESH_MIN_GREEN = FRESH_MIN_ELIGIBLE   # back-compat alias
 
 
 def summarize(records):
@@ -113,12 +119,13 @@ def summarize(records):
             greens.append(_norm(rec.get("address")))
 
     green = counts["GREEN"]
+    eligible = green + counts["GOLD"]          # green + gold = the fresh signal
     # Until gold/grey are decodable, CUSTOMER counts as "customer" (not grey),
     # so grey% stays conservative (won't falsely fail a fresh view).
-    plotted = green + counts["GOLD"] + counts["GREY"] + counts["CUSTOMER"]
+    plotted = eligible + counts["GREY"] + counts["CUSTOMER"]
     grey_pct = (100.0 * counts["GREY"] / plotted) if plotted else 0.0
 
-    fresh = (green >= FRESH_MIN_GREEN and grey_pct < FRESH_MAX_GREY_PCT)
+    fresh = (eligible >= FRESH_MIN_ELIGIBLE and grey_pct < FRESH_MAX_GREY_PCT)
 
     return {
         "counts": counts,

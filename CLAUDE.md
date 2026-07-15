@@ -1174,6 +1174,16 @@ customers vs 53 eligible = **79% penetrated = MATURE**. New fiber lives at the E
 scan newer suburbs (Katy, Cypress, Richmond/Rosenberg, Spring/Conroe), not 77027. Eyeball rule:
 lots of green + almost no blue-grey = fresh; lots of blue-grey = already worked.
 
+**THE FRESHNESS SIGNAL — GOLD+GREEN is the tell (Patrick + field team, 2026-07-01):** "you see
+[gold] here and there, but if you see a LOT that's how you know it's new fiber -- the gold+green
+is key." Confirmed by the field (Bridgewood Dr / Evening Sun Ct screenshot: green-dominant with
+GOLD clusters; teammate note "gold dot clusters should be new"). WHY: GOLD = fiber-eligible COPPER
+customer not yet upgraded; a just-lit area is full of green (non-customers) + gold (copper not-yet-
+upgraded) with little grey, and green+gold both convert to grey as it matures. So the FRESH verdict
+keys on **GREEN+GOLD together** (eligible), not green alone (`backend_classifier.summarize`:
+FRESH = green+gold >= FRESH_MIN_ELIGIBLE and grey% < 15). A gold-heavy cluster with little grey =
+prime new fiber, hit it.
+
 **Capture upgrades built this session (every normal run now pushes these — no test.py):**
   - `_live/backend_analysis.txt` — FULL-feed analysis over ALL captured records (`backend_classifier.deep_analyze`):
     field fill-rates, distinct values of every status field, build_type×ban and build_type×speed
