@@ -1320,3 +1320,12 @@ tab with no matching column is skipped. RUN_CLEANUP.bat + the Drive "OPTIMUS She
 --by-phone (one row per phone = dialer-ready). Dry-run + Y/N confirm; keeps first of each; pipeline tabs
 never deleted, only dup rows. NOTE: by-phone collapses same-phone multi-location businesses into one --
 intended for the dialer, which dedupes by phone anyway.
+
+### 11h-fix6 (2026-07-01) — scraper pipeline now dedupes Fiber Green/Orange Biz by PHONE (was address-only)
+Patrick: "build [dedup] in the scraper also." Root of the 180k Fiber Green Biz dups: `commercial_split.
+write_fiber_biz` deduped by ADDRESS only (`_existing_keys addr_col=2`), so the same business/phone under a
+slightly different address string piled up. FIX: `write_fiber_biz` now dedupes by ADDRESS *and* PHONE
+(`_existing_addr_phone` reads the tab once -> addr+phone sets; `_dedup_biz_rows` skips a row if its address
+OR phone already exists, in-tab or emitted this run) -> one row per phone = dialer-ready. Strictly additive
+(only skips more dups; distinct phones still written). Cleans going FORWARD; the existing 180k is cleaned
+once by dedupe_sheet.py --by-phone (the cleanup .bat). Rows with no phone still dedupe by address.

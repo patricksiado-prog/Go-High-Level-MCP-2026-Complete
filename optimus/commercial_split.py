@@ -434,13 +434,52 @@ def _biz_rows(leads):
              c.get("website") or "", c.get("category") or ""] for c in leads]
 
 
+def _existing_addr_phone(ws, addr_col=2, phone_col=1):
+    """One read of a biz tab -> (addresses set, phones set). BIZ_HEADER is
+    [Business Name, Phone(1), Address(2), Website, Category]."""
+    addrs, phones = set(), set()
+    if not ws:
+        return addrs, phones
+    try:
+        for r in ws.get_all_values()[1:]:
+            if len(r) > addr_col and r[addr_col].strip():
+                addrs.add(r[addr_col].strip().upper())
+            if len(r) > phone_col and r[phone_col].strip():
+                phones.add(r[phone_col].strip().upper())
+    except Exception:
+        pass
+    return addrs, phones
+
+
+def _dedup_biz_rows(rows, addr_seen, phone_seen):
+    """Skip a biz row if its ADDRESS or its PHONE is already present (in the tab
+    or emitted earlier this run) -> one row per phone = dialer-ready. Rows with
+    no phone still dedupe by address. Keeps the first of each."""
+    out = []
+    for row in rows:
+        addr = row[2].strip().upper() if len(row) > 2 else ""
+        phone = row[1].strip().upper() if len(row) > 1 else ""
+        if addr and addr in addr_seen:
+            continue
+        if phone and phone in phone_seen:
+            continue
+        out.append(row)
+        if addr:
+            addr_seen.add(addr)
+        if phone:
+            phone_seen.add(phone)
+    return out
+
+
 def write_fiber_biz(green_biz, orange_biz):
     gw = _open_ws(FIBER_GREEN_TAB, BIZ_HEADER)
     ow = _open_ws(UPGRADE_ORANGE_TAB, BIZ_HEADER)
-    g_seen = _existing_keys(gw, addr_col=2)   # Address is the 3rd column
-    o_seen = _existing_keys(ow, addr_col=2)
-    g_rows = [row for row in _biz_rows(green_biz) if row[2].strip().upper() not in g_seen]
-    o_rows = [row for row in _biz_rows(orange_biz) if row[2].strip().upper() not in o_seen]
+    # dedup by ADDRESS and PHONE (was address-only, which let same-phone/
+    # different-address-string businesses pile up as duplicates).
+    g_addr, g_ph = _existing_addr_phone(gw)
+    o_addr, o_ph = _existing_addr_phone(ow)
+    g_rows = _dedup_biz_rows(_biz_rows(green_biz), g_addr, g_ph)
+    o_rows = _dedup_biz_rows(_biz_rows(orange_biz), o_addr, o_ph)
     _append(gw, g_rows)
     _append(ow, o_rows)
     return len(g_rows), len(o_rows)
