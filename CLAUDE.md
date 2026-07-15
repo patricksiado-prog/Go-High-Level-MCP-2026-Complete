@@ -1308,3 +1308,15 @@ path as fallback; test live before trusting.
   bottom-up (header/order/formatting preserved). Default = exact-row match (safe); --by-key dedupes by
   phone (green/orange/maps) or address (hunter/enriched). Dry-run unless --yes. Both scripts run on the
   user's machine (need google_creds.json). PIPELINE TABS ARE NEVER DELETED, only dup rows removed.
+
+### 11h-fix5 (2026-07-01) — dedupe_sheet by-phone (header-based key); 180k Fiber Green Biz
+Patrick reported ~180k rows in Fiber Green Biz (vs ~217 unique greens noted) -> almost all duplicates.
+Couldn't count from here (sheet export >10MB connector limit; row-read truncates) -> the count comes from
+the cleanup .bat Step-1 dry-run. Hardened dedupe_sheet.py: the dedup KEY is now found BY HEADER NAME
+(finds the "Phone"/"Address" column per tab) instead of a hardcoded index, so it can't dedup on the wrong
+field when tabs have different column orders (green/orange/maps biz = BIZ_HEADER [Business,Phone,Address,
+Website,Category]; Hunter Leads = Address-first). Modes: exact (default) | --by-phone | --by-address; a
+tab with no matching column is skipped. RUN_CLEANUP.bat + the Drive "OPTIMUS Sheet Cleanup" now default to
+--by-phone (one row per phone = dialer-ready). Dry-run + Y/N confirm; keeps first of each; pipeline tabs
+never deleted, only dup rows. NOTE: by-phone collapses same-phone multi-location businesses into one --
+intended for the dialer, which dedupes by phone anyway.

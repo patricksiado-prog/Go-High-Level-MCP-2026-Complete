@@ -30,12 +30,12 @@ curl -L -s -o "hunter_fixes.py"         "%RAW%/hunter_fixes.py"
 
 echo.
 echo ============================================================
-echo   STEP 1: scanning for DUPLICATE rows (nothing deleted yet)
+echo   STEP 1: scanning for DUPLICATE rows BY PHONE (nothing deleted yet)
 echo ============================================================
-py dedupe_sheet.py 2>nul || python dedupe_sheet.py
+py dedupe_sheet.py --by-phone 2>nul || python dedupe_sheet.py --by-phone
 echo.
-set /p GO="Delete those duplicate rows? (keeps the first of each) [Y/N]: "
-if /I "%GO%"=="Y" ( py dedupe_sheet.py --yes 2>nul || python dedupe_sheet.py --yes )
+set /p GO="Delete those duplicate rows? (keeps the first of each phone) [Y/N]: "
+if /I "%GO%"=="Y" ( py dedupe_sheet.py --by-phone --yes 2>nul || python dedupe_sheet.py --by-phone --yes )
 
 echo.
 echo ============================================================
