@@ -1,40 +1,40 @@
-OPTIMUS FULL BACKEND ANALYSIS  2026-07-15 12:54:26  host=LAPTOP-RS9EHSLO  records=73250
+OPTIMUS FULL BACKEND ANALYSIS  2026-07-15 12:55:20  host=LAPTOP-RS9EHSLO  records=75500
 
-=== FULL BACKEND ANALYSIS ===  records: 73250
+=== FULL BACKEND ANALYSIS ===  records: 75500
 
 FIELDS present (fill rate):
-   zip                          73250/73250
-   longitude                    73250/73250
-   subscriber_ban               73250/73250
-   state                        73250/73250
-   curr_ntwrk_bld_type_cd       73250/73250
-   speed                        73250/73250
-   city                         73250/73250
-   miles_from_claim             73250/73250
-   address                      73250/73250
-   subscriber_ban_masked        73250/73250
-   missing_supl                 73250/73250
-   latitude                     73250/73250
+   zip                          75500/75500
+   longitude                    75500/75500
+   subscriber_ban               75500/75500
+   state                        75500/75500
+   curr_ntwrk_bld_type_cd       75500/75500
+   speed                        75500/75500
+   city                         75500/75500
+   miles_from_claim             75500/75500
+   address                      75500/75500
+   subscriber_ban_masked        75500/75500
+   missing_supl                 75500/75500
+   latitude                     75500/75500
 
 curr_ntwrk_bld_type_cd -- distinct values:
-   unavailable                  41714
-   FTTP-GPON                    31437
+   unavailable                  43286
+   FTTP-GPON                    32112
    FTTN-BP                      55
-   FTTN                         22
+   FTTN                         25
    IP-RT                        13
    IP-CO                        9
 
 subscriber_ban -- distinct values:
-   non-cust                     41714
-   customer                     31536
+   non-cust                     43286
+   customer                     32214
 
 speed -- distinct values:
-   (empty)                      41714
-   1000                         12970
-   300                          10864
-   Hsia500g                     5523
-   100                          647
-   Hsia2000g                    464
+   (empty)                      43286
+   1000                         13296
+   300                          11096
+   Hsia500g                     5637
+   100                          648
+   Hsia2000g                    466
    Hsia5000g                    347
    500                          227
    12.288                       91
@@ -42,40 +42,40 @@ speed -- distinct values:
    50                           63
    2000m2000mg                  60
    6.144                        54
-   19.432                       42
+   19.432                       45
    5000m5000mg                  38
 
 missing_supl -- distinct values:
-   0                            73180
+   0                            75430
    1                            70
 
 state -- distinct values:
-   TX                           73250
+   TX                           75500
 
 city -- distinct values:
-   HOUSTON                      72036
-   JERSEY VILLAGE               1214
+   HOUSTON                      72810
+   JERSEY VILLAGE               2690
 
 zip -- distinct values:
-   77064                        40699
+   77064                        41681
    77070                        31503
-   77040                        1048
+   77040                        2316
 
 CROSS-TAB  build_type x ban  -> sample address:
-   unavailable            non-cust   41714   e.g. 114 VINTAGE PARK BLVD
-   fttp-gpon              customer   31437   e.g. 118 VINTAGE PARK BLVD STE A
+   unavailable            non-cust   43286   e.g. 114 VINTAGE PARK BLVD
+   fttp-gpon              customer   32112   e.g. 118 VINTAGE PARK BLVD STE A
    fttn-bp                customer      55   e.g. 13135 BACH ELM ST
-   fttn                   customer      22   e.g. 10214 MINTURN LN
+   fttn                   customer      25   e.g. 10214 MINTURN LN
    ip-rt                  customer      13   e.g. 10522 WILLOW PARK VW
    ip-co                  customer       9   e.g. 10638 CYPRESS CREEK PKWY
 
 CROSS-TAB  build_type x speed:
-   unavailable            (none)          41714
-   fttp-gpon              1000            12970
-   fttp-gpon              300             10853
-   fttp-gpon              Hsia500g         5523
-   fttp-gpon              100               607
-   fttp-gpon              Hsia2000g         464
+   unavailable            (none)          43286
+   fttp-gpon              1000            13296
+   fttp-gpon              300             11085
+   fttp-gpon              Hsia500g         5637
+   fttp-gpon              100               608
+   fttp-gpon              Hsia2000g         466
    fttp-gpon              Hsia5000g         347
    fttp-gpon              500               227
    fttp-gpon              12.288             82
@@ -86,10 +86,10 @@ CROSS-TAB  build_type x speed:
    fttn-bp                100                40
    fttp-gpon              5000m5000mg        38
 
-CLASSIFICATION (full set): green=41714 gold=0 grey=31437 cust-undecoded=99 skip=0  grey%=42.9  -> MATURE
+CLASSIFICATION (full set): green=43286 gold=0 grey=32112 cust-undecoded=102 skip=0  grey%=42.5  -> MATURE
 
 UNMAPPED CUSTOMER build codes (decide fiber vs copper, add to build_codes.json):
    fttn-bp                      55 customers
-   fttn                         22 customers
+   fttn                         25 customers
    ip-rt                        13 customers
    ip-co                        9 customers
