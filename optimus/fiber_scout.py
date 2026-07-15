@@ -474,10 +474,11 @@ def main():
                 write_full_analysis(ws, cap, host)
                 push_backend_exchange(cap, host)
                 backend_done = True
-            # refresh analysis + exchange periodically as more area is captured
-            elif backend_done and idx % 20 == 0:
+            # refresh only the analysis occasionally as more area is captured
+            # (every 100 cells, not 20 -- avoids commit spam). The request recipe
+            # is static once captured, so it's NOT re-pushed here.
+            elif backend_done and idx % 100 == 0:
                 write_full_analysis(ws, cap, host)
-                push_backend_exchange(cap, host)
 
             if col >= args.cols - 1:
                 ok = mouse_drag(page, "down")
