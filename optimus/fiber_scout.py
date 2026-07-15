@@ -439,8 +439,17 @@ def main():
                 fresh.append((idx, down, col, green, gold, gray, gray_share, label, shot))
 
             if not backend_done and idx >= 8:
+                # push EVERYTHING mid-run (not just at the end) so a run that
+                # stops early ("motion stopped") still delivers the full analysis
+                # + AT&T request shape for the direct reader.
                 write_backend(ws, cap, host)
+                write_full_analysis(ws, cap, host)
+                push_backend_exchange(cap, host)
                 backend_done = True
+            # refresh analysis + exchange periodically as more area is captured
+            elif backend_done and idx % 20 == 0:
+                write_full_analysis(ws, cap, host)
+                push_backend_exchange(cap, host)
 
             if col >= args.cols - 1:
                 ok = mouse_drag(page, "down")
