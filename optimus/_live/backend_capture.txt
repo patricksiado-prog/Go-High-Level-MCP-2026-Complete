@@ -1,72 +1,72 @@
-OPTIMUS BACKEND CAPTURE  2026-07-15 04:22:45  host=LAPTOP-TB1L669N
+OPTIMUS BACKEND CAPTURE  2026-07-15 04:47:33  host=LAPTOP-TB1L669N
 --- ENDPOINTS (biggest first) ---
 ENDPOINT     | https://youachieve.att.com/yourefer/dist/assets/img/header-home-2023.png | image/png | 656022B/1hits | 
-ENDPOINT     | blob:https://youachieve.att.com/8f9dfde3-a5f6-4ca5-baa5-cb6f21ec59f9 | application/javascript | 482296B/1hits | 
-ENDPOINT     | blob:https://youachieve.att.com/9a34b68b-9dd3-4dec-88c5-d617759912c1 | application/javascript | 482296B/1hits | 
+ENDPOINT     | blob:https://youachieve.att.com/0b240b68-71df-4134-9c88-1a48e28f214f | application/javascript | 482296B/1hits | 
+ENDPOINT     | blob:https://youachieve.att.com/d67ec697-1439-4ef6-a369-96f5d74b4b81 | application/javascript | 482296B/1hits | 
 ENDPOINT     | https://youachieve.att.com/yourefer/dist/main.js | application/javascript | 475160B/1hits | 
 ENDPOINT     | https://oidc.idp.elogin.att.com/lrr/attLRR/resources/images/mobilekey_96.gif | image/gif | 173213B/1hits | 
-ENDPOINT     | https://www.googletagmanager.com/gtag/js | application/javascript; charset=UTF-8 | 151424B/2hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/9/118/206.vector.pbf | application/x-protobuf | 120122B/1hits | 
+ENDPOINT     | https://www.googletagmanager.com/gtag/js | application/javascript; charset=UTF-8 | 151428B/2hits | 
 ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/480/847.vector.pbf | application/x-protobuf | 104869B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/473/826.vector.pbf | application/x-protobuf | 103313B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/472/825.vector.pbf | application/x-protobuf | 101811B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/473/825.vector.pbf | application/x-protobuf | 100683B/1hits | 
 ENDPOINT     | https://oidc.idp.elogin.att.com/lrr/attLRR/resources/images/howto-for-mobile-devices.gif | image/gif | 96851B/1hits | 
 ENDPOINT     | https://oidc.idp.elogin.att.com/lrr/attLRR/resources/images/howto-for-desktop-devices.gif | image/gif | 95310B/1hits | 
+ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/482/847.vector.pbf | application/x-protobuf | 94725B/1hits | 
 ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/481/847.vector.pbf | application/x-protobuf | 89964B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/472/826.vector.pbf | application/x-protobuf | 87979B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/8/58/103.vector.pbf | application/x-protobuf | 87097B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/474/825.vector.pbf | application/x-protobuf | 87019B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/9/117/206.vector.pbf | application/x-protobuf | 86434B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/10/240/422.vector.pbf | application/x-protobuf | 85088B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/474/826.vector.pbf | application/x-protobuf | 82748B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/12/962/1692.vector.pbf | application/x-protobuf | 81249B/1hits | 
 ENDPOINT     | https://oidc.idp.elogin.att.com/lrr/attLRR/resources/images/securityKeyAnimation.gif | image/gif | 81185B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/8/58/105.vector.pbf | application/x-protobuf | 80144B/1hits | 
 ENDPOINT     | https://youachieve.att.com/yourefer/js/googlejs.js | application/javascript | 76936B/1hits | 
 ENDPOINT     | https://youachieve.att.com/ui/fonts/fontawesome-webfont.woff2 | application/font-woff2 | 71896B/2hits | 
---- LEADS PARSED: 7000 ---
-LEADS PARSED |  |  | 7000 | 
+ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/482/846.vector.pbf | application/x-protobuf | 68962B/1hits | 
+ENDPOINT     | https://youachieve.att.com/ui/jquery/jquery-ui-1_14_1/jquery-ui.min.js | application/javascript | 67248B/2hits | 
+ENDPOINT     | https://youachieve.att.com/resources/59d4152c9d328741d98ac6233c9dc954522001624dcc5 | application/javascript | 60889B/2hits | 
+ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/483/846.vector.pbf | application/x-protobuf | 59095B/1hits | 
+ENDPOINT     | https://youachieve.att.com/yourefer/dist/assets/img/header-fiber.jpg | image/jpeg | 58474B/1hits | 
+ENDPOINT     | https://youachieve.att.com/yourefer/dist/header-bg-resources.png | image/png | 49294B/1hits | 
+ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/483/847.vector.pbf | application/x-protobuf | 48336B/1hits | 
+ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/12/966/1694.vector.pbf | application/x-protobuf | 46467B/1hits | 
+ENDPOINT     | https://youachieve.att.com/yourefer/dist/wireless_card_bg.jpg | image/jpeg | 46267B/1hits | 
+ENDPOINT     | https://youachieve.att.com/yourefer/dist/header-bg-fiber.png | image/png | 46095B/1hits | 
+ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/12/967/1693.vector.pbf | application/x-protobuf | 46011B/1hits | 
+--- LEADS PARSED: 6751 ---
+LEADS PARSED |  |  | 6751 | 
 SAMPLE LEAD  | 3300 CUMMINS ST | status=None | lat=29.736022 lng=-95.439134 ban=None | 
-SAMPLE LEAD  | 3300 CUMMINS ST APT 2101 | status=None | lat=29.736022 lng=-95.439134 ban=BmrSnr!344111F321E9EB5937338BE6303BA5BC | 
-SAMPLE LEAD  | 3300 CUMMINS ST APT 2102 | status=None | lat=29.736022 lng=-95.439134 ban=BmrSnr!36D43ED4C81CB289750C50BFD76C78B2 | 
-SAMPLE LEAD  | 3300 CUMMINS ST APT 2103 | status=None | lat=29.736022 lng=-95.439134 ban=BmrSnr!2C668EF455A0B30C5C5748133B4ED63E | 
-SAMPLE LEAD  | 3300 CUMMINS ST APT 2104 | status=None | lat=29.736022 lng=-95.439134 ban=BmrSnr!F41DF4917350F631990CE496D1134CA5 | 
-SAMPLE LEAD  | 3300 CUMMINS ST APT 2105 | status=None | lat=29.736022 lng=-95.439134 ban=BmrSnr!432F54FC2D0C133CA95D31AC52F72E41 | 
+SAMPLE LEAD  | 3300 CUMMINS ST APT 2101 | status=None | lat=29.736022 lng=-95.439134 ban=BmrSnr!0E324E99B6104F8C9FF54C7286EA7628 | 
+SAMPLE LEAD  | 3300 CUMMINS ST APT 2102 | status=None | lat=29.736022 lng=-95.439134 ban=BmrSnr!59739797ED7693B83FEE37F71CFA9400 | 
+SAMPLE LEAD  | 3300 CUMMINS ST APT 2103 | status=None | lat=29.736022 lng=-95.439134 ban=BmrSnr!E154713466A8B1F7318915176FF7412D | 
+SAMPLE LEAD  | 3300 CUMMINS ST APT 2104 | status=None | lat=29.736022 lng=-95.439134 ban=BmrSnr!06907B02844E0C11409B97A264D1EDAB | 
+SAMPLE LEAD  | 3300 CUMMINS ST APT 2105 | status=None | lat=29.736022 lng=-95.439134 ban=BmrSnr!3C5926771AE7A2EEE0775BB9499F3F23 | 
 JSON TOP KEYS| success, error, content |  |  | 
 --- JSON SAMPLE ---
-{"success": true, "error": {"message": "OK", "status": 200}, "content": [{"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "HOUSTON", "miles_from_claim": "0.09834", "address": "3300 CUMMINS ST", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "BmrSnr!344111F321E9EB5937338BE6303BA5BC", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "1000", "city": "HOUSTON", "miles_from_claim": "0.09834", "address": "3300 CUMMINS ST APT 2101", "subscriber_ban_masked": "******428", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "BmrSnr!36D43ED4C81CB289750C50BFD76C78B2", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "1000", "city": "HOUSTON", "miles_from_claim": "0.09834", "address": "3300 CUMMINS ST APT 2102", "subscriber_ban_masked": "******799", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "BmrSnr!2C668EF455A0B30C5C5748133B4ED63E", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "1000", "city": "HOUSTON", "miles_from_claim": "0.09834", "address": "3300 CUMMINS ST APT 2103", "subscriber_ban_masked": "******606", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "BmrSnr!F41DF4917350F631990CE496D1134CA5", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "1000", "city": "HOUSTON", "miles_from_claim": "0.09834", "address": "3300 CUMMINS ST APT 2104", "subscriber_ban_masked": "******243", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "BmrSnr!432F54FC2D0C133CA95D31AC52F72E41", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "300", "city": "HOUSTON", "miles_from_claim": "0.09834", "address": "3300 CUMMINS ST APT 2105", "subscriber_ban_masked": "******055", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "BmrSnr!A9B09C6DBC7AEAAFBAEA8C7BB098B805", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "Hsia500g", "city": "HOUSTON", "miles_from_claim": "0.09834", "address": "3300 CUMMINS ST APT 2107", "subscriber_ban_masked": "******146", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "HOUSTON", "miles_from_claim": "0.09834", "address": "3300 CUMMINS ST APT 2109", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "HOUSTON", "miles_from_claim": "0.09834", "address": "3300 CUMMINS ST APT 2110", "subscriber_ban_masked": 
+{"success": true, "error": {"message": "OK", "status": 200}, "content": [{"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "HOUSTON", "miles_from_claim": "0.10209", "address": "3300 CUMMINS ST", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "BmrSnr!0E324E99B6104F8C9FF54C7286EA7628", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "1000", "city": "HOUSTON", "miles_from_claim": "0.10209", "address": "3300 CUMMINS ST APT 2101", "subscriber_ban_masked": "******428", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "BmrSnr!59739797ED7693B83FEE37F71CFA9400", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "1000", "city": "HOUSTON", "miles_from_claim": "0.10209", "address": "3300 CUMMINS ST APT 2102", "subscriber_ban_masked": "******799", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "BmrSnr!E154713466A8B1F7318915176FF7412D", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "1000", "city": "HOUSTON", "miles_from_claim": "0.10209", "address": "3300 CUMMINS ST APT 2103", "subscriber_ban_masked": "******606", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "BmrSnr!06907B02844E0C11409B97A264D1EDAB", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "1000", "city": "HOUSTON", "miles_from_claim": "0.10209", "address": "3300 CUMMINS ST APT 2104", "subscriber_ban_masked": "******243", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "BmrSnr!3C5926771AE7A2EEE0775BB9499F3F23", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "300", "city": "HOUSTON", "miles_from_claim": "0.10209", "address": "3300 CUMMINS ST APT 2105", "subscriber_ban_masked": "******055", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "BmrSnr!05A05173995C2334B71FC420F211E673", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "Hsia500g", "city": "HOUSTON", "miles_from_claim": "0.10209", "address": "3300 CUMMINS ST APT 2107", "subscriber_ban_masked": "******146", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "HOUSTON", "miles_from_claim": "0.10209", "address": "3300 CUMMINS ST APT 2109", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "HOUSTON", "miles_from_claim": "0.10209", "address": "3300 CUMMINS ST APT 2110", "subscriber_ban_masked": 
 --- BACKEND INSPECT (fill build_codes.json from this) ---
-=== BACKEND INSPECT ===  total leads: 3500
+=== BACKEND INSPECT ===  total leads: 3376
 
 curr_ntwrk_bld_type_cd values:
-   fttp-gpon                1928
-   unavailable              1572
+   fttp-gpon                2130
+   unavailable              1246
 
 subscriber_ban:
-   customer                 1928
-   non-cust                 1572
+   customer                 2130
+   non-cust                 1246
 
 CROSS-TAB  (build_type x ban)  -> sample address:
-   fttp-gpon              customer   1928   e.g. 3300 CUMMINS ST APT 2101
-   unavailable            non-cust   1572   e.g. 3300 CUMMINS ST
+   fttp-gpon              customer   2130   e.g. 3300 CUMMINS ST APT 2101
+   unavailable            non-cust   1246   e.g. 3300 CUMMINS ST
 
 READ IT LIKE THIS:
    non-cust rows on an available build  = GREEN (prize)
    customer rows split into GOLD(copper)/GREY(fiber) by build code
    -> copy the customer build codes into COPPER/FIBER_BUILD_CODES
-INSPECT      | === BACKEND INSPECT ===  total leads: 3500 |  |  | 
+INSPECT      | === BACKEND INSPECT ===  total leads: 3376 |  |  | 
 INSPECT      | curr_ntwrk_bld_type_cd values: |  |  | 
-INSPECT      | fttp-gpon                1928 |  |  | 
-INSPECT      | unavailable              1572 |  |  | 
+INSPECT      | fttp-gpon                2130 |  |  | 
+INSPECT      | unavailable              1246 |  |  | 
 INSPECT      | subscriber_ban: |  |  | 
-INSPECT      | customer                 1928 |  |  | 
-INSPECT      | non-cust                 1572 |  |  | 
+INSPECT      | customer                 2130 |  |  | 
+INSPECT      | non-cust                 1246 |  |  | 
 INSPECT      | CROSS-TAB  (build_type x ban)  -> sample address: |  |  | 
-INSPECT      | fttp-gpon              customer   1928   e.g. 3300 CUMMINS ST APT 2101 |  |  | 
-INSPECT      | unavailable            non-cust   1572   e.g. 3300 CUMMINS ST |  |  | 
+INSPECT      | fttp-gpon              customer   2130   e.g. 3300 CUMMINS ST APT 2101 |  |  | 
+INSPECT      | unavailable            non-cust   1246   e.g. 3300 CUMMINS ST |  |  | 
 INSPECT      | READ IT LIKE THIS: |  |  | 
-BACKEND VERDICT| MATURE | green=0 gold=0 grey=0 cust=1928 skip=1572 | grey%=0.0 | 
+BACKEND VERDICT| MATURE | green=0 gold=0 grey=0 cust=2130 skip=1246 | grey%=0.0 | 
 SERVICEABILITY FEED URL| https://youachieve.att.com/yourefer/api/fiberMap.cfc |  |  | 
 SERVICEABILITY FEED URL: https://youachieve.att.com/yourefer/api/fiberMap.cfc
-DONE         | LAPTOP-TB1L669N |  | 169 endpoints | 
+DONE         | LAPTOP-TB1L669N |  | 157 endpoints | 
