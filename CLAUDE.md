@@ -1338,3 +1338,14 @@ orange dedup was ADDRESS-only -> the real source of the 180k dups. Fixed there t
 phone sets, skip a match if address OR phone already present. BOTH scrapers (pipeline `commercial_split.
 write_fiber_biz` AND `standalone/maps_scraper_standalone.py`) now dedupe by phone+address. When editing
 "the scraper", edit the STANDALONE one for anything the team runs.
+
+### 11h-fix7 (2026-07-01) — USE THE GOLD: surface gold (copper-upgrade) addresses from the backend read
+Gold was detected + counted but only GREEN addresses were output by the backend path, so upgrade targets
+fell through. FIX: `backend_classifier.summarize` now returns `gold_addresses` (copper customers = upgrade)
+alongside `green_addresses`. `zip_reader.py` writes both to fresh_addresses.csv with a TYPE column
+(GREEN=sell new fiber / GOLD=copper upgrade). NOTE: the dialer ALREADY uses gold -- `dialer_loader.
+gather_leads` loads BOTH "Fiber Green Biz" and "Upgrade Orange Biz" (gold tagged STATUS_COPPER_UPGRADE).
+So gold now flows end-to-end: detected -> written (Upgrade Orange Biz by hunter/scraper, gold_addresses by
+backend read) -> loaded to the dialer as copper-upgrade opportunities. OPEN (ask Patrick): green+gold
+currently load into the SAME power-dialer workflow; a separate GOLD/upgrade campaign (different pitch)
+would need its own workflow id in ghl_loader.

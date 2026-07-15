@@ -244,7 +244,8 @@ def main():
                   % (zc, s["green"], s["gold"], s["grey"], s["grey_pct"],
                      s["verdict"], "  <-- FRESH" if s["verdict"] == "FRESH" else ""))
             results.append((zc, s["green"], s["gold"], s["grey"], s["grey_pct"],
-                            elig, s["verdict"], s.get("green_addresses", [])))
+                            elig, s["verdict"],
+                            (s.get("green_addresses", []), s.get("gold_addresses", []))))
 
         try:
             ctx.close()
@@ -270,10 +271,13 @@ def main():
                 w.writerow([zc, g, o, y, "%.0f" % gp, elig, verd])
         with open(ADDR_CSV, "w", newline="") as f:
             w = csv.writer(f)
-            w.writerow(["zip", "green_address"])
+            w.writerow(["zip", "type", "address"])
             for zc, g, o, y, gp, elig, verd, addrs in results:
-                for a in addrs:
-                    w.writerow([zc, a])
+                greens, golds = addrs
+                for a in greens:
+                    w.writerow([zc, "GREEN", a])       # lead: sell new fiber
+                for a in golds:
+                    w.writerow([zc, "GOLD", a])         # upgrade: copper customer
     except Exception:
         pass
 

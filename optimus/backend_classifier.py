@@ -111,12 +111,14 @@ FRESH_MIN_GREEN = FRESH_MIN_ELIGIBLE   # back-compat alias
 def summarize(records):
     """Classify a view's leads and return counts + a FRESH/MATURE verdict."""
     counts = {"GREEN": 0, "GOLD": 0, "GREY": 0, "CUSTOMER": 0, "SKIP": 0}
-    greens = []
+    greens, golds = [], []
     for rec in records:
         cls = classify_lead(rec)
         counts[cls] += 1
         if cls == "GREEN":
             greens.append(_norm(rec.get("address")))
+        elif cls == "GOLD":
+            golds.append(_norm(rec.get("address")))   # copper upgrade targets
 
     green = counts["GREEN"]
     eligible = green + counts["GOLD"]          # green + gold = the fresh signal
@@ -138,6 +140,7 @@ def summarize(records):
         "grey_pct": round(grey_pct, 1),
         "verdict": "FRESH" if fresh else "MATURE",
         "green_addresses": greens,
+        "gold_addresses": golds,
     }
 
 
