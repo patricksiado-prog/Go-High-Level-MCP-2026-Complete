@@ -38,6 +38,28 @@ import socket
 import base64
 import argparse
 
+# --- self-heal: older launchers download fiber_scout.py but not its newer helper
+# files, which crashes the import below (ModuleNotFoundError: backend_classifier).
+# Fetch any missing helper from the repo raw so the scout runs no matter which
+# launcher started it. Only acts when a file is actually missing.
+def _self_heal_deps():
+    _here = os.path.dirname(os.path.abspath(__file__))
+    _raw = ("https://raw.githubusercontent.com/patricksiado-prog/"
+            "Go-High-Level-MCP-2026-Complete/claude/optimus-map-tools-setup-6dcl6o/optimus")
+    for _f in ("backend_classifier.py", "build_codes.json",
+               "optimus_dot_detect.py", "precise_fiber_hunter.py"):
+        _p = os.path.join(_here, _f)
+        if not os.path.exists(_p):
+            try:
+                import urllib.request
+                urllib.request.urlretrieve("%s/%s" % (_raw, _f), _p)
+                print("  (self-heal: downloaded missing %s)" % _f)
+            except Exception:
+                pass
+
+
+_self_heal_deps()
+
 from precise_fiber_hunter import (
     self_update, PROFILE_DIR, MAP_URL, VIEWPORT, SEARCH_SETTLE,
     open_map_view, on_map, mouse_drag, zoom, find_map_dots, open_sheet, NetCapture,

@@ -1253,3 +1253,14 @@ to fresh_addresses.csv, pushes optimus/_live/fresh_zips.txt. Desktop app: `RUN_Z
   backend-first upgrade (11h #1) is desirable but MUST be done carefully and tested against a live run,
   not rushed -- keep the existing pixel path as fallback. Prefer additive, verifiable changes; when in
   doubt, verify (imports resolve, compiles, dry-run) and leave the working path intact.
+
+### 11h-fix (2026-07-01) — scout/zip_reader self-heal missing helpers (old-launcher crash)
+Symptom: a scout launched from an OLDER RUN_SCOUT.bat crashed with
+`ModuleNotFoundError: No module named 'backend_classifier'` (line 47) — the old launcher fetched the
+new `fiber_scout.py` (which imports backend_classifier) but not `backend_classifier.py`/`build_codes.json`.
+Fix: `fiber_scout.py` and `zip_reader.py` now `_self_heal_deps()` at import time — download any missing
+helper (`backend_classifier.py`, `build_codes.json`, `optimus_dot_detect.py`, `precise_fiber_hunter.py`)
+from the repo raw. Since every launcher (even old ones) fetches the main script, the script now heals its
+own deps and runs regardless of which launcher/copy started it. Only acts when a file is missing
+(offline-safe, no regression). LESSON for future scripts: put the dependency-download safety inside the
+entry script, not only in the .bat launcher, because scattered old launchers persist on the user's PC.
