@@ -563,9 +563,14 @@ def lead_from_dict(d):
             lng = lng if lng is not None else _num(coords[0])
             lat = lat if lat is not None else _num(coords[1])
     status = _pick(low, NET_STATUS_KEYS)
+    # Keep the ORIGINAL record on the lead. The scout's backend classifier reads
+    # subscriber_ban + curr_ntwrk_bld_type_cd off ld["raw"] to score GREEN/GOLD/
+    # GREY per cell; without this the backend path never fires and every cell
+    # silently falls back to pixel detection.
     return {"address": " ".join(addr.split())[:160], "lat": lat, "lng": lng,
             "status": status if isinstance(status, str) else None,
-            "ban": _pick(low, NET_BAN_KEYS)}
+            "ban": _pick(low, NET_BAN_KEYS),
+            "raw": base if isinstance(base, dict) else None}
 
 
 def extract_leads_from_json(obj, out=None, depth=0):
