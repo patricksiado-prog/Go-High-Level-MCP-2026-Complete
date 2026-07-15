@@ -1242,3 +1242,14 @@ to fresh_addresses.csv, pushes optimus/_live/fresh_zips.txt. Desktop app: `RUN_Z
 6. **Pure-HTTP reader (future, fastest).** zip_reader drives the authed browser; hitting fiberMap.cfc
    directly with the session cookie would skip the browser entirely -- needs the request params
    (method/query/body), which `backend_exchange.txt` captures but hasn't landed a clean run yet.
+
+### 11h-status (2026-07-01) — VERIFIED + guardrail
+- `zip_reader.py` verified sound before shipping: every symbol it imports from `precise_fiber_hunter`
+  (`self_update, PROFILE_DIR, MAP_URL, VIEWPORT, SEARCH_SETTLE, open_map_view, on_map, search_zip,
+  search_this_area, NetCapture, open_sheet`) exists; module compiles; per-ZIP capture uses
+  `cap.pending[mark:]` (only that ZIP's fresh leads, no bleed). Ready to run via the ZIP Reader icon.
+- **GUARDRAIL (Patrick, 2026-07-01): "it works, don't break it -- fix only if confident."** The scout,
+  hunter, and scraper are WORKING in the field. Do NOT rewrite their cores speculatively. The hunter's
+  backend-first upgrade (11h #1) is desirable but MUST be done carefully and tested against a live run,
+  not rushed -- keep the existing pixel path as fallback. Prefer additive, verifiable changes; when in
+  doubt, verify (imports resolve, compiles, dry-run) and leave the working path intact.
