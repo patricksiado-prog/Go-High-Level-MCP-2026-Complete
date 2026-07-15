@@ -135,6 +135,59 @@ def _w(t, row):
         pass
 
 
+_ASSET_EXT = (".png", ".gif", ".jpg", ".jpeg", ".svg", ".ico", ".css", ".js",
+              ".woff", ".woff2", ".ttf")
+
+
+def _feed_url(cap):
+    """Best guess at AT&T's serviceability / address-data feed URL from the
+    captured traffic -- so a direct backend reader can be built without a test."""
+    best = ""
+    best_bytes = -1
+    for base, meta in getattr(cap, "seen_urls", {}).items():
+        ct, hits, mx = meta
+        low = base.lower()
+        if "mapbox" in low or low.endswith(_ASSET_EXT):
+            continue
+        looks_feed = (any(k in low for k in ("serviceability", "serviceab",
+                      "availab")) or (("fiber" in low or "/api/" in low
+                      or "referral" in low or "graphql" in low
+                      or low.endswith(".json")) and "youachieve" in low))
+        if looks_feed and mx > best_bytes:
+            best, best_bytes = base, mx
+    return best
+
+
+def push_capture_extras(cap, host):
+    """Upgrade: push the EXACT feed URL, the full non-asset endpoint list, and
+    the raw AT&T serviceability JSON to GitHub so the backend can be read/built
+    from a normal scout run -- no separate test needed."""
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    feed = _feed_url(cap)
+
+    lines = ["OPTIMUS NET ENDPOINTS  %s  host=%s" % (ts, host),
+             "SERVICEABILITY FEED URL: %s" % (feed or "(not identified)"), "",
+             "All non-asset endpoints (biggest first) -- the feed is in here:"]
+    rows = sorted(getattr(cap, "seen_urls", {}).items(), key=lambda kv: -kv[1][2])
+    for base, (ct, hits, mx) in rows:
+        low = base.lower()
+        if "mapbox" in low or low.endswith(_ASSET_EXT):
+            continue
+        lines.append("%10dB  %3dx  %-26s %s" % (mx, hits, (ct or "")[:26], base[:200]))
+    gh_put("optimus/_live/net_endpoints.txt", "\n".join(lines))
+
+    # raw AT&T serviceability response (full records, every field) -- capped so
+    # the GitHub contents API accepts it.
+    raw = os.path.join(HERE, "serviceability_raw.json")
+    if os.path.exists(raw):
+        try:
+            body = open(raw).read()
+            gh_put("optimus/_live/serviceability_raw.json", body[:900000])
+        except Exception:
+            pass
+    return feed
+
+
 def write_backend(ws, cap, host):
     """Dump the captured backend traffic to the 'Backend Capture' sheet tab AND
     push it to GitHub (optimus/_live/backend_capture.txt) so Claude can analyse
@@ -196,6 +249,12 @@ def write_backend(ws, cap, host):
                 s["green"], s["gold"], s["grey"],
                 s["customer_undecoded"], s["skip"]),
             "grey%%=%.1f" % s["grey_pct"])
+    # UPGRADE: catch the exact feed URL + full endpoint list + raw JSON and push
+    # them, so the backend reader can be built from a normal run (no test.py).
+    feed = push_capture_extras(cap, host)
+    row("SERVICEABILITY FEED URL", feed or "(not identified -- see net_endpoints.txt)")
+    lines.append("SERVICEABILITY FEED URL: %s" % (feed or "(not identified)"))
+
     row("DONE", host, "", "%d endpoints" % len(rows))
     gh_put("optimus/_live/backend_capture.txt", "\n".join(lines))
 
