@@ -1349,3 +1349,17 @@ So gold now flows end-to-end: detected -> written (Upgrade Orange Biz by hunter/
 backend read) -> loaded to the dialer as copper-upgrade opportunities. OPEN (ask Patrick): green+gold
 currently load into the SAME power-dialer workflow; a separate GOLD/upgrade campaign (different pitch)
 would need its own workflow id in ghl_loader.
+
+### OPERATING RULE (Patrick, 2026-07-01): mark it in the notes, going forward
+Standing instruction: RECORD every change, discovery, decision, and fix in this brain (CLAUDE.md) as it
+happens -- not just in commits. Each substantive change gets a dated note (like the 11h-fix entries).
+Keep it current so any session or teammate picks up the full state from the notes alone.
+
+OPEN ITEMS (decide when Patrick is ready):
+- GOLD dialer lane: green + gold currently load into the SAME power-dialer workflow. A separate GOLD/
+  upgrade campaign (different pitch: "upgrade your DSL" vs "get new fiber") needs its own workflow id in
+  ghl_loader. Pending Patrick's workflow id or "same queue is fine".
+- One-time: run the by-phone cleanup .bat once to collapse the 180k Fiber Green Biz duplicates.
+- Ed (edsaldana08@gmail.com): share the sheet / set up the tools -- pending Patrick's say.
+- Experimental, build+test-with-Patrick: direct-fetch zip_reader (removes zoom), hunter backend-first,
+  "keeps stopping" watchdog, OKC one-click ZIP reader (73102-73170 + Edmond/Moore/Norman/Yukon/Mustang).
