@@ -1,0 +1,29 @@
+OPTIMUS BACKEND EXCHANGE (AT&T serviceability request)  2026-07-15 12:27:26  host=LAPTOP-RS9EHSLO
+
+METHOD : GET
+URL    : https://youachieve.att.com/yourefer/api/fiberMap.cfc?method=getMapData&lon=-95.58041729286856&lat=29.972415455010278&attuid=zg431x&csrfToken=8D81C09BC34BF290C87847DDC7499F570AB82417
+RESP   : 200  text/html;charset=UTF-8
+
+POST BODY (the params AT&T needs -- lat/lng/radius/etc.):
+(none: GET request, params are in the URL above)
+
+REQUEST HEADERS (auth/cookie/token values REDACTED):
+   :authority: <redacted 18 chars>
+   :method: GET
+   :path: /yourefer/api/fiberMap.cfc?method=getMapData&lon=-95.58041729286856&lat=29.972415455010278&attuid=zg431x&csrfToken=8D81C09BC34BF290C87847DDC7499F570AB82417
+   :scheme: https
+   accept: application/json, text/plain, */*
+   accept-encoding: gzip, deflate, br, zstd
+   accept-language: en-US,en;q=0.9
+   cookie: <redacted 1456 chars>
+   priority: u=1, i
+   referer: https://youachieve.att.com/yourefer/fiber
+   sec-ch-ua: "Not/A)Brand";v="99", "Chromium";v="148"
+   sec-ch-ua-mobile: ?0
+   sec-ch-ua-platform: "Windows"
+   sec-fetch-dest: empty
+   sec-fetch-mode: cors
+   sec-fetch-site: same-origin
+   user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36
+
+Secrets are redacted here. The full request (with your session auth) is saved LOCAL ONLY as serviceability_request_FULL.json and is gitignored -- never commit it.
