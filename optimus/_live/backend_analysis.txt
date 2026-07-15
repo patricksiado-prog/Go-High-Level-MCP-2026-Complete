@@ -1,0 +1,64 @@
+OPTIMUS FULL BACKEND ANALYSIS  2026-07-15 12:27:30  host=LAPTOP-RS9EHSLO  records=1000
+
+=== FULL BACKEND ANALYSIS ===  records: 1000
+
+FIELDS present (fill rate):
+   zip                          1000/1000
+   longitude                    1000/1000
+   subscriber_ban               1000/1000
+   state                        1000/1000
+   curr_ntwrk_bld_type_cd       1000/1000
+   speed                        1000/1000
+   city                         1000/1000
+   miles_from_claim             1000/1000
+   address                      1000/1000
+   subscriber_ban_masked        1000/1000
+   missing_supl                 1000/1000
+   latitude                     1000/1000
+
+curr_ntwrk_bld_type_cd -- distinct values:
+   FTTP-GPON                    552
+   unavailable                  448
+
+subscriber_ban -- distinct values:
+   customer                     552
+   non-cust                     448
+
+speed -- distinct values:
+   (empty)                      448
+   1000                         257
+   300                          145
+   Hsia500g                     119
+   Hsia2000g                    21
+   100                          6
+   50                           3
+   500                          1
+
+missing_supl -- distinct values:
+   0                            998
+   1                            2
+
+state -- distinct values:
+   TX                           1000
+
+city -- distinct values:
+   HOUSTON                      1000
+
+zip -- distinct values:
+   77070                        1000
+
+CROSS-TAB  build_type x ban  -> sample address:
+   fttp-gpon              customer     552   e.g. 118 VINTAGE PARK BLVD STE A
+   unavailable            non-cust     448   e.g. 114 VINTAGE PARK BLVD
+
+CROSS-TAB  build_type x speed:
+   unavailable            (none)            448
+   fttp-gpon              1000              257
+   fttp-gpon              300               145
+   fttp-gpon              Hsia500g          119
+   fttp-gpon              Hsia2000g          21
+   fttp-gpon              100                 6
+   fttp-gpon              50                  3
+   fttp-gpon              500                 1
+
+CLASSIFICATION (full set): green=448 gold=0 grey=552 cust-undecoded=0 skip=0  grey%=55.2  -> MATURE
