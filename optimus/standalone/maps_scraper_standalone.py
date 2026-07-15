@@ -402,7 +402,8 @@ _SUF = {"ST": "ST", "STREET": "ST", "AVE": "AVE", "AV": "AVE", "AVENUE": "AVE",
 _UNIT = re.compile(r"\b(APT|APARTMENT|UNIT|STE|SUITE|#|BLDG|BUILDING|FL|FLOOR|RM|"
                    r"ROOM|OFC|OFFICE|TRLR|LOT|SPC)\b.*$", re.I)
 _MATCH = {"leads": None, "green_ws": None, "orange_ws": None,
-          "green_seen": set(), "orange_seen": set()}
+          "green_seen": set(), "orange_seen": set(),
+          "green_ph": set(), "orange_ph": set()}
 
 
 def _norm_addr(a):
@@ -457,13 +458,17 @@ def init_match(sh):
     try:
         _MATCH["green_ws"] = _ensure_match_tab(sh, GREEN_BIZ_TAB)
         _MATCH["orange_ws"] = _ensure_match_tab(sh, ORANGE_BIZ_TAB)
-        for ws, key in ((_MATCH["green_ws"], "green_seen"),
-                        (_MATCH["orange_ws"], "orange_seen")):
+        for ws, akey, pkey in ((_MATCH["green_ws"], "green_seen", "green_ph"),
+                               (_MATCH["orange_ws"], "orange_seen", "orange_ph")):
             try:
-                _MATCH[key] = set(r[2].strip().upper() for r in ws.get_all_values()[1:]
-                                  if len(r) > 2 and r[2].strip())
+                vals = ws.get_all_values()[1:]
+                # BIZ_HEADER: [Business Name, Phone(1), Address(2), Website, Category]
+                _MATCH[akey] = set(r[2].strip().upper() for r in vals
+                                   if len(r) > 2 and r[2].strip())
+                _MATCH[pkey] = set(r[1].strip().upper() for r in vals
+                                   if len(r) > 1 and r[1].strip())
             except Exception:
-                _MATCH[key] = set()
+                _MATCH[akey] = set(); _MATCH[pkey] = set()
     except Exception:
         pass
     print("  COMBO MATCH ON: %d captured fiber leads loaded -> a scraped business on "
@@ -483,15 +488,24 @@ def _match_new(new):
         if not color:
             continue
         au = (addr or "").strip().upper()
+        pu = (phone or "").strip().upper()   # dedupe by PHONE too (dialer-ready)
         row = [name, phone, addr, web, cat]
         if color == "ORANGE":
-            if au in _MATCH["orange_seen"]:
+            if (au and au in _MATCH["orange_seen"]) or (pu and pu in _MATCH["orange_ph"]):
                 continue
-            _MATCH["orange_seen"].add(au); o.append(row)
+            if au:
+                _MATCH["orange_seen"].add(au)
+            if pu:
+                _MATCH["orange_ph"].add(pu)
+            o.append(row)
         else:
-            if au in _MATCH["green_seen"]:
+            if (au and au in _MATCH["green_seen"]) or (pu and pu in _MATCH["green_ph"]):
                 continue
-            _MATCH["green_seen"].add(au); g.append(row)
+            if au:
+                _MATCH["green_seen"].add(au)
+            if pu:
+                _MATCH["green_ph"].add(pu)
+            g.append(row)
     try:
         if g and _MATCH.get("green_ws"):
             _MATCH["green_ws"].append_rows(g, value_input_option="RAW")
