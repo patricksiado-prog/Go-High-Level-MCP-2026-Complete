@@ -1198,3 +1198,47 @@ prime new fiber, hit it.
 build a **direct backend reader** — hit AT&T's serviceability endpoint for a ZIP/area and get the
 full green list in one call, no map/pixels/panning. Also map any new build codes into build_codes.json.
 Also still parked: visible BUILD stamp in the window; the "keeps stopping" watchdog (see 11f).
+
+### 11h. DISCOVERY 2026-07-01 — the BACKEND is directly readable per-ZIP. THE DIRECT READER + how to improve the other programs.
+**THE DISCOVERY:** the AT&T dealer map's dots come from one backend feed:
+`https://youachieve.att.com/yourefer/api/fiberMap.cfc` (ColdFusion). Every "Search this area" returns a
+JSON batch of EVERY address in view with full status (`subscriber_ban`, `curr_ntwrk_bld_type_cd`,
+`speed`, lat/lng). So you do NOT need to pan a grid or read pixels — you can read a whole area's dots
+per-ZIP: `search_zip(zip)` -> `search_this_area()` -> capture the JSON off the wire (`NetCapture`) ->
+classify (`backend_classifier` + `build_codes.json`). One fetch per ZIP.
+
+**COLOR CODE (fully decoded from live captures):**
+  GREEN = `subscriber_ban` empty (non-customer). `curr_ntwrk_bld_type_cd="unavailable"` just = no AT&T
+          service today, which is normal for a green lead -- NOT "dead". → LEAD
+  GREY  = customer + `curr_ntwrk_bld_type_cd=fttp-gpon` (existing FIBER; speeds seen 1000/300/100/Hsia500g) → SKIP
+  GOLD  = customer + a copper code (copper/ipbb/dsl) → UPGRADE. (No copper record seen live yet; when a
+          customer build code other than fttp-gpon appears, `deep_analyze` flags it under "UNMAPPED
+          CUSTOMER build codes" -> add it to build_codes.json copper list -> gold starts classifying.)
+  FRESH  = GREEN+GOLD together high, grey share low (gold clusters = new fiber, field-confirmed).
+
+**BUILT THIS SESSION:** `zip_reader.py` = THE DIRECT READER. Feed it ZIPs (or use its built-in Houston
+metro-edge list: Katy/Cypress/Richmond/Fulshear/Conroe/Spring/Angleton-Brazoria), it reads each off the
+backend, ranks freshest by green+gold, writes a "Fresh ZIPs" tab + fresh_zips.csv + green+gold addresses
+to fresh_addresses.csv, pushes optimus/_live/fresh_zips.txt. Desktop app: `RUN_ZIPS.bat` + `INSTALL_ZIPS.bat`
+(+ a Drive installer "INSTALL Optimus ZIP Reader"). No panning, no pixels, no capture runs.
+
+**HOW TO IMPROVE THE OTHER PROGRAMS (roadmap):**
+1. **Hunter (`precise_fiber_hunter.py`) -> backend-first + ZIP-driven.** Today it classifies dots by
+   PIXELS/`classify_status` and does NOT import `backend_classifier` at all -- so grey (existing fttp-gpon
+   fiber customers) can leak into leads and green/gold rely on color windows. Improve: classify each lead
+   from its backend record (`subscriber_ban` + `curr_ntwrk_bld_type_cd` via `backend_classifier`), so grey
+   is reliably skipped and green/gold are exact. The raw-record preservation (`lead_from_dict` now carries
+   `raw=base`) already makes the fields available. Optionally drive by ZIP like zip_reader instead of
+   serpentine panning -> faster + more complete + sidesteps "keeps stopping".
+2. **Every launcher MUST download `build_codes.json`.** Without it fttp-gpon never decodes to grey, so a
+   mature (penetrated) area falsely reads FRESH. FIXED in RUN_SCOUT/RUN_ZIPS/RUN_HUNTER this session;
+   audit any other launcher (legacy `run_hunter.bat`, MAPMAN, etc.) before trusting their freshness output.
+3. **Pipe fresh ZIPs into the pipeline.** zip_reader ranks fresh ZIPs; the hunter + scraper should consume
+   `fresh_zips.csv` and work the freshest ground first instead of guessing an area. Auto-finder loop:
+   zip_reader across the metro edge -> top fresh ZIPs -> hunter/scraper run those -> Fiber Green Biz.
+4. **Scraper -> prioritize by fresh ZIP** so business cross-matches land where the fiber is newest.
+5. **Watchdog for "keeps stopping"** (still parked) -- the serpentine hunter/scout halt mid-run; zip_reader
+   avoids it (discrete per-ZIP calls), but the panning hunter still needs the auto-restart watchdog (see 11f).
+6. **Pure-HTTP reader (future, fastest).** zip_reader drives the authed browser; hitting fiberMap.cfc
+   directly with the session cookie would skip the browser entirely -- needs the request params
+   (method/query/body), which `backend_exchange.txt` captures but hasn't landed a clean run yet.
