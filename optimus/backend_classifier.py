@@ -177,6 +177,84 @@ def inspect(records):
     return "\n".join(out)
 
 
+# ── FULL BACKEND ANALYSIS (learn the WHOLE feed, not a sample) ──────────────
+def deep_analyze(records, top=15):
+    """Comprehensive report over ALL captured records: field fill-rates, the
+    distinct values of every status-bearing field, build_type x ban and
+    build_type x speed cross-tabs, the full-set classification, and any
+    CUSTOMER build codes not yet mapped (so we know what to learn next)."""
+    from collections import Counter
+
+    n = len(records)
+    out = ["=== FULL BACKEND ANALYSIS ===  records: %d" % n, ""]
+    if not n:
+        return "\n".join(out + ["(no records captured)"])
+
+    fields = Counter()
+    for r in records:
+        if isinstance(r, dict):
+            for k in r.keys():
+                fields[k] += 1
+    out.append("FIELDS present (fill rate):")
+    for k, c in fields.most_common():
+        out.append("   %-28s %d/%d" % (k, c, n))
+    out.append("")
+
+    for key in ("curr_ntwrk_bld_type_cd", "subscriber_ban", "speed",
+                "missing_supl", "state", "city", "zip"):
+        vals = Counter()
+        for r in records:
+            v = _norm(r.get(key))
+            if key == "subscriber_ban":
+                v = "customer" if v else "non-cust"
+            vals[v or "(empty)"] += 1
+        out.append("%s -- distinct values:" % key)
+        for v, c in vals.most_common(top):
+            out.append("   %-28s %d" % (v[:28], c))
+        out.append("")
+
+    cross = Counter(); samp = {}
+    for r in records:
+        bld = _norm(r.get("curr_ntwrk_bld_type_cd")).lower() or "(empty)"
+        ban = "customer" if _norm(r.get("subscriber_ban")) else "non-cust"
+        cross[(bld, ban)] += 1
+        samp.setdefault((bld, ban), _norm(r.get("address")))
+    out.append("CROSS-TAB  build_type x ban  -> sample address:")
+    for (bld, ban), c in cross.most_common():
+        out.append("   %-22s %-9s %6d   e.g. %s" % (bld, ban, c, samp[(bld, ban)]))
+    out.append("")
+
+    sp = Counter()
+    for r in records:
+        bld = _norm(r.get("curr_ntwrk_bld_type_cd")).lower() or "(empty)"
+        speed = _norm(r.get("speed")) or "(none)"
+        sp[(bld, speed)] += 1
+    out.append("CROSS-TAB  build_type x speed:")
+    for (bld, speed), c in sp.most_common(top):
+        out.append("   %-22s %-14s %6d" % (bld, speed, c))
+    out.append("")
+
+    s = summarize(records)
+    out.append("CLASSIFICATION (full set): green=%d gold=%d grey=%d "
+               "cust-undecoded=%d skip=%d  grey%%=%.1f  -> %s"
+               % (s["green"], s["gold"], s["grey"], s["customer_undecoded"],
+                  s["skip"], s["grey_pct"], s["verdict"]))
+
+    unmapped = Counter()
+    for r in records:
+        if _norm(r.get("subscriber_ban")):
+            bld = _norm(r.get("curr_ntwrk_bld_type_cd")).lower()
+            if bld and bld not in FIBER_BUILD_CODES and bld not in COPPER_BUILD_CODES:
+                unmapped[bld] += 1
+    if unmapped:
+        out.append("")
+        out.append("UNMAPPED CUSTOMER build codes (decide fiber vs copper, add "
+                   "to build_codes.json):")
+        for bld, c in unmapped.most_common():
+            out.append("   %-28s %d customers" % (bld, c))
+    return "\n".join(out)
+
+
 # ── PAYLOAD HELPERS ────────────────────────────────────────────────────────
 def load_leads(payload):
     """Accept the raw JSON envelope, a already-parsed dict, or a bare list;

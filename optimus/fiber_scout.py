@@ -188,6 +188,25 @@ def push_capture_extras(cap, host):
     return feed
 
 
+def write_full_analysis(ws, cap, host):
+    """UPGRADE #1: run the FULL backend analysis over ALL captured records (not
+    the 250-sample) and push it, so the whole feed's schema + codes can be
+    learned in one look -> optimus/_live/backend_analysis.txt + a sheet tab."""
+    recs = _wire_records(getattr(cap, "pending", []))
+    if not recs:
+        return
+    report = bc.deep_analyze(recs)
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    gh_put("optimus/_live/backend_analysis.txt",
+           "OPTIMUS FULL BACKEND ANALYSIS  %s  host=%s  records=%d\n\n%s"
+           % (ts, host, len(recs), report))
+    t = _tab(ws, "Backend Analysis", ["Time", "Line"], clear=True)
+    for ln in report.splitlines():
+        if ln.strip():
+            _w(t, [ts, ln])
+    print("  -> full backend analysis pushed (%d records)." % len(recs))
+
+
 def write_backend(ws, cap, host):
     """Dump the captured backend traffic to the 'Backend Capture' sheet tab AND
     push it to GitHub (optimus/_live/backend_capture.txt) so Claude can analyse
@@ -434,6 +453,7 @@ def main():
         _w(sws, [ts1, host, "DONE", "", "", "", "", "%d fresh/working" % len(fresh), "survey stopped"])
         if not backend_done:
             write_backend(ws, cap, host)
+        write_full_analysis(ws, cap, host)
         gh_put("optimus/_live/scout_findings.txt", "\n".join(flines))
 
         print("\n=========== NEW-FIBER SCOUT RESULTS ===========")
