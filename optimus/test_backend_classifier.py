@@ -3,8 +3,11 @@ test_backend_classifier.py — prove the backend logic on real + synthetic data.
 
 Run:  python test_backend_classifier.py
 
-WEBSTER sample = the actual records the Scout captured (build "unavailable")
-                 -> should score MATURE (0 green, dead ground).
+WEBSTER sample = actual records the Scout captured (build "unavailable", ban
+                 empty). "unavailable" is the address's CURRENT network, NOT
+                 availability -> these are GREEN eligible non-customers, same as
+                 the 77027 corridor. (The old "dead ground / MATURE" reading was
+                 the GREEN-0 bug: skipping "unavailable" dropped every green.)
 GREEN sample   = a synthetic Third-Ward-style view (eligible + non-customers)
                  -> should score FRESH and list the green addresses.
 """
@@ -59,8 +62,8 @@ def show(name, records):
 
 
 if __name__ == "__main__":
-    # Webster with codes unknown -> everything SKIP (unavailable) -> MATURE.
-    show("WEBSTER 77598  (real capture, unavailable = dead)", WEBSTER)
+    # Webster: ban empty + "unavailable" -> GREEN (eligible non-customers).
+    show("WEBSTER 77598  (real capture; unavailable = current net, still GREEN)", WEBSTER)
 
     # Green view with codes still empty -> customers show as 'undecoded'.
     show("THIRD WARD 77004  (codes NOT yet configured)", GREEN_VIEW)

@@ -27,26 +27,30 @@ THE COLOR KEY (from the dealer-map legend, confirmed on the Third Ward view)
     GOLD   = Fiber eligible / COPPER customer -> upgrade target (on DSL now)
     GREY   = Fiber customer                    -> already sold, skip
 
-TWO SIGNALS WE UNDERSTAND TODAY
-    subscriber_ban  ""/empty  = NON-customer     |  present ("BmrSnr!...") = customer
-    curr_ntwrk_bld_type_cd    = "unavailable"    = fiber NOT available here (dead)
-                              = anything else    = treated as eligible/available
+THE SIGNAL THAT ACTUALLY WORKS  (corrected 2026-07-01 from a live 77027 capture)
+    subscriber_ban  ""/empty  = NON-customer (GREEN lead)  |  present = customer
+    curr_ntwrk_bld_type_cd    = the address's CURRENT AT&T network, NOT
+                                availability. "unavailable" just means the
+                                address has no AT&T service today -- which is
+                                what a GREEN eligible non-customer looks like.
+    >>> DO NOT treat "unavailable" as dead. A live capture over ZIP 77027 (a
+        known green corridor) returned every green address as ban="" +
+        curr_ntwrk_bld_type_cd="unavailable". Skipping "unavailable" threw away
+        100% of the greens (the GREEN-0 bug). The map only plots eligible /
+        customer dots anyway, so every record here is a real dot.
 
-WHAT WE DON'T KNOW YET (the next capture answers it)
-    The exact build-type code(s) that separate GOLD (copper customer) from
-    GREY (fiber customer). Run inspect() over a GREEN-heavy area (e.g. the
-    Arbor/Blodgett Third Ward view) and the cross-tab prints the answer.
-    Then drop those codes into FIBER_BUILD_CODES / COPPER_BUILD_CODES below.
+WHAT WE DON'T KNOW YET (a CUSTOMER-area capture answers it)
+    Among CUSTOMERS (ban present), which curr_ntwrk_bld_type_cd values mean an
+    existing FIBER subscriber (GREY) vs a COPPER customer (GOLD). Run inspect()
+    over an area with customers, then drop those codes into
+    FIBER_BUILD_CODES / COPPER_BUILD_CODES below. Greens don't need this.
 """
 
 import json
 
 
-# ── CONFIG: fill these in from an inspect() run over a green area ───────────
-# Build-type codes (curr_ntwrk_bld_type_cd, lowercased) that mean "not lit".
-UNAVAILABLE_CODES = {"", "unavailable", "not_eligible", "none", "n/a"}
-
-# Once a green-area capture reveals them, list the codes that mean an
+# ── CONFIG: fill these in from a CUSTOMER-area inspect() run ────────────────
+# Once a customer-area capture reveals them, list the codes that mean an
 # existing FIBER subscriber (=> GREY) vs a COPPER/DSL account (=> GOLD).
 # Until then they stay empty and customers are reported as "CUSTOMER".
 FIBER_BUILD_CODES  = set()   # e.g. {"fiber", "ftth", "available_fiber"}
@@ -64,25 +68,32 @@ def classify_lead(rec):
     GREEN     eligible + non-customer          (the prize)
     GOLD      eligible + copper customer        (upgrade)
     GREY      eligible + fiber customer         (sold)
-    CUSTOMER  eligible customer, gold/grey not
-              yet decodable (codes unknown)     (refine via inspect())
-    SKIP      fiber unavailable here            (dead ground)
-    """
-    bld = _norm(rec.get("curr_ntwrk_bld_type_cd")).lower()
-    ban = _norm(rec.get("subscriber_ban"))
+    CUSTOMER  customer, gold/grey not yet
+              decodable (codes unknown)         (refine via inspect())
+    SKIP      empty / unusable record           (no address at all)
 
-    if bld in UNAVAILABLE_CODES:
+    Signal: subscriber_ban drives it. Empty ban = non-customer = GREEN.
+    curr_ntwrk_bld_type_cd is the address's CURRENT network, NOT availability --
+    "unavailable" (no service today) is normal for a green lead, so it is NOT a
+    skip. The map only returns eligible/customer dots, so every real record is
+    one of GREEN / GOLD / GREY.
+    """
+    ban = _norm(rec.get("subscriber_ban"))
+    bld = _norm(rec.get("curr_ntwrk_bld_type_cd")).lower()
+
+    # Only skip records that carry no address at all (garbage / non-dot rows).
+    if not _norm(rec.get("address")):
         return "SKIP"
 
     if not ban:
-        return "GREEN"                      # eligible, no account = PRIZE
+        return "GREEN"                      # no account = eligible non-customer = PRIZE
 
-    # eligible customer -> gold (copper) or grey (fiber), if we know the codes
+    # customer -> gold (copper) or grey (fiber), once the codes are known
     if bld in FIBER_BUILD_CODES:
         return "GREY"
     if bld in COPPER_BUILD_CODES:
         return "GOLD"
-    return "CUSTOMER"                        # decode pending an inspect() run
+    return "CUSTOMER"                        # has account; copper/fiber decode pending
 
 
 # ── VIEW SUMMARY + FRESH VERDICT ───────────────────────────────────────────
