@@ -1,4 +1,4 @@
-OPTIMUS BACKEND EXCHANGE (AT&T serviceability request)  2026-07-15 12:54:47  host=LAPTOP-RS9EHSLO
+OPTIMUS BACKEND EXCHANGE (AT&T serviceability request)  2026-07-15 12:55:37  host=LAPTOP-RS9EHSLO
 
 METHOD : GET
 URL    : https://youachieve.att.com/yourefer/api/fiberMap.cfc?method=getMapData&lon=-95.58041729286856&lat=29.972415455010278&attuid=zg431x&csrfToken=8D81C09BC34BF290C87847DDC7499F570AB82417
