@@ -1277,3 +1277,21 @@ mature), NOT full address coverage -- send the HUNTER to the ZIPs it flags fresh
 STATUS: EXPERIMENTAL -- `--zoom`/`--sweeps` are tunable; the exact zoom level was not verifiable offline,
 so tune on the first live run (watch the GREEN/GOLD/GREY counts per ZIP; if 0 everywhere over a known-
 green ZIP, increase --zoom). The SCOUT remains the proven tool; zip_reader is the fast triage layer.
+
+### 11h-fix3 (2026-07-01) — GOLD codes decoded + full request recipe captured (19,500-record run)
+A 19,500-record capture (Vintage Park / NW Houston, laptop RS9EHSLO) delivered the two missing pieces:
+1. **GOLD/copper build codes:** `deep_analyze` flagged 28 unmapped CUSTOMER codes -> `fttn-bp` (Fiber-To-
+   The-Node = copper last mile) and `ip-rt` (legacy IP remote terminal). Both are copper customers =
+   GOLD upgrade targets. Added to build_codes.json copper list -> GOLD now classifies (was 0/undecoded).
+   Full code map now: GREEN=ban empty (any build). GREY(fiber)=fttp-gpon/fttp/gpon/ftth. GOLD(copper)=
+   fttn-bp/fttn/ip-rt/iprt/copper/ipbb/adsl/vdsl/dsl.
+2. **AT&T request recipe (backend_exchange.txt landed):**
+   `GET https://youachieve.att.com/yourefer/api/fiberMap.cfc?method=getMapData&lon={lon}&lat={lat}&attuid={attuid}&csrfToken={token}`
+   plus session cookie + `referer: .../yourefer/fiber`. attuid (dealer id, e.g. zg431x) + csrfToken +
+   cookie all come from the logged-in session. Response is JSON (labeled text/html) = the dot batch.
+**NEXT UPGRADE (build + TEST carefully) — direct-fetch zip_reader:** instead of zoom+pan+"Search this
+area" (fragile, Patrick's zoom concern), do ONE normal capture to grab csrfToken+attuid off
+`cap.req_capture`, then for each target lat/lon call `page.evaluate(fetch(getMapData URL))` same-origin
+(cookies+csrf auto-included) -> returns that area's dot JSON with NO zoom/pan/click. Covers a ZIP by
+calling a few lat/lon points across it. This removes the zoom dependency entirely. Keep browser-driven
+path as fallback; test live before trusting.

@@ -1,5 +1,5 @@
 {
-  "_comment": "curr_ntwrk_bld_type_cd -> customer dot color. Decoded from a live 3300 CUMMINS ST capture 2026-07-01: fttp-gpon customers = existing FIBER (grey). Add copper/DSL codes here as they appear in a customer-area capture.",
+  "_comment": "curr_ntwrk_bld_type_cd -> customer dot color. Decoded from live captures: fttp-gpon = existing FIBER (grey). fttn-bp (fiber-to-node, copper last mile) + ip-rt (legacy copper terminal) = COPPER customer (gold upgrade), confirmed 2026-07-01 from a 19,500-record Vintage Park capture. Non-customers (ban empty) are GREEN regardless of build code.",
   "fiber": ["fttp-gpon", "fttp", "gpon", "ftth"],
-  "copper": ["copper", "ipbb", "adsl", "vdsl", "dsl"]
+  "copper": ["fttn-bp", "fttn", "ip-rt", "iprt", "copper", "ipbb", "adsl", "vdsl", "dsl"]
 }
