@@ -1,55 +1,55 @@
-OPTIMUS BACKEND CAPTURE  2026-07-13 00:43:51  host=LAPTOP-TB1L669N
+OPTIMUS BACKEND CAPTURE  2026-07-15 03:35:18  host=LAPTOP-TB1L669N
 --- ENDPOINTS (biggest first) ---
 ENDPOINT     | https://youachieve.att.com/yourefer/dist/assets/img/header-home-2023.png | image/png | 656022B/1hits | 
-ENDPOINT     | blob:https://youachieve.att.com/1a36e0cd-f67c-4dd5-9cb0-237112dff1ce | application/javascript | 482296B/1hits | 
-ENDPOINT     | blob:https://youachieve.att.com/dacfaf64-413d-440e-a612-af707d797656 | application/javascript | 482296B/1hits | 
+ENDPOINT     | blob:https://youachieve.att.com/8acfe88d-dc88-4ed6-9f9c-49d803c0472b | application/javascript | 482296B/1hits | 
+ENDPOINT     | blob:https://youachieve.att.com/ecd8c57e-4202-41a2-a674-3af3014dab5e | application/javascript | 482296B/1hits | 
 ENDPOINT     | https://youachieve.att.com/yourefer/dist/main.js | application/javascript | 475160B/1hits | 
 ENDPOINT     | https://oidc.idp.elogin.att.com/lrr/attLRR/resources/images/mobilekey_96.gif | image/gif | 173213B/1hits | 
-ENDPOINT     | https://www.googletagmanager.com/gtag/js | application/javascript; charset=UTF-8 | 153261B/2hits | 
-ENDPOINT     | https://youachieve.att.com/ui/img/YouAchieve_rgb_pos.png | image/png | 122609B/1hits | 
+ENDPOINT     | https://www.googletagmanager.com/gtag/js | application/javascript; charset=UTF-8 | 151424B/2hits | 
 ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/8/59/103.vector.pbf | application/x-protobuf | 116471B/1hits | 
 ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/8/60/105.vector.pbf | application/x-protobuf | 112357B/1hits | 
 ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/9/120/211.vector.pbf | application/x-protobuf | 110797B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/480/847.vector.pbf | application/x-protobuf | 104869B/1hits | 
 ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/481/846.vector.pbf | application/x-protobuf | 104732B/1hits | 
 ENDPOINT     | https://oidc.idp.elogin.att.com/lrr/attLRR/resources/images/howto-for-mobile-devices.gif | image/gif | 96851B/1hits | 
 ENDPOINT     | https://oidc.idp.elogin.att.com/lrr/attLRR/resources/images/howto-for-desktop-devices.gif | image/gif | 95310B/1hits | 
 ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/12/962/1693.vector.pbf | application/x-protobuf | 91582B/1hits | 
 ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/481/847.vector.pbf | application/x-protobuf | 89964B/1hits | 
 ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/480/846.vector.pbf | application/x-protobuf | 88869B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/8/58/103.vector.pbf | application/x-protobuf | 87097B/1hits | 
 ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/10/240/423.vector.pbf | application/x-protobuf | 83219B/1hits | 
 ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/7/30/52.vector.pbf | application/x-protobuf | 81907B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/12/962/1692.vector.pbf | application/x-protobuf | 81249B/1hits | 
 ENDPOINT     | https://oidc.idp.elogin.att.com/lrr/attLRR/resources/images/securityKeyAnimation.gif | image/gif | 81185B/1hits | 
 ENDPOINT     | https://youachieve.att.com/yourefer/js/googlejs.js | application/javascript | 76936B/1hits | 
 ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/8/59/105.vector.pbf | application/x-protobuf | 74530B/1hits | 
 ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/7/29/52.vector.pbf | application/x-protobuf | 73340B/1hits | 
---- LEADS PARSED: 1000 ---
-LEADS PARSED |  |  | 1000 | 
-SAMPLE LEAD  | 2000 WESTCREEK LN STE 1410 | status=None | lat=29.746399 lng=-95.45512 ban=None | 
-SAMPLE LEAD  | 2000 WESTCREEK LN SUIT 1360 | status=None | lat=29.746399 lng=-95.45512 ban=None | 
-SAMPLE LEAD  | 2000 WESTCREEK LN SUIT 430 | status=None | lat=29.746399 lng=-95.45512 ban=None | 
-SAMPLE LEAD  | 2000 WESTCREEK LN UNIT 300 | status=None | lat=29.746399 lng=-95.45512 ban=None | 
-SAMPLE LEAD  | 1900 WEST LOOP S FLR 3 | status=None | lat=29.747295 lng=-95.458025 ban=None | 
-SAMPLE LEAD  | 1900 WEST LOOP S UNIT TELCO | status=None | lat=29.747295 lng=-95.458025 ban=None | 
+ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/12/961/1693.vector.pbf | application/x-protobuf | 72028B/1hits | 
+ENDPOINT     | https://youachieve.att.com/ui/fonts/fontawesome-webfont.woff2 | application/font-woff2 | 71896B/2hits | 
+ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/8/60/103.vector.pbf | application/x-protobuf | 67654B/1hits | 
+ENDPOINT     | https://youachieve.att.com/ui/jquery/jquery-ui-1_14_1/jquery-ui.min.js | application/javascript | 67248B/2hits | 
+--- LEADS PARSED: 4500 ---
+LEADS PARSED |  |  | 4500 | 
+SAMPLE LEAD  | 3300 CUMMINS ST | status=None | lat=29.736022 lng=-95.439134 ban=None | 
+SAMPLE LEAD  | 3300 CUMMINS ST APT 2101 | status=None | lat=29.736022 lng=-95.439134 ban=BmrSnr!78A9D23AD2211735B4E50591D8FA6EDA | 
+SAMPLE LEAD  | 3300 CUMMINS ST APT 2102 | status=None | lat=29.736022 lng=-95.439134 ban=BmrSnr!3CE06CC2775B7AFBFBF26FA1D6807D9D | 
+SAMPLE LEAD  | 3300 CUMMINS ST APT 2103 | status=None | lat=29.736022 lng=-95.439134 ban=BmrSnr!49D1F816347ADDBB351DFBDB289A6308 | 
+SAMPLE LEAD  | 3300 CUMMINS ST APT 2104 | status=None | lat=29.736022 lng=-95.439134 ban=BmrSnr!F0888BFD7116463968717465672B11E5 | 
+SAMPLE LEAD  | 3300 CUMMINS ST APT 2105 | status=None | lat=29.736022 lng=-95.439134 ban=BmrSnr!65E63A582F91947807D4B92101005F9B | 
 JSON TOP KEYS| success, error, content |  |  | 
 --- JSON SAMPLE ---
-{"success": true, "error": {"message": "OK", "status": 200}, "content": [{"zip": "77027", "longitude": "-95.455120", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "HOUSTON", "miles_from_claim": "0.08106", "address": "2000 WESTCREEK LN STE 1410", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "29.746399"}, {"zip": "77027", "longitude": "-95.455120", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "HOUSTON", "miles_from_claim": "0.08106", "address": "2000 WESTCREEK LN SUIT 1360", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "29.746399"}, {"zip": "77027", "longitude": "-95.455120", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "HOUSTON", "miles_from_claim": "0.08106", "address": "2000 WESTCREEK LN SUIT 430", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "29.746399"}, {"zip": "77027", "longitude": "-95.455120", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "HOUSTON", "miles_from_claim": "0.08106", "address": "2000 WESTCREEK LN UNIT 300", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "29.746399"}, {"zip": "77027", "longitude": "-95.458025", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "HOUSTON", "miles_from_claim": "0.11234", "address": "1900 WEST LOOP S FLR 3", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "29.747295"}, {"zip": "77027", "longitude": "-95.458025", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "HOUSTON", "miles_from_claim": "0.11234", "address": "1900 WEST LOOP S UNIT TELCO", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "29.747295"}, {"zip": "77027", "longitude": "-95.454296", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "HOUSTON", "miles_from_claim": "0.11482", "address": "4543 POST OAK PKWY", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "29.747493"}, {"zip": "77027", "longitude": "-95.454526", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "HOUSTON", "miles_from_claim": "0.12095", "address": "4521 SAN FELIPE ST APT 1001", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "29.746124"}, {"zip": "77027", "longitude": "-95.454526", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "HOUSTON", "miles_from_claim": "0.12095", "address": "4521 SAN FELIPE ST APT 1002", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "29.746124"}, {"zip": "77027", "longitude": "-95.454526", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "HOUSTON", "miles_from_claim": "0.12095", "address": "4521 SAN FELIPE ST APT 1003", "subscri
+{"success": true, "error": {"message": "OK", "status": 200}, "content": [{"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "HOUSTON", "miles_from_claim": "0.10017", "address": "3300 CUMMINS ST", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "BmrSnr!78A9D23AD2211735B4E50591D8FA6EDA", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "1000", "city": "HOUSTON", "miles_from_claim": "0.10017", "address": "3300 CUMMINS ST APT 2101", "subscriber_ban_masked": "******428", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "BmrSnr!3CE06CC2775B7AFBFBF26FA1D6807D9D", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "1000", "city": "HOUSTON", "miles_from_claim": "0.10017", "address": "3300 CUMMINS ST APT 2102", "subscriber_ban_masked": "******799", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "BmrSnr!49D1F816347ADDBB351DFBDB289A6308", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "1000", "city": "HOUSTON", "miles_from_claim": "0.10017", "address": "3300 CUMMINS ST APT 2103", "subscriber_ban_masked": "******606", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "BmrSnr!F0888BFD7116463968717465672B11E5", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "1000", "city": "HOUSTON", "miles_from_claim": "0.10017", "address": "3300 CUMMINS ST APT 2104", "subscriber_ban_masked": "******243", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "BmrSnr!65E63A582F91947807D4B92101005F9B", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "300", "city": "HOUSTON", "miles_from_claim": "0.10017", "address": "3300 CUMMINS ST APT 2105", "subscriber_ban_masked": "******055", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "BmrSnr!29CAAB72EC8878719575406596D256B7", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "Hsia500g", "city": "HOUSTON", "miles_from_claim": "0.10017", "address": "3300 CUMMINS ST APT 2107", "subscriber_ban_masked": "******146", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "HOUSTON", "miles_from_claim": "0.10017", "address": "3300 CUMMINS ST APT 2109", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "29.736022"}, {"zip": "77027", "longitude": "-95.439134", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "HOUSTON", "miles_from_claim": "0.10017", "address": "3300 CUMMINS ST APT 2110", "subscriber_ban_masked": 
 --- BACKEND INSPECT (fill build_codes.json from this) ---
 === BACKEND INSPECT ===  total leads: 250
 
 curr_ntwrk_bld_type_cd values:
-   unavailable              136
-   fttp-gpon                114
+   fttp-gpon                197
+   unavailable              53
 
 subscriber_ban:
-   non-cust                 136
-   customer                 114
+   customer                 197
+   non-cust                 53
 
 CROSS-TAB  (build_type x ban)  -> sample address:
-   unavailable            non-cust    136   e.g. 2000 WESTCREEK LN STE 1410
-   fttp-gpon              customer    114   e.g. 4521 SAN FELIPE ST APT 1101
+   fttp-gpon              customer    197   e.g. 3300 CUMMINS ST APT 2101
+   unavailable            non-cust     53   e.g. 3300 CUMMINS ST
 
 READ IT LIKE THIS:
    non-cust rows on an available build  = GREEN (prize)
@@ -57,14 +57,14 @@ READ IT LIKE THIS:
    -> copy the customer build codes into COPPER/FIBER_BUILD_CODES
 INSPECT      | === BACKEND INSPECT ===  total leads: 250 |  |  | 
 INSPECT      | curr_ntwrk_bld_type_cd values: |  |  | 
-INSPECT      | unavailable              136 |  |  | 
-INSPECT      | fttp-gpon                114 |  |  | 
+INSPECT      | fttp-gpon                197 |  |  | 
+INSPECT      | unavailable              53 |  |  | 
 INSPECT      | subscriber_ban: |  |  | 
-INSPECT      | non-cust                 136 |  |  | 
-INSPECT      | customer                 114 |  |  | 
+INSPECT      | customer                 197 |  |  | 
+INSPECT      | non-cust                 53 |  |  | 
 INSPECT      | CROSS-TAB  (build_type x ban)  -> sample address: |  |  | 
-INSPECT      | unavailable            non-cust    136   e.g. 2000 WESTCREEK LN STE 1410 |  |  | 
-INSPECT      | fttp-gpon              customer    114   e.g. 4521 SAN FELIPE ST APT 1101 |  |  | 
+INSPECT      | fttp-gpon              customer    197   e.g. 3300 CUMMINS ST APT 2101 |  |  | 
+INSPECT      | unavailable            non-cust     53   e.g. 3300 CUMMINS ST |  |  | 
 INSPECT      | READ IT LIKE THIS: |  |  | 
-BACKEND VERDICT| MATURE | green=0 gold=0 grey=0 cust=114 skip=136 | grey%=0.0 | 
-DONE         | LAPTOP-TB1L669N |  | 185 endpoints | 
+BACKEND VERDICT| MATURE | green=0 gold=0 grey=0 cust=197 skip=53 | grey%=0.0 | 
+DONE         | LAPTOP-TB1L669N |  | 168 endpoints | 
