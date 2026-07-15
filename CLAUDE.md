@@ -638,6 +638,13 @@
 - Canonical key = fiberscanner-493900 on Drive (id `1upYH4h2VsmOwO82v9CVjMpE6IzV-5dIs`); the
   hunter auto-picks the valid fiberscanner copy among scattered ones. Normal hygiene only: the
   live key lives on the device / in env, not pasted into the repo.
+- **Backend captures are NOT sensitive — push them freely (Patrick, 2026-07-01):** "I'm not
+  worried about security, nobody is watching our fiber find." So the scout's backend data —
+  `_live/backend_capture.txt`, `backend_analysis.txt`, `net_endpoints.txt`, `serviceability_raw.json`,
+  the AT&T request shape in `backend_exchange.txt` — all get pushed to the repo without hesitation.
+  Don't add security friction or gate on it for the fiber-find data. The ONE thing still kept out
+  of git is `serviceability_request_FULL.json` (his live AT&T session cookies/tokens) — gitignored
+  purely to protect his own account from being hijacked, NOT because the fiber data is sensitive.
 
 ## 8. Accounts (CORRECTED 2026-07-03 — the old "custody" framing was WRONG, Patrick's words:
 ## "this is my sales team, my ghl, my biz; Frontline is a separate manager who works for me")
