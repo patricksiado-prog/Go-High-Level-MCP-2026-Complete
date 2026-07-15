@@ -1295,3 +1295,16 @@ area" (fragile, Patrick's zoom concern), do ONE normal capture to grab csrfToken
 (cookies+csrf auto-included) -> returns that area's dot JSON with NO zoom/pan/click. Covers a ZIP by
 calling a few lat/lon points across it. This removes the zoom dependency entirely. Keep browser-driven
 path as fallback; test live before trusting.
+
+### 11h-fix4 (2026-07-01) — sheet cleanup tools (no Drive row-edit; dedup in code)
+- The Google Drive connector CANNOT edit rows in a live Sheet (only create/read files); overwriting the
+  file would destroy tabs/formulas/dialer link. So sheet dedup/cleanup is done in code the user runs.
+- The hunter ALREADY dedupes on write (precise_fiber_hunter ~line 913: skips keys already in the sheet),
+  so new runs don't add dups; existing dups are historical (pre-dedup / multi-machine).
+- `clean_sheet.py` -- deletes only DEBUG tabs (Backend Capture/Analysis, Fiber Scout, Fresh ZIPs, Hunter
+  Status, OPTIMUS_DRIVE_LOG, _optimus_probe); hard PROTECT guard on pipeline tabs. Dry-run unless --yes.
+- `dedupe_sheet.py` -- removes DUPLICATE rows from pipeline tabs (Fiber Green Biz, Upgrade Orange Biz,
+  Maps Businesses, Hunter Leads, Enriched Leads), keeping the FIRST of each and deleting later copies
+  bottom-up (header/order/formatting preserved). Default = exact-row match (safe); --by-key dedupes by
+  phone (green/orange/maps) or address (hunter/enriched). Dry-run unless --yes. Both scripts run on the
+  user's machine (need google_creds.json). PIPELINE TABS ARE NEVER DELETED, only dup rows removed.
