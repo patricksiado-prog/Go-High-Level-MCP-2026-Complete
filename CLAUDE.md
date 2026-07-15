@@ -1142,3 +1142,49 @@ Green Biz" tab → dedupe by phone → load into the GHL Command power dialer (r
   protobuf decode (tile-local→lng/lat web-mercator). NEXT worth trying on AT&T: inject the
   getContext+fiber-walk recovery to see if the hidden map becomes readable (would beat pixel/tile
   guessing). Skill file: `.claude/skills/mapbox-extraction/SKILL.md`.
+
+### 11g. SESSION 2026-07-01 — Fiber Scout GREEN-0 root-caused + backend color code DECODED. Read before touching the scout.
+**Symptom:** scout read GREEN 0 / "finds nothing" even over blocks visibly full of green dots.
+Four separate bugs, all fixed this session (branch `claude/optimus-map-tools-setup-6dcl6o`):
+
+1. **THE KILLER — `lead_from_dict` dropped the raw record.** It returned only
+   `{address,lat,lng,status,ban}`, so `scan_cell`'s `_wire_records` (which reads `ld["raw"]`)
+   always got `[]` → the backend path NEVER fired → every cell silently used the (broken) pixel
+   fallback, even though runs captured 4,500 real leads. FIX: attach `raw=base` to every lead in
+   `precise_fiber_hunter.lead_from_dict`.
+2. **Classifier treated `curr_ntwrk_bld_type_cd="unavailable"` as dead/SKIP** → discarded every
+   green. FIX: `unavailable` is the address's CURRENT network (no AT&T service today) = a GREEN
+   eligible non-customer. Classify by `subscriber_ban`: empty = GREEN; present = customer.
+   (`backend_classifier.classify_lead`.)
+3. **Gold/grey codes unknown.** DECODED from a live 3300 CUMMINS ST capture:
+   `fttp-gpon` (+ `1000M` speed) + customer = existing FIBER = GREY. Saved in
+   `optimus/build_codes.json` (`fiber: fttp-gpon/fttp/gpon/ftth`, `copper: copper/ipbb/dsl/...`).
+4. **Pixel green window too narrow** (for cells that still fall back). AT&T's dot is a LIME green
+   (high red, near-zero blue) that fell outside the old `(30,130,30)-(100,210,80)` box. Widened to
+   `(40,120,0)-(180,225,130)` in `optimus_dot_detect.py`; also capped GRAY neutral ceiling so road-
+   grey stops inflating grey share.
+
+**THE COLOR CODE (confirmed from live backend data):**
+  GREEN = `subscriber_ban` empty + `curr_ntwrk_bld_type_cd="unavailable"`  → eligible non-customer (LEAD)
+  GREY  = customer + `fttp-gpon` (fiber, 1000M)                            → existing fiber, SKIP
+  GOLD  = customer + copper code (copper/ipbb/dsl — not yet seen live)     → copper upgrade
+
+**Operational reality it exposed:** the inner loop is PICKED OVER. 3300 Cummins = 197 fiber
+customers vs 53 eligible = **79% penetrated = MATURE**. New fiber lives at the EXPANSION EDGE —
+scan newer suburbs (Katy, Cypress, Richmond/Rosenberg, Spring/Conroe), not 77027. Eyeball rule:
+lots of green + almost no blue-grey = fresh; lots of blue-grey = already worked.
+
+**Capture upgrades built this session (every normal run now pushes these — no test.py):**
+  - `_live/backend_analysis.txt` — FULL-feed analysis over ALL captured records (`backend_classifier.deep_analyze`):
+    field fill-rates, distinct values of every status field, build_type×ban and build_type×speed
+    cross-tabs, full classification, and any UNMAPPED customer build codes to learn next.
+  - `_live/net_endpoints.txt` — AT&T's serviceability FEED URL + every non-asset endpoint.
+  - `_live/serviceability_raw.json` — full raw records (every field).
+  - `_live/backend_exchange.txt` — AT&T's REQUEST shape (method/URL/POST params/header names) to
+    replicate the call. Auth values REDACTED; full request saved local-only in
+    `serviceability_request_FULL.json` (gitignored, protects Patrick's session).
+
+**NEXT (update #2, not yet built):** from a fresh run's `backend_exchange.txt` + `serviceability_raw.json`,
+build a **direct backend reader** — hit AT&T's serviceability endpoint for a ZIP/area and get the
+full green list in one call, no map/pixels/panning. Also map any new build codes into build_codes.json.
+Also still parked: visible BUILD stamp in the window; the "keeps stopping" watchdog (see 11f).
