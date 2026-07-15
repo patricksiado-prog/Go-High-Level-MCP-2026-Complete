@@ -1,64 +1,79 @@
-OPTIMUS FULL BACKEND ANALYSIS  2026-07-15 12:28:18  host=LAPTOP-RS9EHSLO  records=2500
+OPTIMUS FULL BACKEND ANALYSIS  2026-07-15 12:29:10  host=LAPTOP-RS9EHSLO  records=5000
 
-=== FULL BACKEND ANALYSIS ===  records: 2500
+=== FULL BACKEND ANALYSIS ===  records: 5000
 
 FIELDS present (fill rate):
-   zip                          2500/2500
-   longitude                    2500/2500
-   subscriber_ban               2500/2500
-   state                        2500/2500
-   curr_ntwrk_bld_type_cd       2500/2500
-   speed                        2500/2500
-   city                         2500/2500
-   miles_from_claim             2500/2500
-   address                      2500/2500
-   subscriber_ban_masked        2500/2500
-   missing_supl                 2500/2500
-   latitude                     2500/2500
+   zip                          5000/5000
+   longitude                    5000/5000
+   subscriber_ban               5000/5000
+   state                        5000/5000
+   curr_ntwrk_bld_type_cd       5000/5000
+   speed                        5000/5000
+   city                         5000/5000
+   miles_from_claim             5000/5000
+   address                      5000/5000
+   subscriber_ban_masked        5000/5000
+   missing_supl                 5000/5000
+   latitude                     5000/5000
 
 curr_ntwrk_bld_type_cd -- distinct values:
-   FTTP-GPON                    1274
-   unavailable                  1226
+   unavailable                  2911
+   FTTP-GPON                    2087
+   FTTN-BP                      2
 
 subscriber_ban -- distinct values:
-   customer                     1274
-   non-cust                     1226
+   non-cust                     2911
+   customer                     2089
 
 speed -- distinct values:
-   (empty)                      1226
-   1000                         574
-   300                          344
-   Hsia500g                     284
-   Hsia2000g                    48
-   100                          13
-   50                           9
-   500                          2
+   (empty)                      2911
+   1000                         906
+   300                          570
+   Hsia500g                     438
+   Hsia2000g                    70
+   100                          30
+   500                          23
+   50                           22
+   Hsia5000g                    13
+   25                           8
+   12.288                       5
+   6.144                        2
+   3.072                        2
 
 missing_supl -- distinct values:
-   0                            2498
-   1                            2
+   0                            4970
+   1                            30
 
 state -- distinct values:
-   TX                           2500
+   TX                           5000
 
 city -- distinct values:
-   HOUSTON                      2500
+   HOUSTON                      5000
 
 zip -- distinct values:
-   77070                        2500
+   77070                        5000
 
 CROSS-TAB  build_type x ban  -> sample address:
-   fttp-gpon              customer    1274   e.g. 118 VINTAGE PARK BLVD STE A
-   unavailable            non-cust    1226   e.g. 114 VINTAGE PARK BLVD
+   unavailable            non-cust    2911   e.g. 114 VINTAGE PARK BLVD
+   fttp-gpon              customer    2087   e.g. 118 VINTAGE PARK BLVD STE A
+   fttn-bp                customer       2   e.g. 13135 BACH ELM ST
 
 CROSS-TAB  build_type x speed:
-   unavailable            (none)           1226
-   fttp-gpon              1000              574
-   fttp-gpon              300               344
-   fttp-gpon              Hsia500g          284
-   fttp-gpon              Hsia2000g          48
-   fttp-gpon              100                13
-   fttp-gpon              50                  9
-   fttp-gpon              500                 2
+   unavailable            (none)           2911
+   fttp-gpon              1000              906
+   fttp-gpon              300               570
+   fttp-gpon              Hsia500g          438
+   fttp-gpon              Hsia2000g          70
+   fttp-gpon              100                30
+   fttp-gpon              500                23
+   fttp-gpon              50                 22
+   fttp-gpon              Hsia5000g          13
+   fttp-gpon              25                  8
+   fttp-gpon              12.288              5
+   fttp-gpon              6.144               2
+   fttn-bp                3.072               2
 
-CLASSIFICATION (full set): green=1226 gold=0 grey=1274 cust-undecoded=0 skip=0  grey%=51.0  -> MATURE
+CLASSIFICATION (full set): green=2911 gold=0 grey=2087 cust-undecoded=2 skip=0  grey%=41.7  -> MATURE
+
+UNMAPPED CUSTOMER build codes (decide fiber vs copper, add to build_codes.json):
+   fttn-bp                      2 customers
