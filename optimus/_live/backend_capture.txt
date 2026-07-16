@@ -1,9 +1,9 @@
-OPTIMUS BACKEND CAPTURE  2026-07-16 01:19:34  host=LAPTOP-TB1L669N
+OPTIMUS BACKEND CAPTURE  2026-07-16 11:30:11  host=LAPTOP-TB1L669N
 --- ENDPOINTS (biggest first) ---
-ENDPOINT     | blob:https://youachieve.att.com/c690a389-84fd-47b7-a10a-cf0ec8e3ca99 | application/javascript | 482296B/1hits | 
-ENDPOINT     | blob:https://youachieve.att.com/21a6b038-d78f-412a-ba53-8610cd0b911c | application/javascript | 482296B/1hits | 
+ENDPOINT     | blob:https://youachieve.att.com/d85c0480-dffb-4fdc-a416-0b88d2b1bb47 | application/javascript | 482296B/1hits | 
+ENDPOINT     | blob:https://youachieve.att.com/aa9aeac9-5c8a-4d6b-8e82-fd00d4e57172 | application/javascript | 482296B/1hits | 
 ENDPOINT     | https://youachieve.att.com/yourefer/dist/main.js | application/javascript | 475160B/1hits | 
-ENDPOINT     | https://www.googletagmanager.com/gtag/js | application/javascript; charset=UTF-8 | 154116B/2hits | 
+ENDPOINT     | https://www.googletagmanager.com/gtag/js | application/javascript; charset=UTF-8 | 154119B/2hits | 
 ENDPOINT     | https://youachieve.att.com/yourefer/js/googlejs.js | application/javascript | 76936B/1hits | 
 ENDPOINT     | https://youachieve.att.com/ui/fonts/fontawesome-webfont.woff2 | application/font-woff2 | 71896B/1hits | 
 ENDPOINT     | https://youachieve.att.com/ui/jquery/jquery-ui-1_14_1/jquery-ui.min.js | application/javascript | 67248B/1hits | 
@@ -16,62 +16,57 @@ ENDPOINT     | https://api.mapbox.com/fonts/v1/mapbox/DIN%20Offc%20Pro%20Medium,
 ENDPOINT     | https://api.mapbox.com/fonts/v1/mapbox/DIN%20Offc%20Pro%20Regular,Arial%20Unicode%20MS%20Regular/0-255.pbf | application/x-protobuf | 38616B/1hits | 
 ENDPOINT     | https://api.mapbox.com/styles/v1/mapbox/streets-v9/sprite.png | image/png | 36415B/1hits | 
 ENDPOINT     | https://youachieve.att.com/resources/59d4152c9d328741d98ac6233c9dc954522001624dcc5/e/65226_747628124.js | application/javascript | 33127B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/14/3788/6611.vector.pbf | application/x-protobuf | 32534B/1hits | 
 ENDPOINT     | https://youachieve.att.com/ui/jquery/jquery-3.6.4.min.js | application/javascript | 31085B/1hits | 
 ENDPOINT     | https://youachieve.att.com/yourefer/dist/styles.css | text/css | 29639B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/14/3788/6612.vector.pbf | application/x-protobuf | 28366B/1hits | 
 ENDPOINT     | https://youachieve.att.com/6xVC2M/1I_/Tfe/JsJnFM2f/JciXEa/eDYzPgE/BBR1F/jA4CQMq | application/javascript | 28076B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/15/7572/13222.vector.pbf | application/x-protobuf | 26017B/1hits | 
 ENDPOINT     | https://youachieve.att.com/yourefer/dist/ATTAleckSans_W_Md.ttf | application/octet-stream | 24446B/1hits | 
 ENDPOINT     | https://youachieve.att.com/yourefer/dist/ATTAleckSans_W_Bd.ttf | application/octet-stream | 23507B/1hits | 
 ENDPOINT     | https://api.mapbox.com/fonts/v1/mapbox/DIN%20Offc%20Pro%20Medium,Arial%20Unicode%20MS%20Regular/8192-8447.pbf | application/x-protobuf | 21550B/1hits | 
---- LEADS PARSED: 1999 ---
-LEADS PARSED |  |  | 1999 | 
-SAMPLE LEAD  | 211 S AKARD ST | status=None | lat=32.779296 lng=-96.800016 ban=None | 
-SAMPLE LEAD  | 211 S AKARD ST RM BRKRM | status=None | lat=32.779296 lng=-96.800016 ban=None | 
-SAMPLE LEAD  | 211 S AKARD ST STE 101 | status=None | lat=32.779296 lng=-96.800016 ban=None | 
-SAMPLE LEAD  | 211 S AKARD ST SUIT 107 | status=None | lat=32.779296 lng=-96.800016 ban=None | 
-SAMPLE LEAD  | 211 S AKARD ST UNIT 104MRL | status=None | lat=32.779296 lng=-96.800016 ban=BmrSnr!FC45809D5BF95A438A0D95CCDBC656DB | 
-SAMPLE LEAD  | 211 S AKARD ST UNIT GPDEMO01 | status=None | lat=32.779296 lng=-96.800016 ban=None | 
+ENDPOINT     | https://api.mapbox.com/fonts/v1/mapbox/DIN%20Offc%20Pro%20Regular,Arial%20Unicode%20MS%20Regular/8192-8447.pbf | application/x-protobuf | 21178B/1hits | 
+ENDPOINT     | https://youachieve.att.com/ui/css/bootstrap.css | text/css | 21055B/1hits | 
+ENDPOINT     | https://www.google-analytics.com/analytics.js | text/javascript | 20802B/1hits | 
+--- LEADS PARSED: 1000 ---
+LEADS PARSED |  |  | 1000 | 
+SAMPLE LEAD  | 102 CENTRAL AVE | status=None | lat=30.346911 lng=-97.370353 ban=None | 
+SAMPLE LEAD  | 101 CENTRAL AVE | status=None | lat=30.346617 lng=-97.370194 ban=None | 
+SAMPLE LEAD  | 101 CENTRAL AVE APT REAR | status=None | lat=30.346617 lng=-97.370194 ban=None | 
+SAMPLE LEAD  | 101 CENTRAL AVE UNIT A | status=None | lat=30.346617 lng=-97.370194 ban=None | 
+SAMPLE LEAD  | 106 CENTRAL AVE | status=None | lat=30.34687 lng=-97.370506 ban=None | 
+SAMPLE LEAD  | 102 S MAIN ST | status=None | lat=30.346474 lng=-97.370098 ban=None | 
 JSON TOP KEYS| success, error, content |  |  | 
 --- JSON SAMPLE ---
-{"success": true, "error": {"message": "OK", "status": 200}, "content": [{"zip": "75202", "longitude": "-96.800016", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "DALLAS", "miles_from_claim": "0.00983", "address": "211 S AKARD ST", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "32.779296"}, {"zip": "75202", "longitude": "-96.800016", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "DALLAS", "miles_from_claim": "0.00983", "address": "211 S AKARD ST RM BRKRM", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "32.779296"}, {"zip": "75202", "longitude": "-96.800016", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "DALLAS", "miles_from_claim": "0.00983", "address": "211 S AKARD ST STE 101", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "32.779296"}, {"zip": "75202", "longitude": "-96.800016", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "DALLAS", "miles_from_claim": "0.00983", "address": "211 S AKARD ST SUIT 107", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "32.779296"}, {"zip": "75202", "longitude": "-96.800016", "subscriber_ban": "BmrSnr!FC45809D5BF95A438A0D95CCDBC656DB", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "1000", "city": "DALLAS", "miles_from_claim": "0.00983", "address": "211 S AKARD ST UNIT 104MRL", "subscriber_ban_masked": "******314", "missing_supl": 0, "latitude": "32.779296"}, {"zip": "75202", "longitude": "-96.800016", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "DALLAS", "miles_from_claim": "0.00983", "address": "211 S AKARD ST UNIT GPDEMO01", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "32.779296"}, {"zip": "75202", "longitude": "-96.800016", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "DALLAS", "miles_from_claim": "0.00983", "address": "211 S AKARD ST UNIT GPDEMO02", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "32.779296"}, {"zip": "75202", "longitude": "-96.800016", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "DALLAS", "miles_from_claim": "0.00983", "address": "211 S AKARD ST UNIT GPDEMO03", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "32.779296"}, {"zip": "75202", "longitude": "-96.799177", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "DALLAS", "miles_from_claim": "0.04826", "address": "214 S AKARD ST", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "32.779433"}, {"zip": "75202", "longitude": "-96.799443", "subscriber_ban": "BmrSnr!2AC65C6C82853E137DC1B752CF1AEA0F", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "1000", "city": "DALLAS", "miles_from_claim": 
+{"success": true, "error": {"message": "OK", "status": 200}, "content": [{"zip": "78621", "longitude": "-97.370353", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "ELGIN", "miles_from_claim": "0.01559", "address": "102 CENTRAL AVE", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "30.346911"}, {"zip": "78621", "longitude": "-97.370194", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "ELGIN", "miles_from_claim": "0.01988", "address": "101 CENTRAL AVE", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "30.346617"}, {"zip": "78621", "longitude": "-97.370194", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "ELGIN", "miles_from_claim": "0.01988", "address": "101 CENTRAL AVE APT REAR", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "30.346617"}, {"zip": "78621", "longitude": "-97.370194", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "ELGIN", "miles_from_claim": "0.01988", "address": "101 CENTRAL AVE UNIT A", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "30.346617"}, {"zip": "78621", "longitude": "-97.370506", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "ELGIN", "miles_from_claim": "0.02472", "address": "106 CENTRAL AVE", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "30.346870"}, {"zip": "78621", "longitude": "-97.370098", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "ELGIN", "miles_from_claim": "0.02880", "address": "102 S MAIN ST", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "30.346474"}, {"zip": "78621", "longitude": "-97.370438", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "ELGIN", "miles_from_claim": "0.03496", "address": "109 CENTRAL AVE STE A", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "30.346482"}, {"zip": "78621", "longitude": "-97.370438", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "ELGIN", "miles_from_claim": "0.03496", "address": "109 CENTRAL AVE STE B", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "30.346482"}, {"zip": "78621", "longitude": "-97.370631", "subscriber_ban": "BmrSnr!E1B466880A9061CA8058C38FD59D59CF", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "300", "city": "ELGIN", "miles_from_claim": "0.04279", "address": "113 CENTRAL AVE", "subscriber_ban_masked": "******159", "missing_supl": 0, "latitude": "30.346482"}, {"zip": "78621", "longitude": "-97.370631", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "ELGIN", "miles_from_claim": "0.04279", "address": "113 CENTRAL AVE UNIT B", "subscriber_ban_masked": "", "missing_supl": 0, "
 --- BACKEND INSPECT (fill build_codes.json from this) ---
-=== BACKEND INSPECT ===  total leads: 1000
+=== BACKEND INSPECT ===  total leads: 500
 
 curr_ntwrk_bld_type_cd values:
-   unavailable              661
-   fttp-gpon                264
-   fttn                     73
-   ip-co                    2
+   unavailable              402
+   fttp-gpon                98
 
 subscriber_ban:
-   non-cust                 661
-   customer                 339
+   non-cust                 402
+   customer                 98
 
 CROSS-TAB  (build_type x ban)  -> sample address:
-   unavailable            non-cust    661   e.g. 211 S AKARD ST
-   fttp-gpon              customer    264   e.g. 211 S AKARD ST UNIT 104MRL
-   fttn                   customer     73   e.g. 208 S AKARD ST UNIT 1505DEMO
-   ip-co                  customer      2   e.g. 601 COMMERCE ST
+   unavailable            non-cust    402   e.g. 102 CENTRAL AVE
+   fttp-gpon              customer     98   e.g. 113 CENTRAL AVE
 
 READ IT LIKE THIS:
    non-cust rows on an available build  = GREEN (prize)
    customer rows split into GOLD(copper)/GREY(fiber) by build code
    -> copy the customer build codes into COPPER/FIBER_BUILD_CODES
-INSPECT      | === BACKEND INSPECT ===  total leads: 1000 |  |  | 
+INSPECT      | === BACKEND INSPECT ===  total leads: 500 |  |  | 
 INSPECT      | curr_ntwrk_bld_type_cd values: |  |  | 
-INSPECT      | unavailable              661 |  |  | 
-INSPECT      | fttp-gpon                264 |  |  | 
-INSPECT      | fttn                     73 |  |  | 
-INSPECT      | ip-co                    2 |  |  | 
+INSPECT      | unavailable              402 |  |  | 
+INSPECT      | fttp-gpon                98 |  |  | 
 INSPECT      | subscriber_ban: |  |  | 
-INSPECT      | non-cust                 661 |  |  | 
-INSPECT      | customer                 339 |  |  | 
+INSPECT      | non-cust                 402 |  |  | 
+INSPECT      | customer                 98 |  |  | 
 INSPECT      | CROSS-TAB  (build_type x ban)  -> sample address: |  |  | 
-INSPECT      | unavailable            non-cust    661   e.g. 211 S AKARD ST |  |  | 
-INSPECT      | fttp-gpon              customer    264   e.g. 211 S AKARD ST UNIT 104MRL |  |  | 
-BACKEND VERDICT| MATURE | green=0 gold=73 grey=264 cust=2 skip=661 | grey%=77.9 | 
+INSPECT      | unavailable            non-cust    402   e.g. 102 CENTRAL AVE |  |  | 
+INSPECT      | fttp-gpon              customer     98   e.g. 113 CENTRAL AVE |  |  | 
+INSPECT      | READ IT LIKE THIS: |  |  | 
+BACKEND VERDICT| MATURE | green=0 gold=0 grey=98 cust=0 skip=402 | grey%=100.0 | 
 SERVICEABILITY FEED URL| https://youachieve.att.com/yourefer/api/fiberMap.cfc |  |  | 
 SERVICEABILITY FEED URL: https://youachieve.att.com/yourefer/api/fiberMap.cfc
-DONE         | LAPTOP-TB1L669N |  | 71 endpoints | 
+DONE         | LAPTOP-TB1L669N |  | 69 endpoints | 
