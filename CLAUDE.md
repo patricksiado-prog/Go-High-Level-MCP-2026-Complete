@@ -1399,3 +1399,16 @@ So finding fresh now yields callable leads directly, supporting the "catch fresh
 strategy. HOW CLAUDE READS OUTPUT PRECISELY: the scout auto-pushes to optimus/_live/ via github_token; I
 git-pull the branch and read fresh_leads.txt / backend_analysis.txt / scout_findings.txt. Pixel-fallback
 cells have no addresses (dots only) -- only backend-classified cells yield leads.
+
+### 11h-fix10 (2026-07-16) — STURDY STARTUP (chrome "keeps failing / tries opens starts")
+Patrick reported the launcher's chrome kept failing at launch (2 screenshots). Traceback was
+`Page.goto: net::ERR_INTERNET_DISCONNECTED` at fiber_scout.py's `page.goto(MAP_URL, timeout=60000)`.
+ROOT CAUSE = a NETWORK blip on his machine at the moment of launch (browser couldn't reach
+youachieve.att.com), NOT the last code upgrade -- goto runs BEFORE any of the sturdy-motion/fresh-leads
+changes. FIX (additive, low-risk): wrapped the startup goto in `_sturdy_goto(page, MAP_URL, tries=5)` --
+same "motion that can't hang" idea as `_sturdy_pan`, applied to launch. It retries with a growing wait
+(3s,6s,9s,12s,15s) and uses wait_until="domcontentloaded" so a transient hiccup rides out instead of
+crashing; only if ALL 5 tries fail does it raise, and it prints a plain-English network checklist first
+(check wifi / close leftover Chrome / pause VPN+McAfee). Does not change what the scout does once loaded --
+purely makes the door sturdier. Note for Patrick: if internet is genuinely down this still can't help;
+the retry only covers a blip.

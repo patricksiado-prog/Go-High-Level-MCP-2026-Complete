@@ -399,6 +399,32 @@ def _sturdy_pan(page, direction, tries=3):
     return False
 
 
+def _sturdy_goto(page, url, tries=5):
+    """STURDY STARTUP: the map load is the one spot a network blip (VPN/wifi
+    hiccup, ERR_INTERNET_DISCONNECTED, a slow AT&T redirect) kills the whole
+    Scout before it does any work. Retry the goto a few times with a growing
+    wait instead of crashing on the first miss -- same 'motion that can't hang'
+    idea as the pan retry, applied to launch. Raises only if every try fails
+    (internet is genuinely down, not just hiccuping)."""
+    last = None
+    for i in range(max(1, tries)):
+        try:
+            page.goto(url, timeout=60000, wait_until="domcontentloaded")
+            return True
+        except Exception as e:
+            last = e
+            wait = 3 * (i + 1)   # 3s, 6s, 9s, 12s ...
+            print("  map load failed (%s) -- retry %d/%d in %ds ..."
+                  % (str(e).split("\n")[0][:80], i + 1, tries, wait))
+            time.sleep(wait)
+    print("\nCould not reach the AT&T map after %d tries. This is a NETWORK "
+          "problem on this machine, not the Scout:\n"
+          "  - check wifi / that a browser can open youachieve.att.com\n"
+          "  - close any leftover Chrome windows and rerun\n"
+          "  - if on VPN/McAfee, pause it and rerun\n" % tries)
+    raise last
+
+
 def main():
     self_update()
     ap = argparse.ArgumentParser(description="Scout the AT&T map for NEW fiber areas.")
@@ -424,7 +450,7 @@ def main():
         page.on("response", cap.handle)
 
         print("Opening the AT&T fiber map ...")
-        page.goto(MAP_URL, timeout=60000)
+        _sturdy_goto(page, MAP_URL)
         time.sleep(4)
         open_map_view(page)
         time.sleep(2)
