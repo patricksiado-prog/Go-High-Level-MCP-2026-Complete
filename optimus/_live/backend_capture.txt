@@ -1,72 +1,72 @@
-OPTIMUS BACKEND CAPTURE  2026-07-16 01:03:27  host=LAPTOP-TB1L669N
+OPTIMUS BACKEND CAPTURE  2026-07-16 01:15:49  host=LAPTOP-TB1L669N
 --- ENDPOINTS (biggest first) ---
-ENDPOINT     | blob:https://youachieve.att.com/53cb4a4f-e618-4132-ac69-a8a83d7654d9 | application/javascript | 482296B/1hits | 
-ENDPOINT     | blob:https://youachieve.att.com/71d4581d-ed21-4723-87bf-755152bf0ac5 | application/javascript | 482296B/1hits | 
+ENDPOINT     | https://youachieve.att.com/yourefer/dist/assets/img/header-home-2023.png | image/png | 656022B/1hits | 
+ENDPOINT     | blob:https://youachieve.att.com/858b7c2e-fee4-470c-a7ca-963c83a92d72 | application/javascript | 482296B/1hits | 
+ENDPOINT     | blob:https://youachieve.att.com/1bf20c6b-9bf4-4319-9f70-a1a8baca68ea | application/javascript | 482296B/1hits | 
 ENDPOINT     | https://youachieve.att.com/yourefer/dist/main.js | application/javascript | 475160B/1hits | 
+ENDPOINT     | https://oidc.idp.elogin.att.com/lrr/attLRR/resources/images/mobilekey_96.gif | image/gif | 173213B/1hits | 
 ENDPOINT     | https://www.googletagmanager.com/gtag/js | application/javascript; charset=UTF-8 | 154116B/2hits | 
 ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/473/826.vector.pbf | application/x-protobuf | 103313B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/10/236/413.vector.pbf | application/x-protobuf | 100101B/1hits | 
+ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/472/825.vector.pbf | application/x-protobuf | 101811B/1hits | 
+ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/473/825.vector.pbf | application/x-protobuf | 100683B/1hits | 
+ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/472/827.vector.pbf | application/x-protobuf | 97414B/1hits | 
+ENDPOINT     | https://oidc.idp.elogin.att.com/lrr/attLRR/resources/images/howto-for-mobile-devices.gif | image/gif | 96851B/1hits | 
+ENDPOINT     | https://oidc.idp.elogin.att.com/lrr/attLRR/resources/images/howto-for-desktop-devices.gif | image/gif | 95310B/1hits | 
+ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/12/946/1652.vector.pbf | application/x-protobuf | 92403B/1hits | 
+ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/473/827.vector.pbf | application/x-protobuf | 90676B/1hits | 
+ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/472/826.vector.pbf | application/x-protobuf | 87979B/1hits | 
+ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/474/825.vector.pbf | application/x-protobuf | 87019B/1hits | 
+ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/474/826.vector.pbf | application/x-protobuf | 82748B/1hits | 
+ENDPOINT     | https://oidc.idp.elogin.att.com/lrr/attLRR/resources/images/securityKeyAnimation.gif | image/gif | 81185B/1hits | 
 ENDPOINT     | https://youachieve.att.com/yourefer/js/googlejs.js | application/javascript | 76936B/1hits | 
-ENDPOINT     | https://youachieve.att.com/ui/fonts/fontawesome-webfont.woff2 | application/font-woff2 | 71896B/1hits | 
-ENDPOINT     | https://youachieve.att.com/ui/jquery/jquery-ui-1_14_1/jquery-ui.min.js | application/javascript | 67248B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/10/237/413.vector.pbf | application/x-protobuf | 61373B/1hits | 
-ENDPOINT     | https://youachieve.att.com/resources/59d4152c9d328741d98ac6233c9dc954522001624dcc5 | application/javascript | 60889B/1hits | 
+ENDPOINT     | https://youachieve.att.com/ui/fonts/fontawesome-webfont.woff2 | application/font-woff2 | 71896B/2hits | 
+ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/11/474/827.vector.pbf | application/x-protobuf | 68406B/1hits | 
+ENDPOINT     | https://youachieve.att.com/ui/jquery/jquery-ui-1_14_1/jquery-ui.min.js | application/javascript | 67248B/2hits | 
+ENDPOINT     | https://oidc.idp.elogin.att.com/postauth/attPOSTAUTH/resources/images/oneid-password.gif | image/gif | 66291B/1hits | 
+ENDPOINT     | https://youachieve.att.com/resources/59d4152c9d328741d98ac6233c9dc954522001624dcc5 | application/javascript | 60889B/2hits | 
 ENDPOINT     | https://youachieve.att.com/yourefer/dist/assets/img/header-fiber.jpg | image/jpeg | 58474B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/10/237/412.vector.pbf | application/x-protobuf | 54462B/1hits | 
-ENDPOINT     | https://youachieve.att.com/yourefer/dist/header-bg-fiber.png | image/png | 46095B/1hits | 
-ENDPOINT     | https://api.mapbox.com/fonts/v1/mapbox/DIN%20Offc%20Pro%20Italic,Arial%20Unicode%20MS%20Regular/0-255.pbf | application/x-protobuf | 45769B/1hits | 
-ENDPOINT     | https://api.mapbox.com/fonts/v1/mapbox/DIN%20Offc%20Pro%20Bold,Arial%20Unicode%20MS%20Bold/0-255.pbf | application/x-protobuf | 43272B/1hits | 
-ENDPOINT     | https://api.mapbox.com/fonts/v1/mapbox/DIN%20Offc%20Pro%20Medium,Arial%20Unicode%20MS%20Regular/0-255.pbf | application/x-protobuf | 41066B/1hits | 
-ENDPOINT     | https://api.mapbox.com/fonts/v1/mapbox/DIN%20Offc%20Pro%20Regular,Arial%20Unicode%20MS%20Regular/0-255.pbf | application/x-protobuf | 38616B/1hits | 
-ENDPOINT     | https://api.mapbox.com/styles/v1/mapbox/streets-v9/sprite.png | image/png | 36415B/1hits | 
-ENDPOINT     | https://youachieve.att.com/resources/59d4152c9d328741d98ac6233c9dc954522001624dcc5/e/65226_747628124.js | application/javascript | 33127B/1hits | 
-ENDPOINT     | https://youachieve.att.com/ui/jquery/jquery-3.6.4.min.js | application/javascript | 31085B/1hits | 
-ENDPOINT     | https://youachieve.att.com/yourefer/dist/styles.css | text/css | 29639B/1hits | 
-ENDPOINT     | https://youachieve.att.com/6xVC2M/1I_/Tfe/JsJnFM2f/JciXEa/eDYzPgE/BBR1F/jA4CQMq | application/javascript | 28076B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/13/1880/3439.vector.pbf | application/x-protobuf | 27390B/1hits | 
-ENDPOINT     | https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2,mapbox.mapbox-streets-v7/13/1879/3439.vector.pbf | application/x-protobuf | 24785B/1hits | 
---- LEADS PARSED: 3000 ---
-LEADS PARSED |  |  | 3000 | 
-SAMPLE LEAD  | 2702 S STAPLES ST | status=None | lat=27.763122 lng=-97.403118 ban=None | 
-SAMPLE LEAD  | 1106 FLORIDA AVE | status=None | lat=27.763289 lng=-97.403784 ban=None | 
-SAMPLE LEAD  | 1011 LOUISIANA AVE | status=None | lat=27.763143 lng=-97.402843 ban=None | 
-SAMPLE LEAD  | 1001 LOUISIANA AVE | status=None | lat=27.763306 lng=-97.402635 ban=None | 
-SAMPLE LEAD  | 1001 LOUISIANA AVE APT 202 | status=None | lat=27.763306 lng=-97.402635 ban=None | 
-SAMPLE LEAD  | 1001 LOUISIANA AVE RM 302 | status=None | lat=27.763306 lng=-97.402635 ban=None | 
+--- LEADS PARSED: 3500 ---
+LEADS PARSED |  |  | 3500 | 
+SAMPLE LEAD  | 102 CENTRAL AVE | status=None | lat=30.346911 lng=-97.370353 ban=None | 
+SAMPLE LEAD  | 101 CENTRAL AVE | status=None | lat=30.346617 lng=-97.370194 ban=None | 
+SAMPLE LEAD  | 101 CENTRAL AVE APT REAR | status=None | lat=30.346617 lng=-97.370194 ban=None | 
+SAMPLE LEAD  | 101 CENTRAL AVE UNIT A | status=None | lat=30.346617 lng=-97.370194 ban=None | 
+SAMPLE LEAD  | 106 CENTRAL AVE | status=None | lat=30.34687 lng=-97.370506 ban=None | 
+SAMPLE LEAD  | 102 S MAIN ST | status=None | lat=30.346474 lng=-97.370098 ban=None | 
 JSON TOP KEYS| success, error, content |  |  | 
 --- JSON SAMPLE ---
-{"success": true, "error": {"message": "OK", "status": 200}, "content": [{"zip": "78404", "longitude": "-97.403118", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "CORPUS CHRISTI", "miles_from_claim": "0.03177", "address": "2702 S STAPLES ST", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "27.763122"}, {"zip": "78404", "longitude": "-97.403784", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "CORPUS CHRISTI", "miles_from_claim": "0.03539", "address": "1106 FLORIDA AVE", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "27.763289"}, {"zip": "78404", "longitude": "-97.402843", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "CORPUS CHRISTI", "miles_from_claim": "0.03957", "address": "1011 LOUISIANA AVE", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "27.763143"}, {"zip": "78404", "longitude": "-97.402635", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "CORPUS CHRISTI", "miles_from_claim": "0.04374", "address": "1001 LOUISIANA AVE", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "27.763306"}, {"zip": "78404", "longitude": "-97.402635", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "CORPUS CHRISTI", "miles_from_claim": "0.04374", "address": "1001 LOUISIANA AVE APT 202", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "27.763306"}, {"zip": "78404", "longitude": "-97.402635", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "CORPUS CHRISTI", "miles_from_claim": "0.04374", "address": "1001 LOUISIANA AVE RM 302", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "27.763306"}, {"zip": "78404", "longitude": "-97.402635", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "CORPUS CHRISTI", "miles_from_claim": "0.04374", "address": "1001 LOUISIANA AVE STE 101", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "27.763306"}, {"zip": "78404", "longitude": "-97.402635", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "CORPUS CHRISTI", "miles_from_claim": "0.04374", "address": "1001 LOUISIANA AVE STE 200", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "27.763306"}, {"zip": "78404", "longitude": "-97.402635", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "CORPUS CHRISTI", "miles_from_claim": "0.04374", "address": "1001 LOUISIANA AVE STE 201", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "27.763306"}, {"zip": "78404", "longitude": "-97.402635", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "CORPUS CHRISTI", "miles_from_claim": "0.04374", "address
+{"success": true, "error": {"message": "OK", "status": 200}, "content": [{"zip": "78621", "longitude": "-97.370353", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "ELGIN", "miles_from_claim": "0.01559", "address": "102 CENTRAL AVE", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "30.346911"}, {"zip": "78621", "longitude": "-97.370194", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "ELGIN", "miles_from_claim": "0.01988", "address": "101 CENTRAL AVE", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "30.346617"}, {"zip": "78621", "longitude": "-97.370194", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "ELGIN", "miles_from_claim": "0.01988", "address": "101 CENTRAL AVE APT REAR", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "30.346617"}, {"zip": "78621", "longitude": "-97.370194", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "ELGIN", "miles_from_claim": "0.01988", "address": "101 CENTRAL AVE UNIT A", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "30.346617"}, {"zip": "78621", "longitude": "-97.370506", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "ELGIN", "miles_from_claim": "0.02472", "address": "106 CENTRAL AVE", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "30.346870"}, {"zip": "78621", "longitude": "-97.370098", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "ELGIN", "miles_from_claim": "0.02880", "address": "102 S MAIN ST", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "30.346474"}, {"zip": "78621", "longitude": "-97.370438", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "ELGIN", "miles_from_claim": "0.03496", "address": "109 CENTRAL AVE STE A", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "30.346482"}, {"zip": "78621", "longitude": "-97.370438", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "ELGIN", "miles_from_claim": "0.03496", "address": "109 CENTRAL AVE STE B", "subscriber_ban_masked": "", "missing_supl": 0, "latitude": "30.346482"}, {"zip": "78621", "longitude": "-97.370631", "subscriber_ban": "BmrSnr!E1B466880A9061CA8058C38FD59D59CF", "state": "TX", "curr_ntwrk_bld_type_cd": "FTTP-GPON", "speed": "300", "city": "ELGIN", "miles_from_claim": "0.04279", "address": "113 CENTRAL AVE", "subscriber_ban_masked": "******159", "missing_supl": 0, "latitude": "30.346482"}, {"zip": "78621", "longitude": "-97.370631", "subscriber_ban": "", "state": "TX", "curr_ntwrk_bld_type_cd": "unavailable", "speed": "", "city": "ELGIN", "miles_from_claim": "0.04279", "address": "113 CENTRAL AVE UNIT B", "subscriber_ban_masked": "", "missing_supl": 0, "
 --- BACKEND INSPECT (fill build_codes.json from this) ---
-=== BACKEND INSPECT ===  total leads: 1500
+=== BACKEND INSPECT ===  total leads: 1750
 
 curr_ntwrk_bld_type_cd values:
-   unavailable              858
-   fttp-gpon                642
+   unavailable              1360
+   fttp-gpon                390
 
 subscriber_ban:
-   non-cust                 858
-   customer                 642
+   non-cust                 1360
+   customer                 390
 
 CROSS-TAB  (build_type x ban)  -> sample address:
-   unavailable            non-cust    858   e.g. 2702 S STAPLES ST
-   fttp-gpon              customer    642   e.g. 1001 LOUISIANA AVE STE 402
+   unavailable            non-cust   1360   e.g. 102 CENTRAL AVE
+   fttp-gpon              customer    390   e.g. 113 CENTRAL AVE
 
 READ IT LIKE THIS:
    non-cust rows on an available build  = GREEN (prize)
    customer rows split into GOLD(copper)/GREY(fiber) by build code
    -> copy the customer build codes into COPPER/FIBER_BUILD_CODES
-INSPECT      | === BACKEND INSPECT ===  total leads: 1500 |  |  | 
+INSPECT      | === BACKEND INSPECT ===  total leads: 1750 |  |  | 
 INSPECT      | curr_ntwrk_bld_type_cd values: |  |  | 
-INSPECT      | unavailable              858 |  |  | 
-INSPECT      | fttp-gpon                642 |  |  | 
+INSPECT      | unavailable              1360 |  |  | 
+INSPECT      | fttp-gpon                390 |  |  | 
 INSPECT      | subscriber_ban: |  |  | 
-INSPECT      | non-cust                 858 |  |  | 
-INSPECT      | customer                 642 |  |  | 
+INSPECT      | non-cust                 1360 |  |  | 
+INSPECT      | customer                 390 |  |  | 
 INSPECT      | CROSS-TAB  (build_type x ban)  -> sample address: |  |  | 
-INSPECT      | unavailable            non-cust    858   e.g. 2702 S STAPLES ST |  |  | 
-INSPECT      | fttp-gpon              customer    642   e.g. 1001 LOUISIANA AVE STE 402 |  |  | 
+INSPECT      | unavailable            non-cust   1360   e.g. 102 CENTRAL AVE |  |  | 
+INSPECT      | fttp-gpon              customer    390   e.g. 113 CENTRAL AVE |  |  | 
 INSPECT      | READ IT LIKE THIS: |  |  | 
-BACKEND VERDICT| MATURE | green=0 gold=0 grey=642 cust=0 skip=858 | grey%=100.0 | 
+BACKEND VERDICT| MATURE | green=0 gold=0 grey=390 cust=0 skip=1360 | grey%=100.0 | 
 SERVICEABILITY FEED URL| https://youachieve.att.com/yourefer/api/fiberMap.cfc |  |  | 
 SERVICEABILITY FEED URL: https://youachieve.att.com/yourefer/api/fiberMap.cfc
-DONE         | LAPTOP-TB1L669N |  | 88 endpoints | 
+DONE         | LAPTOP-TB1L669N |  | 161 endpoints | 
