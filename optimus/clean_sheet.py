@@ -19,8 +19,12 @@ import sys
 from precise_fiber_hunter import open_sheet
 
 # Debug / log / capture tabs -- regenerated on the next run, safe to remove.
+# "Fresh Leads" + "Fiber Scout" are the SCOUT's discovery tabs -- removing them
+# from the shared team sheet keeps fresh green private (Patrick 2026-07-16). Any
+# tab with data is BACKED UP to a local CSV before deletion so nothing is lost.
 DEBUG = {
     "Backend Capture", "Backend Analysis", "Fiber Scout", "Fresh ZIPs",
+    "Fresh Leads",
     "Hunter Status", "OPTIMUS_DRIVE_LOG", "_optimus_probe", "Precise Fiber_DEBUG",
 }
 
@@ -36,8 +40,18 @@ def _protected(title):
     return any(p in low for p in PROTECT)
 
 
+# The SCOUT's own discovery tabs -- with --scout-only we remove ONLY these from
+# the shared team sheet (leaves the hunter's Backend/Status logs alone).
+SCOUT_TABS = {"Fiber Scout", "Fresh Leads", "Fresh ZIPs"}
+
+
 def main():
     do_it = "--yes" in sys.argv
+    scout_only = "--scout-only" in sys.argv
+    targets = SCOUT_TABS if scout_only else DEBUG
+    if scout_only:
+        print("SCOUT-ONLY: removing just the scout's discovery tabs "
+              "(Fiber Scout, Fresh Leads, Fresh ZIPs) from the team sheet.\n")
     sh = open_sheet()
     if sh is None:
         print("Could not open the sheet (check google_creds.json)."); return
@@ -50,7 +64,7 @@ def main():
     to_delete, kept = [], []
     for ws in tabs:
         t = ws.title
-        if t in DEBUG and not _protected(t):
+        if t in targets and not _protected(t):
             to_delete.append(ws)
         else:
             kept.append(t)
@@ -70,13 +84,34 @@ def main():
               % len(to_delete))
         return
 
+    import os, csv, time
+    bdir = os.path.join(os.path.expanduser("~"), "optimus",
+                        "sheet_backups_" + time.strftime("%Y%m%d_%H%M%S"))
     for ws in to_delete:
+        # BACK UP the tab's data to a local CSV before deleting, so nothing
+        # valuable (e.g. Fresh Leads' callable green/gold addresses) is lost.
+        try:
+            rows = ws.get_all_values()
+        except Exception:
+            rows = []
+        if rows:
+            try:
+                os.makedirs(bdir, exist_ok=True)
+                safe = "".join(c if c.isalnum() else "_" for c in ws.title)
+                with open(os.path.join(bdir, safe + ".csv"), "w", newline="",
+                          encoding="utf-8") as f:
+                    csv.writer(f).writerows(rows)
+                print("   backed up %s (%d rows) -> %s" % (ws.title, len(rows), bdir))
+            except Exception as e:
+                print("   (backup hiccup for %s: %s -- NOT deleting it to be safe)"
+                      % (ws.title, str(e)[:50]))
+                continue   # never delete a tab we couldn't back up
         try:
             ss.del_worksheet(ws)
             print("   deleted: %s" % ws.title)
         except Exception as e:
             print("   could not delete %s: %s" % (ws.title, str(e)[:60]))
-    print("\nDone. Debug tabs removed; pipeline tabs untouched.")
+    print("\nDone. Debug/scout tabs removed (backed up to %s); pipeline tabs untouched." % bdir)
 
 
 if __name__ == "__main__":

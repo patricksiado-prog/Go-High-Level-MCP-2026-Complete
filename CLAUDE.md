@@ -1495,3 +1495,17 @@ leak. ALL scout tabs (Fiber Scout, Backend Capture/Analysis, Fresh Leads) write 
 in the private sheet. Imported find_creds + SCOPES from the hunter. NOTE: OLD scout data already in the shared
 sheet's 'Fiber Scout'/'Fresh Leads' tabs from past runs is still there -- offered to clean it if he wants the
 history hidden. "sometimes" honored via --to-team; can also copy private->team on request when ready to share.
+
+### 11h-fix17 (2026-07-16) — clean OLD scout tabs off the TEAM sheet (backed up first)
+Patrick: "yes clean it please" -> remove the scout's old discovery tabs from the shared team sheet. Claude
+CANNOT edit sheet tabs remotely (Drive MCP reads/exports only; deleting tabs needs gspread on Patrick's
+machine), so this runs on his PC like the other cleanups. Changes to clean_sheet.py: (a) added "Fresh Leads"
+to the DEBUG set (it was missing -- that's the tab with the callable green/gold addresses, the sensitive one);
+(b) NEW --scout-only mode -> removes ONLY {Fiber Scout, Fresh Leads, Fresh ZIPs} (leaves hunter Backend/Status
+logs alone), the precise match to "clean the scout tabs"; (c) BACKUP-BEFORE-DELETE: every tab with data is
+dumped to a local CSV at ~/optimus/sheet_backups_<ts>/<tab>.csv before deletion, and a tab that can't be
+backed up is NOT deleted -- so no callable leads are ever lost. New one-click optimus/install/RUN_HIDE_SCOUT.bat
+(downloads deps, dry-run preview, Y to delete --scout-only --yes). PROTECT guard + dry-run default still apply.
+TODO: also drop RUN_HIDE_SCOUT.bat into Patrick's Drive installers folder (0AHafe86gsae2Uk9PVA) so he can
+double-click it. Old Fresh Leads addresses live on in the CSV backup; can be imported to the private sheet if
+he wants them there.
