@@ -1450,3 +1450,20 @@ Side benefit: with no surprise second browser, the persistent att_profile keeps 
 launches; he only centers once per launch, not twice. NOTE: hunter still has self_update relaunch -- left
 alone (Patrick was running the scout; change hunter only if he asks). Open idea offered, not built: remember
 last centered lat/lon and auto-restore on launch so even manual relaunches skip re-centering.
+
+### 11h-fix14 (2026-07-16) — REAL-TIME LEAD COUNT + Claude can read the live sheet
+Patrick: "can u see the Google sheet ... I wanna know how many leads are getting pulled in real time ... convert
+to xls ... can they print u the data it's critical." TWO capabilities confirmed/added:
+(1) CLAUDE CAN SEE THE LIVE SHEET via Google Drive MCP. The live master is "ATT FIBER LEADS" spreadsheet id
+    1FhO2BTMXGefm1tLwKbbMPXvzT1160882Auauzep7ooA (owner patricksiado@gmail.com, in Drive folder
+    0AHafe86gsae2Uk9PVA). I can read tabs (mcp Google_Drive read_file_content) and export xlsx
+    (download_file_content exportMimeType=...spreadsheetml.sheet). CAVEAT: the sheet is huge (~10MB xlsx, 180k+
+    rows) so a full read truncates + burns context -- do NOT full-read it to count. Use the live tally instead:
+(2) LIVE TALLY (real-time count I can read instantly): scout now pushes optimus/_live/LIVE_COUNTS.txt every 15
+    cells (and a final one at stop) via gh_put -- running totals: cells scanned, GREEN/GOLD/GREY dots, eligible
+    (green+gold), fresh/working cells, callable leads this run, last cell. To answer "how many so far" I just
+    `git pull` the branch and read that one tiny file -- no sheet parse. New fn push_live_tally(host, cells,
+    green, gold, grey, fresh_cells, leads, last); accumulators tot_green/tot_gold/tot_grey/fresh_cells in the
+    survey loop. TODO (offered): add the SAME 2-line tally to the HUNTER (backend addresses) and the STANDALONE
+    SCRAPER (business leads into Fiber Green Biz) so I can report a COMBINED real-time total across all three --
+    those are the real lead VOLUME; the scout is fresh-area discovery. Not done yet -- do when Patrick confirms.

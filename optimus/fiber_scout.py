@@ -128,6 +128,31 @@ def gh_put(path, text):
         return False
 
 
+def push_live_tally(host, cells, green, gold, grey, fresh_cells, leads, last):
+    """REAL-TIME COUNTER (Patrick 2026-07-16 "I wanna know how many leads are
+    getting pulled in real time"). Push a tiny running-totals file to GitHub
+    (optimus/_live/LIVE_COUNTS.txt) as the survey runs, so Claude can git-pull
+    and read the current count at ANY moment -- no need to open/parse the whole
+    180k-row sheet. Small file, updated every few cells; best-effort (no token
+    -> silently skips, exactly like the other pushes)."""
+    txt = (
+        "OPTIMUS SCOUT -- LIVE COUNTS\n"
+        "updated: %s   host: %s\n"
+        "STATUS: surveying (this file updates every ~15 cells while it runs)\n"
+        "----------------------------------------\n"
+        "cells scanned:            %d\n"
+        "GREEN dots (leads):       %d\n"
+        "GOLD dots (upgrades):     %d\n"
+        "GREY dots (existing):     %d\n"
+        "ELIGIBLE (green+gold):    %d\n"
+        "FRESH/WORKING cells:      %d\n"
+        "CALLABLE LEADS this run:  %d\n"
+        "last cell: %s\n"
+        % (time.strftime("%Y-%m-%d %H:%M:%S"), host, cells, green, gold, grey,
+           green + gold, fresh_cells, leads, last))
+    gh_put("optimus/_live/LIVE_COUNTS.txt", txt)
+
+
 # ---- sheet tabs ----
 def _tab(ws, title, header, clear=False):
     if ws is None:
@@ -487,6 +512,7 @@ def main():
         idx = col = down = 0
         direction = "right"
         backend_done = False
+        tot_green = tot_gold = tot_grey = fresh_cells = 0   # real-time tally
         while True:
             idx += 1
             try:
@@ -502,6 +528,7 @@ def main():
                 print("scan error: %s" % str(e)[:80]); break
 
             elig = green + gold
+            tot_green += green; tot_gold += gold; tot_grey += gray
             tag = {"FRESH": "*** FRESH (NEW FIBER)", "WORKING": " ~ working",
                    "MATURE": "   mature (skip)", "EMPTY": "   empty"}.get(label, label)
             print("cell %3d [down %d col %d]  GREEN %3d  GOLD %3d  GREY %3d  grey%%=%.0f%%  -> %s  [%s]"
@@ -512,6 +539,7 @@ def main():
                          green, gold, gray, "%.0f%%" % (gray_share * 100), label, via])
 
             if label in ("FRESH", "WORKING") and elig >= 1:
+                fresh_cells += 1
                 shot = os.path.join(SHOT_DIR, "zone_%03d_%s_g%d_o%d_grey%d.png"
                                     % (idx, label, green, gold, gray))
                 try:
@@ -541,6 +569,15 @@ def main():
             # is static once captured, so it's NOT re-pushed here.
             elif backend_done and idx % 100 == 0:
                 write_full_analysis(ws, cap, host)
+
+            # REAL-TIME COUNT: push the running tally every 15 cells so Claude
+            # can read "how many so far" at any moment (tiny file; 15-cell
+            # cadence keeps commit traffic sane while still feeling live).
+            if idx % 15 == 0:
+                last = ("d%dc%d GREEN %d GOLD %d GREY %d -> %s"
+                        % (down, col, green, gold, gray, label))
+                push_live_tally(host, idx, tot_green, tot_gold, tot_grey,
+                                fresh_cells, len(fresh_leads), last)
 
             # THE HUNTER'S MOTION, verbatim (Patrick 2026-07-16 "use the price
             # hunter motion"): the hunter FIRES the drag and keeps going -- its
@@ -584,6 +621,8 @@ def main():
             flines.append("  d%dc%d  GREEN %d + GOLD %d  (grey %d, %.0f%%)  %s  %s"
                           % (dn, cc, g, o, gy, gs * 100, lb, os.path.basename(sh)))
         _w(sws, [ts1, host, "DONE", "", "", "", "", "%d fresh/working" % len(fresh), "survey stopped"])
+        push_live_tally(host, idx, tot_green, tot_gold, tot_grey, len(fresh),
+                        len(fresh_leads), "survey stopped (final count)")
         if not backend_done:
             write_backend(ws, cap, host)
         write_full_analysis(ws, cap, host)
