@@ -1467,3 +1467,16 @@ to xls ... can they print u the data it's critical." TWO capabilities confirmed/
     survey loop. TODO (offered): add the SAME 2-line tally to the HUNTER (backend addresses) and the STANDALONE
     SCRAPER (business leads into Fiber Green Biz) so I can report a COMBINED real-time total across all three --
     those are the real lead VOLUME; the scout is fresh-area discovery. Not done yet -- do when Patrick confirms.
+
+### 11h-fix15 (2026-07-16) — LIVE COUNTS on ALL THREE programs (combined real-time total)
+Patrick: "go" -> added the same real-time tally to the HUNTER and the STANDALONE SCRAPER. Each program now
+pushes its own tiny live file via a self-contained best-effort gh_put (copied from the scout; no token ->
+silently skips; never crashes):
+  - SCOUT   -> optimus/_live/LIVE_COUNTS.txt          (cells, GREEN/GOLD/GREY dots, eligible, fresh cells, callable leads)  [fix14]
+  - HUNTER  -> optimus/_live/LIVE_COUNTS_hunter.txt    (cells, addresses captured) -- hooked into sweep_grid capture_here() at the existing every-15-cells report_status; new push_live_counts_hunter(); added GH_REPO/GH_BRANCH/_gh_token/gh_put to precise_fiber_hunter.py (it had none before)
+  - SCRAPER -> optimus/_live/LIVE_COUNTS_scraper.txt   (businesses pulled, added-to-sheet) -- pushed every 5 category searches + at each ZIP-done + final; new push_live_counts_scraper(); added GH_REPO/GH_BRANCH/_gh_token/gh_put to standalone/maps_scraper_standalone.py
+HOW I REPORT "how many leads right now": `git pull` the branch, read the 3 LIVE_COUNTS*.txt files, sum the
+lead numbers -> combined real-time total across scout+hunter+scraper. All three files are tiny (no sheet
+parse). Each program needs github_token.txt present (same one the scout uses) for the push to fire; without a
+token it just skips silently and I fall back to reading the sheet via Drive. Left the scraper's own
+self-update relaunch alone (it runs headless in background -- no login/center cost, unlike the scout).

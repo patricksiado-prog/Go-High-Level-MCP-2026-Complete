@@ -117,6 +117,80 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
 # Self-update: which branch to pull on each start (matches the launcher).
 REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
 
+# ---- GitHub write: real-time count channel (Patrick 2026-07-16 "how many leads
+#      are getting pulled in real time"). Same proven best-effort push the scout
+#      uses -- pushes a tiny running-total file Claude can read instantly without
+#      opening the 180k-row sheet. No token -> silently skips. Never crashes. ----
+GH_REPO = "patricksiado-prog/Go-High-Level-MCP-2026-Complete"
+GH_BRANCH = REPO_BRANCH
+
+
+def _gh_token():
+    home = os.path.expanduser("~")
+    here = os.path.dirname(os.path.abspath(__file__))
+    for p in [os.path.join(home, "Downloads", "github_token.txt"),
+              os.path.join(home, "Desktop", "github_token.txt"),
+              os.path.join(home, "github_token.txt"),
+              os.path.join(home, "optimus", "github_token.txt"),
+              os.path.join(here, "github_token.txt"), "github_token.txt"]:
+        try:
+            if os.path.exists(p):
+                t = open(p).read().strip()
+                if t:
+                    return t
+        except Exception:
+            pass
+    return os.environ.get("GITHUB_TOKEN")
+
+
+def gh_put(path, text):
+    """Best-effort: commit a small text file so Claude can read it at the raw URL."""
+    import base64
+    token = _gh_token()
+    if not token:
+        return False
+    import urllib.request
+    api = "https://api.github.com/repos/%s/contents/%s" % (GH_REPO, path)
+    hdr = {"Authorization": "token %s" % token, "User-Agent": "optimus-hunter",
+           "Accept": "application/vnd.github+json"}
+    sha = None
+    try:
+        req = urllib.request.Request(api + "?ref=" + GH_BRANCH, headers=hdr)
+        with urllib.request.urlopen(req, timeout=20) as r:
+            sha = json.load(r).get("sha")
+    except Exception:
+        pass
+    body = {"message": "live: %s" % path, "branch": GH_BRANCH,
+            "content": base64.b64encode(text.encode("utf-8")).decode("ascii")}
+    if sha:
+        body["sha"] = sha
+    try:
+        req = urllib.request.Request(api, data=json.dumps(body).encode("utf-8"),
+                                     headers=hdr, method="PUT")
+        with urllib.request.urlopen(req, timeout=25) as r:
+            r.read()
+        print("  -> pushed %s to GitHub (Claude can read the live count)." % path)
+        return True
+    except Exception as e:
+        print("  (GitHub push skipped: %s)" % str(e)[:70])
+        return False
+
+
+def push_live_counts_hunter(cells, leads, area):
+    """Running total for the HUNTER (backend addresses captured off the wire),
+    pushed to optimus/_live/LIVE_COUNTS_hunter.txt so Claude can read it live."""
+    import socket
+    txt = (
+        "OPTIMUS HUNTER -- LIVE COUNTS\n"
+        "updated: %s   host: %s   area: %s\n"
+        "STATUS: hunting (updates every ~15 cells while it runs)\n"
+        "----------------------------------------\n"
+        "cells scanned:              %d\n"
+        "ADDRESSES captured this run: %d\n"
+        % (time.strftime("%Y-%m-%d %H:%M:%S"), socket.gethostname(),
+           str(area), cells, leads))
+    gh_put("optimus/_live/LIVE_COUNTS_hunter.txt", txt)
+
 VIEWPORT = {"width": 1366, "height": 768}
 
 # --- map viewport region of the screen (fractions of the window) ---
@@ -1968,6 +2042,7 @@ def sweep_grid(page, ws, seen, area_label, dry, capture):
         if tally["cells"] % 15 == 0:
             report_status(ws, area_label, "watching", found=tally["total"],
                           note="grid: %d cells, %d leads" % (tally["cells"], tally["total"]))
+            push_live_counts_hunter(tally["cells"], tally["total"], area_label)
 
     def _next(direction):
         return (pos[0] + (1 if direction == "right" else -1 if direction == "left" else 0),

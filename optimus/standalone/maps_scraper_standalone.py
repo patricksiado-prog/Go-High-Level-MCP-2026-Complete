@@ -29,6 +29,78 @@ SCROLL_ROUNDS = 18
 THROTTLE = 0.8
 _PHONE_RE = re.compile(r"\+?\d[\d\-\.\s\(\)]{8,}\d")
 
+# ---- GitHub write: real-time count channel (Patrick 2026-07-16 "how many leads
+#      are getting pulled in real time"). Same best-effort push the scout/hunter
+#      use -- pushes a tiny running-total file Claude can read instantly. No token
+#      -> silently skips; never crashes the scrape. ----
+GH_REPO = "patricksiado-prog/Go-High-Level-MCP-2026-Complete"
+GH_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
+
+
+def _gh_token():
+    home = os.path.expanduser("~")
+    for p in [os.path.join(home, "Downloads", "github_token.txt"),
+              os.path.join(home, "Desktop", "github_token.txt"),
+              os.path.join(home, "github_token.txt"),
+              os.path.join(home, "optimus", "github_token.txt"),
+              os.path.join(HERE, "github_token.txt"), "github_token.txt"]:
+        try:
+            if os.path.exists(p):
+                t = open(p).read().strip()
+                if t:
+                    return t
+        except Exception:
+            pass
+    return os.environ.get("GITHUB_TOKEN")
+
+
+def gh_put(path, text):
+    """Best-effort: commit a small text file so Claude can read it at the raw URL."""
+    import base64, urllib.request
+    token = _gh_token()
+    if not token:
+        return False
+    api = "https://api.github.com/repos/%s/contents/%s" % (GH_REPO, path)
+    hdr = {"Authorization": "token %s" % token, "User-Agent": "optimus-scraper",
+           "Accept": "application/vnd.github+json"}
+    sha = None
+    try:
+        req = urllib.request.Request(api + "?ref=" + GH_BRANCH, headers=hdr)
+        with urllib.request.urlopen(req, timeout=20) as r:
+            sha = json.load(r).get("sha")
+    except Exception:
+        pass
+    body = {"message": "live: %s" % path, "branch": GH_BRANCH,
+            "content": base64.b64encode(text.encode("utf-8")).decode("ascii")}
+    if sha:
+        body["sha"] = sha
+    try:
+        req = urllib.request.Request(api, data=json.dumps(body).encode("utf-8"),
+                                     headers=hdr, method="PUT")
+        with urllib.request.urlopen(req, timeout=25) as r:
+            r.read()
+        return True
+    except Exception:
+        return False
+
+
+def push_live_counts_scraper(total, sheet_added, zip_now, matches=None):
+    """Running total for the SCRAPER (businesses pulled), pushed to
+    optimus/_live/LIVE_COUNTS_scraper.txt so Claude can read it live."""
+    import socket
+    txt = (
+        "OPTIMUS SCRAPER -- LIVE COUNTS\n"
+        "updated: %s   host: %s   ZIP now: %s\n"
+        "STATUS: scraping (updates as it runs)\n"
+        "----------------------------------------\n"
+        "BUSINESSES pulled this run:   %d\n"
+        "added to sheet (Maps Biz):    %d\n"
+        % (time.strftime("%Y-%m-%d %H:%M:%S"), socket.gethostname(),
+           str(zip_now), total, sheet_added))
+    if matches is not None:
+        txt += "COMBO matches (green+orange): %d\n" % matches
+    gh_put("optimus/_live/LIVE_COUNTS_scraper.txt", txt)
+
 # category sets -- the run asks Light / Heavy / Deep at the start.
 CATEGORIES_LIGHT = [
     "plumber", "electrician", "hvac", "roofing", "general contractor",
@@ -712,12 +784,18 @@ def main():
                 save_progress(qdone)
                 withp = sum(1 for r in rows if r.get("phone"))
                 print("  [%d/%d] %-32s +%d (%d w/phone)" % (i, len(qs), q[:32], new, withp))
+                # REAL-TIME COUNT: push the running tally every 5 searches so
+                # Claude can read "how many pulled so far" at any moment.
+                if i % 5 == 0:
+                    push_live_counts_scraper(total, sheet_added, z)
             if not stopped:
                 zips_done.add(z)                         # whole ZIP covered
                 save_zips_done(zips_done)
+                push_live_counts_scraper(total, sheet_added, z)   # ZIP-complete snapshot
                 print("=== ZIP %s done -> moving to the next needed ZIP ===" % z)
         out_f.close()
         ctx.close()
+    push_live_counts_scraper(total, sheet_added, "DONE (final count)")
     print("\nDONE this session: %d businesses (CSV: %s)." % (total, OUT_PATH))
     if to_sheet:
         print("  %d added to the '%s' tab (live as it ran)." % (sheet_added, SHEET_TAB))
