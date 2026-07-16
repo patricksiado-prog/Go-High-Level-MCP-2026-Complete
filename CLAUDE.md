@@ -1363,3 +1363,18 @@ OPEN ITEMS (decide when Patrick is ready):
 - Ed (edsaldana08@gmail.com): share the sheet / set up the tools -- pending Patrick's say.
 - Experimental, build+test-with-Patrick: direct-fetch zip_reader (removes zoom), hunter backend-first,
   "keeps stopping" watchdog, OKC one-click ZIP reader (73102-73170 + Edmond/Moore/Norman/Yukon/Mustang).
+
+### STRATEGY (Patrick, 2026-07-01): Houston dialing is cold -- CHASE FRESH GREEN
+Patrick: "the dialing in Houston isn't too hot, MS was better -- we need to catch fresh green and call
+that." Houston inner/metro is PENETRATED (lots of grey; ~180k green-biz is mostly picked-over/dup), so
+cold calling it converts poorly. A fresher market (MS) converted better -- because fresh = lots of GREEN
+non-customers who don't have fiber yet and no competition has worked them. So the north-star play is:
+  FIND FRESH (green+gold heavy, low grey) -> HUNT it -> CALL that green, FAST, before it ages to grey.
+Mechanism we already built supports this exactly:
+  1. ZIP Reader ranks ZIPs by green+gold (fresh triage) across whatever markets we target.
+  2. Hunter works the top fresh ZIPs -> green leads to Fiber Green Biz.
+  3. Dialer calls them.
+GAP to close (proposed): the dialer loads ALL of Fiber Green Biz (mostly stale Houston), so fresh green
+drowns. Want a FRESH-FIRST load -- prioritize newest/fresh-area green (by Captured At or a freshness tag)
+so reps call the hot stuff first. Also: don't keep grinding mature Houston ZIPs; point the tools at the
+expansion edge / newer markets (MS, Corpus, newer TX suburbs). ("MS" = confirm: Mississippi?)
