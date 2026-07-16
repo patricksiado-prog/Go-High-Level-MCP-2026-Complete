@@ -1,15 +1,15 @@
-OPTIMUS NET ENDPOINTS  2026-07-15 20:57:32  host=LAPTOP-TB1L669N
+OPTIMUS NET ENDPOINTS  2026-07-16 00:55:30  host=LAPTOP-TB1L669N
 SERVICEABILITY FEED URL: https://youachieve.att.com/yourefer/api/fiberMap.cfc
 
 All non-asset endpoints (biggest first) -- the feed is in here:
-    482296B    1x  application/javascript     blob:https://youachieve.att.com/a5cfdbe2-cf92-4c0a-9ca3-234646b99f06
-    482296B    1x  application/javascript     blob:https://youachieve.att.com/d3722da5-bffe-41b7-939d-24924e18411f
+    482296B    1x  application/javascript     blob:https://youachieve.att.com/8f9741aa-afba-409f-ba7b-f966fb04703f
+    482296B    1x  application/javascript     blob:https://youachieve.att.com/74734b02-3a25-4428-af3c-207a0420bc80
     154116B    2x  application/javascript; ch https://www.googletagmanager.com/gtag/js
      60889B    1x  application/javascript     https://youachieve.att.com/resources/59d4152c9d328741d98ac6233c9dc954522001624dcc5
      28076B    1x  application/javascript     https://youachieve.att.com/6xVC2M/1I_/Tfe/JsJnFM2f/JciXEa/eDYzPgE/BBR1F/jA4CQMq
-      9700B    1x  application/javascript     blob:https://youachieve.att.com/1241f5f6-e0d1-4979-9bd7-87f4644956b4
-      9700B    1x  application/javascript     blob:https://youachieve.att.com/2714f2cc-ed39-4bcc-b788-a2fa7a2f04d8
-      9127B    6x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/api/fiberMap.cfc
-      4177B    1x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/fiber
+      9700B    1x  application/javascript     blob:https://youachieve.att.com/fe24f368-fd86-4c78-aabc-065fc3d30ff7
+      9700B    1x  application/javascript     blob:https://youachieve.att.com/89878cdc-e8de-4b48-8d9c-675c9b86ee95
+      4539B    6x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/api/fiberMap.cfc
+      4178B    1x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/fiber
        654B    1x  text/css                   https://youachieve.att.com/6xVC2M/1I_/Tfe/JsJnFM2f/JciXEa/eDYzPgE/UFh4Q/VUyXRFZ
         88B    1x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/api/UserSuspensionMainForm.cfc
