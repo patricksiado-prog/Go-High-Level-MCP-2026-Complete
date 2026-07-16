@@ -1506,6 +1506,6 @@ logs alone), the precise match to "clean the scout tabs"; (c) BACKUP-BEFORE-DELE
 dumped to a local CSV at ~/optimus/sheet_backups_<ts>/<tab>.csv before deletion, and a tab that can't be
 backed up is NOT deleted -- so no callable leads are ever lost. New one-click optimus/install/RUN_HIDE_SCOUT.bat
 (downloads deps, dry-run preview, Y to delete --scout-only --yes). PROTECT guard + dry-run default still apply.
-TODO: also drop RUN_HIDE_SCOUT.bat into Patrick's Drive installers folder (0AHafe86gsae2Uk9PVA) so he can
-double-click it. Old Fresh Leads addresses live on in the CSV backup; can be imported to the private sheet if
-he wants them there.
+DONE: dropped "RUN HIDE SCOUT (remove scout tabs from team sheet).bat" into Patrick's Drive installers folder
+(0AHafe86gsae2Uk9PVA, file id 1R2JVwjEnWKjN9rw-yh2nSbdmv42j1oli) so he can double-click it. Old Fresh Leads
+addresses live on in the CSV backup; can be imported to the private sheet if he wants them there.
