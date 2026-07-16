@@ -1,15 +1,14 @@
-OPTIMUS NET ENDPOINTS  2026-07-16 00:55:30  host=LAPTOP-TB1L669N
-SERVICEABILITY FEED URL: https://youachieve.att.com/yourefer/api/fiberMap.cfc
+OPTIMUS NET ENDPOINTS  2026-07-16 01:02:22  host=LAPTOP-TB1L669N
+SERVICEABILITY FEED URL: https://youachieve.att.com/yourefer/fiber
 
 All non-asset endpoints (biggest first) -- the feed is in here:
-    482296B    1x  application/javascript     blob:https://youachieve.att.com/8f9741aa-afba-409f-ba7b-f966fb04703f
-    482296B    1x  application/javascript     blob:https://youachieve.att.com/74734b02-3a25-4428-af3c-207a0420bc80
-    154116B    2x  application/javascript; ch https://www.googletagmanager.com/gtag/js
      60889B    1x  application/javascript     https://youachieve.att.com/resources/59d4152c9d328741d98ac6233c9dc954522001624dcc5
      28076B    1x  application/javascript     https://youachieve.att.com/6xVC2M/1I_/Tfe/JsJnFM2f/JciXEa/eDYzPgE/BBR1F/jA4CQMq
-      9700B    1x  application/javascript     blob:https://youachieve.att.com/fe24f368-fd86-4c78-aabc-065fc3d30ff7
-      9700B    1x  application/javascript     blob:https://youachieve.att.com/89878cdc-e8de-4b48-8d9c-675c9b86ee95
-      4539B    6x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/api/fiberMap.cfc
-      4178B    1x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/fiber
+      4003B    1x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/fiber
+      3162B    1x  text/html                  https://saml.e-access.att.com/isam/sps/attsamlidp_mfaia/saml20/logininitial
+      2519B    1x  text/html                  https://oidc.idp.elogin.att.com/mga/sps/oauth/oauth20/authorize
        654B    1x  text/css                   https://youachieve.att.com/6xVC2M/1I_/Tfe/JsJnFM2f/JciXEa/eDYzPgE/UFh4Q/VUyXRFZ
-        88B    1x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/api/UserSuspensionMainForm.cfc
+         0B    1x                             https://saml.e-access.att.com/isam/sps/oidc/rp/SAML-IDP/kickoff/SAML-IDP-Password
+         0B    1x  text/html;charset=utf-8    https://oidc.idp.elogin.att.com/lrr/attLRR/LrrController
+         0B    1x                             https://oidc.idp.elogin.att.com/mga/sps/authsvc
+         0B    1x  text/html;charset=ISO-8859 https://oidc.idp.elogin.att.com/postauth/attPOSTAUTH/postAuth
