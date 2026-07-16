@@ -480,7 +480,6 @@ def main():
         idx = col = down = 0
         direction = "right"
         backend_done = False
-        stalls = 0
         while True:
             idx += 1
             try:
@@ -536,42 +535,24 @@ def main():
             elif backend_done and idx % 100 == 0:
                 write_full_analysis(ws, cap, host)
 
+            # THE HUNTER'S MOTION, verbatim (Patrick 2026-07-16 "use the price
+            # hunter motion"): the hunter FIRES the drag and keeps going -- its
+            # real Windows-mouse drag (_drag_real) physically pans the map and
+            # can't hang, and its sweep loops IGNORE the drag's return value and
+            # never stop for a bad pan. Its whole philosophy: "the cure is
+            # motion that can't hang, not restarts." So the scout now pans the
+            # same way -- drag, keep surveying, NO stall counter, NO giving up
+            # on motion. A genuinely closed/crashed window is still caught by
+            # the scan_cell try/except above ('closed'/'crash'/'target'), which
+            # is the ONLY thing that stops the survey. Close the window to stop.
             if col >= args.cols - 1:
-                ok = _sturdy_pan(page, "down")
+                mouse_drag(page, "down")
                 down += 1
                 col = 0
                 direction = "left" if direction == "right" else "right"
             else:
-                ok = _sturdy_pan(page, direction)
+                mouse_drag(page, direction)
                 col += 1
-            # STURDY MOTION (ported from the hunter's "motion that can't hang"):
-            # a single failed drag is usually a transient hiccup, not a closed
-            # window -- keep surveying and only stop after several genuine
-            # consecutive stalls. (A truly closed window is caught by the scan
-            # try/except above via 'closed'/'crash'/'target'.)
-            if ok:
-                stalls = 0
-            else:
-                stalls += 1
-                # RECOVERY before giving up: a stalled pan is almost always the
-                # map briefly not interactive -- a re-render, or a NETWORK blip
-                # (Patrick's airplane-mode toggle, wifi drop, VPN reconnect) --
-                # NOT a closed window. A truly closed window is caught by the
-                # scan try/except above ('closed'/'crash'/'target'), so it's
-                # safe to be patient here. Re-assert the map view WITHOUT a page
-                # reload (a reload could land on a login screen it can't get
-                # back from -- why auto-restart was removed) and wait for the
-                # network/render to settle, then keep surveying.
-                try:
-                    if not on_map(page):
-                        open_map_view(page)
-                except Exception:
-                    pass
-                time.sleep(3)   # give a blip time to heal before retrying
-                if stalls >= 8:
-                    print("\nMotion stalled %d panning attempts in a row (~30s) "
-                          "-- map gone / window closed for good. Stopping." % stalls); break
-                print("  (pan hiccup %d/8 -- re-asserted map, waiting it out, continuing)" % stalls)
 
         # exit: local CSV + ranked summary -> sheet + GitHub
         try:

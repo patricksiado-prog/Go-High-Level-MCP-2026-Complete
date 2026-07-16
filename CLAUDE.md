@@ -1423,3 +1423,17 @@ heal, and raised the hard-stop threshold 4 -> 8 (~30s of patience, enough to rid
 toggle / wifi drop / VPN reconnect). Safe because a genuinely closed window is still caught immediately by
 the scan_cell try/except ('closed'/'crash'/'target'), so being patient on pans can't hang forever. Net:
 a network hiccup mid-survey no longer kills the run; only a real closed/dead window stops it.
+
+### 11h-fix12 (2026-07-16) — SCOUT NOW PANS EXACTLY LIKE THE HUNTER ("use the price hunter motion")
+Patrick: "use the price hunter motion." Root difference found: the hunter FIRES its drag and keeps going --
+its real Windows-mouse drag (_drag_real, raw ctypes user32 SetCursorPos+mouse_event) physically pans the map
+and can't hang, and its sweep loops (sweep_backend/sweep_grid) IGNORE the drag return and NEVER stop for a
+bad pan. Hunter's own words: "the cure is motion that can't hang, not restarts." The SCOUT, by contrast, had
+its OWN invention -- a stall counter that STOPPED the whole survey (first at 4, then fix11 at 8). THAT was
+what Patrick kept seeing "stop." FIX: ripped out the scout's stall counter + give-up entirely; the motion
+section now calls mouse_drag(page, dir) directly (same primitive, prefers the unhangable _drag_real on
+Windows) and just keeps surveying. The ONLY thing that stops the run is a genuinely closed/crashed window,
+still caught by the scan_cell try/except ('closed'/'crash'/'target'). Removed the `stalls` var; `_sturdy_pan`
+left defined but now unused (harmless). Net: scout motion == hunter motion; it won't stop itself anymore,
+close the window to stop. (Supersedes the stall-based fix11 stop; fix11's map re-assert idea was dropped
+because the hunter doesn't do it -- it just drags and moves on.)
