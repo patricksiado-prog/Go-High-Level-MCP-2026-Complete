@@ -1412,3 +1412,14 @@ crashing; only if ALL 5 tries fail does it raise, and it prints a plain-English 
 (check wifi / close leftover Chrome / pause VPN+McAfee). Does not change what the scout does once loaded --
 purely makes the door sturdier. Note for Patrick: if internet is genuinely down this still can't help;
 the retry only covers a blip.
+
+### 11h-fix11 (2026-07-16) — motion rides out a NETWORK blip instead of quitting
+Right after fix10, Patrick: "airplane mode fixed [network] but the motion stopped." Cause: while network
+was OFF (his airplane-mode toggle), every pan drag failed; the old loop stopped after just 4 straight
+stalls (~5s), so it had already quit by the time network came back. FIX: in the survey loop's stall branch,
+on each stalled pan now RE-ASSERT the map view (on_map -> open_map_view, NO page reload -- a reload could
+land on a login screen it can't recover from, why auto-restart stays removed) and sleep 3s to let a blip
+heal, and raised the hard-stop threshold 4 -> 8 (~30s of patience, enough to ride out an airplane-mode
+toggle / wifi drop / VPN reconnect). Safe because a genuinely closed window is still caught immediately by
+the scan_cell try/except ('closed'/'crash'/'target'), so being patient on pans can't hang forever. Net:
+a network hiccup mid-survey no longer kills the run; only a real closed/dead window stops it.

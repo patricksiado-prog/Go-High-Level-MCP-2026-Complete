@@ -553,10 +553,25 @@ def main():
                 stalls = 0
             else:
                 stalls += 1
-                if stalls >= 4:
-                    print("\nMotion stalled %d panning attempts in a row -- "
-                          "window closed / stuck. Stopping." % stalls); break
-                print("  (pan hiccup %d/4 -- shrugging it off, continuing)" % stalls)
+                # RECOVERY before giving up: a stalled pan is almost always the
+                # map briefly not interactive -- a re-render, or a NETWORK blip
+                # (Patrick's airplane-mode toggle, wifi drop, VPN reconnect) --
+                # NOT a closed window. A truly closed window is caught by the
+                # scan try/except above ('closed'/'crash'/'target'), so it's
+                # safe to be patient here. Re-assert the map view WITHOUT a page
+                # reload (a reload could land on a login screen it can't get
+                # back from -- why auto-restart was removed) and wait for the
+                # network/render to settle, then keep surveying.
+                try:
+                    if not on_map(page):
+                        open_map_view(page)
+                except Exception:
+                    pass
+                time.sleep(3)   # give a blip time to heal before retrying
+                if stalls >= 8:
+                    print("\nMotion stalled %d panning attempts in a row (~30s) "
+                          "-- map gone / window closed for good. Stopping." % stalls); break
+                print("  (pan hiccup %d/8 -- re-asserted map, waiting it out, continuing)" % stalls)
 
         # exit: local CSV + ranked summary -> sheet + GitHub
         try:
