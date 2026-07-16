@@ -1,24 +1,15 @@
-OPTIMUS NET ENDPOINTS  2026-07-15 12:27:22  host=LAPTOP-RS9EHSLO
+OPTIMUS NET ENDPOINTS  2026-07-15 20:57:32  host=LAPTOP-TB1L669N
 SERVICEABILITY FEED URL: https://youachieve.att.com/yourefer/api/fiberMap.cfc
 
 All non-asset endpoints (biggest first) -- the feed is in here:
-    482296B    1x  application/javascript     blob:https://youachieve.att.com/77a76fb6-6612-4cda-93bf-cf516b80848b
-    482296B    1x  application/javascript     blob:https://youachieve.att.com/88dd8d15-b076-40e7-b997-6c23e53e4661
-    151471B    2x  application/javascript; ch https://www.googletagmanager.com/gtag/js
-     60889B    2x  application/javascript     https://youachieve.att.com/resources/59d4152c9d328741d98ac6233c9dc954522001624dcc5
-     28089B    2x  application/javascript     https://youachieve.att.com/ylN1qNN_cEo0/E1V-Lo/E90lS5/Xb/Yh0DP2YC/NVcUAm/ZhA20p
-      9700B    1x  application/javascript     blob:https://youachieve.att.com/c9256482-e821-424c-bf23-5b6e86cd2e02
-      9700B    1x  application/javascript     blob:https://youachieve.att.com/04a595d0-da29-46f3-8951-459a13372df0
-      8004B    4x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/api/fiberMap.cfc
-      4176B    1x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/index.cfm
-      4002B    1x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/fiber
-      3162B    2x  text/html                  https://saml.e-access.att.com/isam/sps/attsamlidp_mfaia/saml20/logininitial
-      2519B    1x  text/html                  https://oidc.idp.elogin.att.com/mga/sps/oauth/oauth20/authorize
-      1613B    1x  text/html                  https://saml.e-access.att.com/isam/sps/oidc/rp/SAML-IDP/redirect/SAML-IDP-Password
-       627B    2x  text/css                   https://youachieve.att.com/ylN1qNN_cEo0/E1V-Lo/E90lS5/Xb/Yh0DP2YC/Ah0YLQ/xcV3tY
+    482296B    1x  application/javascript     blob:https://youachieve.att.com/a5cfdbe2-cf92-4c0a-9ca3-234646b99f06
+    482296B    1x  application/javascript     blob:https://youachieve.att.com/d3722da5-bffe-41b7-939d-24924e18411f
+    154116B    2x  application/javascript; ch https://www.googletagmanager.com/gtag/js
+     60889B    1x  application/javascript     https://youachieve.att.com/resources/59d4152c9d328741d98ac6233c9dc954522001624dcc5
+     28076B    1x  application/javascript     https://youachieve.att.com/6xVC2M/1I_/Tfe/JsJnFM2f/JciXEa/eDYzPgE/BBR1F/jA4CQMq
+      9700B    1x  application/javascript     blob:https://youachieve.att.com/1241f5f6-e0d1-4979-9bd7-87f4644956b4
+      9700B    1x  application/javascript     blob:https://youachieve.att.com/2714f2cc-ed39-4bcc-b788-a2fa7a2f04d8
+      9127B    6x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/api/fiberMap.cfc
+      4177B    1x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/fiber
+       654B    1x  text/css                   https://youachieve.att.com/6xVC2M/1I_/Tfe/JsJnFM2f/JciXEa/eDYzPgE/UFh4Q/VUyXRFZ
         88B    1x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/api/UserSuspensionMainForm.cfc
-         0B    1x                             https://saml.e-access.att.com/isam/sps/oidc/rp/SAML-IDP/kickoff/SAML-IDP-Password
-         0B    1x  text/html;charset=utf-8    https://oidc.idp.elogin.att.com/lrr/attLRR/LrrController
-         0B    2x                             https://oidc.idp.elogin.att.com/mga/sps/authsvc
-         0B    1x  text/html;charset=ISO-8859 https://oidc.idp.elogin.att.com/postauth/attPOSTAUTH/postAuth
-         0B    1x  text/html;charset=UTF-8    https://youachieve.att.com/gatekeeper.cfm
