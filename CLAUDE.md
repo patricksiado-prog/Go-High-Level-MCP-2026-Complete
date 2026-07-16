@@ -1378,3 +1378,13 @@ GAP to close (proposed): the dialer loads ALL of Fiber Green Biz (mostly stale H
 drowns. Want a FRESH-FIRST load -- prioritize newest/fresh-area green (by Captured At or a freshness tag)
 so reps call the hot stuff first. Also: don't keep grinding mature Houston ZIPs; point the tools at the
 expansion edge / newer markets (MS, Corpus, newer TX suburbs). ("MS" = confirm: Mississippi?)
+
+### 11h-fix8 (2026-07-01) — sturdy motion from hunter -> scout ("motion that can't hang")
+Patrick asked to bring the hunter's sturdy pan to the scout. Root of the scout's "motion stopped": it
+called mouse_drag once and BROKE on the first False, but mouse_drag returns False on a transient drag
+hiccup too -- not just a closed window. The hunter's rule (brain 11f) is "motion that can't hang": it
+keeps panning through hiccups and never restarts. FIX: fiber_scout `_sturdy_pan(page,dir,tries=3)` retries
+the proven mouse_drag a few times; the survey loop tolerates up to 4 consecutive stalls before stopping
+(a truly closed window is still caught by the scan try/except via closed/crash/target). Same proven
+motion, just doesn't quit on a blip. Additive; compiles. NOTE: the hunter also removed auto-restart for
+good (2026-07-02) -- the cure is unhangable motion, not restarts; the scout follows that now too.

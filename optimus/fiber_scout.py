@@ -379,6 +379,21 @@ def scan_cell(page, wire_leads=None):
     return green, gold, gray, gray_share, label, "pixel fallback (legend can fake 1 gold)"
 
 
+def _sturdy_pan(page, direction, tries=3):
+    """STURDY MOTION ported from the hunter ('motion that can't hang'): retry the
+    proven mouse_drag a few times so a transient drag hiccup doesn't stop the
+    survey. Returns True if any attempt lands; False only if all fail (window
+    truly stuck/closed). The hunter never restarts -- it just keeps panning."""
+    for _ in range(max(1, tries)):
+        try:
+            if mouse_drag(page, direction):
+                return True
+        except Exception:
+            pass
+        time.sleep(0.4)
+    return False
+
+
 def main():
     self_update()
     ap = argparse.ArgumentParser(description="Scout the AT&T map for NEW fiber areas.")
@@ -433,6 +448,7 @@ def main():
         idx = col = down = 0
         direction = "right"
         backend_done = False
+        stalls = 0
         while True:
             idx += 1
             try:
@@ -481,15 +497,26 @@ def main():
                 write_full_analysis(ws, cap, host)
 
             if col >= args.cols - 1:
-                ok = mouse_drag(page, "down")
+                ok = _sturdy_pan(page, "down")
                 down += 1
                 col = 0
                 direction = "left" if direction == "right" else "right"
             else:
-                ok = mouse_drag(page, direction)
+                ok = _sturdy_pan(page, direction)
                 col += 1
-            if not ok:
-                print("\nMotion stopped (window closed?). Stopping."); break
+            # STURDY MOTION (ported from the hunter's "motion that can't hang"):
+            # a single failed drag is usually a transient hiccup, not a closed
+            # window -- keep surveying and only stop after several genuine
+            # consecutive stalls. (A truly closed window is caught by the scan
+            # try/except above via 'closed'/'crash'/'target'.)
+            if ok:
+                stalls = 0
+            else:
+                stalls += 1
+                if stalls >= 4:
+                    print("\nMotion stalled %d panning attempts in a row -- "
+                          "window closed / stuck. Stopping." % stalls); break
+                print("  (pan hiccup %d/4 -- shrugging it off, continuing)" % stalls)
 
         # exit: local CSV + ranked summary -> sheet + GitHub
         try:
