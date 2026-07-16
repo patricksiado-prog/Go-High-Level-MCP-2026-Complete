@@ -1,7 +1,7 @@
-OPTIMUS BACKEND EXCHANGE (AT&T serviceability request)  2026-07-16 01:03:41  host=LAPTOP-TB1L669N
+OPTIMUS BACKEND EXCHANGE (AT&T serviceability request)  2026-07-16 01:16:23  host=LAPTOP-TB1L669N
 
 METHOD : GET
-URL    : https://youachieve.att.com/yourefer/api/fiberMap.cfc?method=getMapData&lon=-97.41906649999999&lat=27.655509954720316&attuid=zg431x&csrfToken=655D1680F312B20DC282A3348F8D00BF25198D57
+URL    : https://youachieve.att.com/yourefer/api/fiberMap.cfc?method=getMapData&lon=-97.36259231245549&lat=30.3421485766559&attuid=zg431x&csrfToken=CD619C0F97E1242F0FF96EEAC2858D5F56CC95A5
 RESP   : 200  text/html;charset=UTF-8
 
 POST BODY (the params AT&T needs -- lat/lng/radius/etc.):
@@ -10,7 +10,7 @@ POST BODY (the params AT&T needs -- lat/lng/radius/etc.):
 REQUEST HEADERS (auth/cookie/token values REDACTED):
    :authority: <redacted 18 chars>
    :method: GET
-   :path: /yourefer/api/fiberMap.cfc?method=getMapData&lon=-97.41906649999999&lat=27.655509954720316&attuid=zg431x&csrfToken=655D1680F312B20DC282A3348F8D00BF25198D57
+   :path: /yourefer/api/fiberMap.cfc?method=getMapData&lon=-97.36259231245549&lat=30.3421485766559&attuid=zg431x&csrfToken=CD619C0F97E1242F0FF96EEAC2858D5F56CC95A5
    :scheme: https
    accept: application/json, text/plain, */*
    accept-encoding: gzip, deflate, br, zstd
