@@ -1,14 +1,15 @@
-OPTIMUS NET ENDPOINTS  2026-07-16 01:02:22  host=LAPTOP-TB1L669N
-SERVICEABILITY FEED URL: https://youachieve.att.com/yourefer/fiber
+OPTIMUS NET ENDPOINTS  2026-07-16 01:03:37  host=LAPTOP-TB1L669N
+SERVICEABILITY FEED URL: https://youachieve.att.com/yourefer/api/fiberMap.cfc
 
 All non-asset endpoints (biggest first) -- the feed is in here:
+    482296B    1x  application/javascript     blob:https://youachieve.att.com/53cb4a4f-e618-4132-ac69-a8a83d7654d9
+    482296B    1x  application/javascript     blob:https://youachieve.att.com/71d4581d-ed21-4723-87bf-755152bf0ac5
+    154116B    2x  application/javascript; ch https://www.googletagmanager.com/gtag/js
      60889B    1x  application/javascript     https://youachieve.att.com/resources/59d4152c9d328741d98ac6233c9dc954522001624dcc5
      28076B    1x  application/javascript     https://youachieve.att.com/6xVC2M/1I_/Tfe/JsJnFM2f/JciXEa/eDYzPgE/BBR1F/jA4CQMq
-      4003B    1x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/fiber
-      3162B    1x  text/html                  https://saml.e-access.att.com/isam/sps/attsamlidp_mfaia/saml20/logininitial
-      2519B    1x  text/html                  https://oidc.idp.elogin.att.com/mga/sps/oauth/oauth20/authorize
+      9700B    1x  application/javascript     blob:https://youachieve.att.com/76c077a4-5c27-4dd9-b25f-8468ae8f5dad
+      9700B    1x  application/javascript     blob:https://youachieve.att.com/e92ac1f9-4233-4821-8de2-8bd8149bd94d
+      8864B    6x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/api/fiberMap.cfc
+      4176B    1x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/fiber
        654B    1x  text/css                   https://youachieve.att.com/6xVC2M/1I_/Tfe/JsJnFM2f/JciXEa/eDYzPgE/UFh4Q/VUyXRFZ
-         0B    1x                             https://saml.e-access.att.com/isam/sps/oidc/rp/SAML-IDP/kickoff/SAML-IDP-Password
-         0B    1x  text/html;charset=utf-8    https://oidc.idp.elogin.att.com/lrr/attLRR/LrrController
-         0B    1x                             https://oidc.idp.elogin.att.com/mga/sps/authsvc
-         0B    1x  text/html;charset=ISO-8859 https://oidc.idp.elogin.att.com/postauth/attPOSTAUTH/postAuth
+        88B    1x  text/html;charset=UTF-8    https://youachieve.att.com/yourefer/api/UserSuspensionMainForm.cfc
