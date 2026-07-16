@@ -426,7 +426,14 @@ def _sturdy_goto(page, url, tries=5):
 
 
 def main():
-    self_update()
+    # NO in-process self-update/relaunch (Patrick 2026-07-16 "stop the relaunch
+    # it's not helpful cuz I gotta login and center it"). self_update() re-execs
+    # the whole process when the code changed, which opens a FRESH browser --
+    # losing his AT&T login and his centered map every time. The launcher
+    # (RUN_SCOUT.bat) already curls the newest fiber_scout.py + helpers from
+    # GitHub on every start, so we already run the latest code WITHOUT a relaunch.
+    # So: never relaunch here. Close + reopen the launcher yourself to get a new
+    # version, once, on your terms.
     ap = argparse.ArgumentParser(description="Scout the AT&T map for NEW fiber areas.")
     ap.add_argument("--cols", type=int, default=4, help="serpentine strip width before stepping down")
     ap.add_argument("--survey-out", type=int, default=0, help="zoom OUT this many times first")

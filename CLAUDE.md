@@ -1437,3 +1437,16 @@ still caught by the scan_cell try/except ('closed'/'crash'/'target'). Removed th
 left defined but now unused (harmless). Net: scout motion == hunter motion; it won't stop itself anymore,
 close the window to stop. (Supersedes the stall-based fix11 stop; fix11's map re-assert idea was dropped
 because the hunter doesn't do it -- it just drags and moves on.)
+
+### 11h-fix13 (2026-07-16) — SCOUT NO LONGER RELAUNCHES ITSELF (stop the login+center re-do)
+Patrick: "stop the relaunch it's not helpful cuz I gotta login and center it." Culprit: main() called
+self_update(), which on any code change did `subprocess.run([sys.executable]+sys.argv); sys.exit()` -- a
+full RE-EXEC of the process. That opens a FRESH browser context, so he lost his AT&T login AND his centered
+map every time a new version landed (i.e. every time I pushed a fix and he ran). FIX: removed the
+self_update() call from fiber_scout.py main() entirely -- the scout never relaunches itself now. Updates
+still arrive: RUN_SCOUT.bat curls the newest fiber_scout.py + helpers from GitHub raw on EVERY start, so a
+normal launch already runs latest code with NO in-process relaunch. self_update import now unused (harmless).
+Side benefit: with no surprise second browser, the persistent att_profile keeps him logged in across normal
+launches; he only centers once per launch, not twice. NOTE: hunter still has self_update relaunch -- left
+alone (Patrick was running the scout; change hunter only if he asks). Open idea offered, not built: remember
+last centered lat/lon and auto-restore on launch so even manual relaunches skip re-centering.
