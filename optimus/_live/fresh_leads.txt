@@ -1,0 +1,4 @@
+OPTIMUS FRESH LEADS  2026-07-16 01:00:00  host=LAPTOP-TB1L669N
+green=0  gold=0  from 0 fresh/working cells
+
+cell | type | address
