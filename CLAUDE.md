@@ -1480,3 +1480,18 @@ lead numbers -> combined real-time total across scout+hunter+scraper. All three 
 parse). Each program needs github_token.txt present (same one the scout uses) for the push to fire; without a
 token it just skips silently and I fall back to reading the sheet via Drive. Left the scraper's own
 self-update relaunch alone (it runs headless in background -- no login/center cost, unlike the scout).
+
+### 11h-fix16 (2026-07-16) — SCOUT writes to a PRIVATE sheet (keep fresh green from the team)
+Patrick: "I don't wanna show the fresh green to the guys yet ... scout fresh green i wanna keep those
+discoveries to myself sometimes." Decisions (via AskUserQuestion): (1) ONLY the SCOUT goes private; hunter +
+scraper + everything else UNCHANGED, still feed the shared team sheet exactly as before. (2) Team's "ATT
+FIBER LEADS" sheet left frozen/untouched. IMPLEMENTATION: new open_private_sheet() in fiber_scout.py -- the
+service account creates (or reuses) a separate spreadsheet titled "OPTIMUS SCOUT FRESH (PRIVATE)", shares it
+with patricksiado@gmail.com as writer, caches the id at ~/optimus/scout_private_sheet_id.txt so the same
+private sheet is reused each run. main() routes ws: PRIVATE by default, or the SHARED team sheet only with
+--to-team (or env SCOUT_TO_TEAM=1) for when Patrick RELEASES a run to the guys. SAFETY: a failed private open
+returns None (leads stay in local CSV + _live only) and NEVER falls back to the team sheet -- a glitch can't
+leak. ALL scout tabs (Fiber Scout, Backend Capture/Analysis, Fresh Leads) write through this ws, so all land
+in the private sheet. Imported find_creds + SCOPES from the hunter. NOTE: OLD scout data already in the shared
+sheet's 'Fiber Scout'/'Fresh Leads' tabs from past runs is still there -- offered to clean it if he wants the
+history hidden. "sometimes" honored via --to-team; can also copy private->team on request when ready to share.

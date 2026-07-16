@@ -63,7 +63,7 @@ _self_heal_deps()
 from precise_fiber_hunter import (
     self_update, PROFILE_DIR, MAP_URL, VIEWPORT, SEARCH_SETTLE,
     open_map_view, on_map, mouse_drag, zoom, find_map_dots, open_sheet, NetCapture,
-    search_this_area,
+    search_this_area, find_creds, SCOPES,
 )
 from optimus_dot_detect import zone_freshness, FRESH_MIN_ELIGIBLE
 import backend_classifier as bc
@@ -450,6 +450,75 @@ def _sturdy_goto(page, url, tries=5):
     raise last
 
 
+# PRIVATE scout sheet (Patrick 2026-07-16 "I don't wanna show the fresh green to
+# the guys yet ... scout fresh green i wanna keep those discoveries to myself").
+# The scout writes its fresh finds to a SEPARATE private spreadsheet that only
+# Patrick sees -- the shared team sheet (hunter/scraper feed it) is untouched.
+PRIVATE_SHEET_TITLE = "OPTIMUS SCOUT FRESH (PRIVATE)"
+OWNER_EMAIL = "patricksiado@gmail.com"
+PRIVATE_ID_FILE = os.path.join(os.path.expanduser("~"), "optimus",
+                               "scout_private_sheet_id.txt")
+
+
+def open_private_sheet():
+    """Open (or CREATE) a PRIVATE spreadsheet only Patrick can see, for the
+    scout's fresh-green discoveries. The service account creates + owns it and
+    shares it with Patrick (writer); the sheet id is cached locally so the same
+    private sheet is reused every run. Returns a worksheet handle (_tab uses
+    ws.spreadsheet), or None on failure -- NEVER falls back to the team sheet, so
+    a failure keeps discoveries out of the team's view rather than leaking them."""
+    import gspread
+    from google.oauth2.service_account import Credentials
+    creds_file = find_creds()
+    if not creds_file:
+        print("No creds -> can't open the private scout sheet; fresh leads stay "
+              "in the local CSV + _live files (NOT sent to the team).")
+        return None
+    try:
+        client = gspread.authorize(
+            Credentials.from_service_account_file(creds_file, scopes=SCOPES))
+    except Exception as e:
+        print("  (private sheet auth failed: %s)" % str(e)[:80])
+        return None
+    sh = None
+    try:                                        # 1) reuse the cached id
+        if os.path.exists(PRIVATE_ID_FILE):
+            sid = open(PRIVATE_ID_FILE).read().strip()
+            if sid:
+                sh = client.open_by_key(sid)
+    except Exception:
+        sh = None
+    if sh is None:                              # 2) find it by title
+        try:
+            sh = client.open(PRIVATE_SHEET_TITLE)
+        except Exception:
+            sh = None
+    if sh is None:                              # 3) create it
+        try:
+            sh = client.create(PRIVATE_SHEET_TITLE)
+            print("  Created your NEW private scout sheet: %s" % PRIVATE_SHEET_TITLE)
+        except Exception as e:
+            print("  (couldn't create the private sheet: %s)" % str(e)[:80])
+            return None
+    try:                                        # share with Patrick (best-effort)
+        sh.share(OWNER_EMAIL, perm_type="user", role="writer")
+    except Exception:
+        pass
+    try:                                        # cache the id for next run
+        os.makedirs(os.path.dirname(PRIVATE_ID_FILE), exist_ok=True)
+        open(PRIVATE_ID_FILE, "w").write(sh.id)
+    except Exception:
+        pass
+    try:
+        ws = sh.sheet1
+        print("  PRIVATE scout sheet ready (only YOU see it): "
+              "https://docs.google.com/spreadsheets/d/%s" % sh.id)
+        return ws
+    except Exception as e:
+        print("  (private sheet tab error: %s)" % str(e)[:80])
+        return None
+
+
 def main():
     # NO in-process self-update/relaunch (Patrick 2026-07-16 "stop the relaunch
     # it's not helpful cuz I gotta login and center it"). self_update() re-execs
@@ -464,6 +533,9 @@ def main():
     ap.add_argument("--survey-out", type=int, default=0, help="zoom OUT this many times first")
     ap.add_argument("--auto", action="store_true", help="no 'press Enter' pause")
     ap.add_argument("--no-update", action="store_true", help="skip the GitHub auto-pull on start")
+    ap.add_argument("--to-team", action="store_true",
+                    help="write fresh finds to the SHARED team sheet (the guys will see them). "
+                         "Default: PRIVATE sheet only you see.")
     args = ap.parse_args()
 
     load_build_codes()
@@ -501,7 +573,20 @@ def main():
             except EOFError:
                 pass
 
-        ws = open_sheet()
+        # WHERE fresh finds go: PRIVATE by default (only Patrick), or the SHARED
+        # team sheet with --to-team when he wants to release a run. A failed
+        # private open returns None (CSV + _live only) -- it never silently
+        # leaks to the team sheet.
+        to_team = args.to_team or os.environ.get("SCOUT_TO_TEAM", "").strip().lower() in ("1", "true", "yes", "y")
+        if to_team:
+            print("Writing fresh finds to the SHARED TEAM sheet (--to-team) -- the guys WILL see these.")
+            ws = open_sheet()
+        else:
+            print("Writing fresh finds to your PRIVATE sheet (default) -- the team does NOT see these.")
+            ws = open_private_sheet()
+            if ws is None:
+                print("  (private sheet unavailable -- fresh leads stay in the local CSV + _live "
+                      "files only, still NOT sent to the team.)")
         sws = _tab(ws, SCOUT_TAB,
                    ["Time", "Host", "Cell", "Green", "Gold", "Grey", "Grey%", "Verdict", "Note"])
         host = socket.gethostname()
