@@ -1524,3 +1524,23 @@ valid: export ONLY the "Fiber Green Biz" tab (File>Download>CSV, ~15k rows, smal
 OUTWARD-ACTION NOTE: the pasted plan proposed messaging Romeo + loading leads into "Zack's dialer" -- did NOT
 do either autonomously (third-party contact + writing to a dialer are consequential/outward); waiting on
 Patrick's explicit go, and I have no wired channel to Romeo or Zack's dialer yet anyway.
+
+### 11h-fix19 (2026-07-16) — HUNTER FREEZE FIX: non-200 serviceability body read hung the whole hunt
+Romeo (team, runs the hunter, +63 PH number) sent a screenshot: hunter frozen ~1 HOUR, last line
+"pressing 'Search this area' (fetching dots from server)..." right after "batch write error: APIError [503]
+The service is currently unavailable" and "[cell 1] +462". ROOT CAUSE: NetCapture.handle() at the
+serviceability data_url branch called `body = response.body()` UNCONDITIONALLY. On the upgraded Chromium,
+response.body() on a hung/error/CANCELLED reply BLOCKS FOREVER (the code already documents this exact trap for
+vector TILES at ~line 903-912 and skips them -- but the serviceability JSON read never got the same guard).
+When AT&T answered "Search this area" with a 503 "service currently unavailable", the response handler read
+that dead reply's body and froze the entire Playwright dispatcher -> whole hunt hung, map stopped moving.
+Matches the recurring "map would stop moving around" reports. FIX: before response.body(), check
+`response.status`; if != 200, print a one-liner and return (skip). A 503/500/429/redirect carries no dot data
+anyway, so nothing is lost and the sweep keeps moving through an AT&T hiccup. Residual (not the reported case):
+a 200 serviceability cancelled mid-body by a fast pan could still theoretically hang -- can't bound
+response.body() with a timeout in SYNC Playwright (objects are thread-bound, no timeout arg), so left as-is;
+the 200-then-cancel case is far rarer than the 503 we saw. DEPLOY NOTE: Romeo's box showed "auto-update
+skipped: [WinError 2]" = git not found on that PC, so the in-process git self-update can't run -- he must
+relaunch via the DESKTOP RUN_HUNTER icon (the .bat curls the newest .py straight from GitHub raw) to get this
+fix; a plain rerun of the same on-disk copy won't. Also close any zombie Chromium first (holds att_profile).
+The Google-side "batch write error 503" is SEPARATE + already safe (failed batches queue + retry, no freeze).

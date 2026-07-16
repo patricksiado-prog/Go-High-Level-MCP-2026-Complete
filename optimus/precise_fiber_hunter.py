@@ -824,6 +824,20 @@ class NetCapture:
                 # on the upgraded browser. The serviceability feed matches these
                 # keywords, so capture is unchanged; random page JSON no longer
                 # gets read at all.)
+                # FREEZE FIX (Patrick 2026-07-16, Romeo's hunter hung ~1h after a
+                # 503 "service currently unavailable"): NEVER read the body of a
+                # non-200 reply. On the upgraded browser response.body() on a
+                # hung/error/cancelled reply BLOCKS FOREVER and freezes the whole
+                # hunt (same trap the tile-skip above avoids). A 503/500/429/redirect
+                # carries no dot data anyway, so skipping it loses nothing and keeps
+                # the sweep moving when AT&T's server hiccups.
+                try:
+                    st = response.status
+                except Exception:
+                    st = 0
+                if st != 200:
+                    print("  (serviceability reply %s -- skipping, map keeps moving)" % st)
+                    return
                 try:
                     body = response.body()
                     if not body or len(body) > 8 * 1024 * 1024:
