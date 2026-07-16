@@ -369,14 +369,19 @@ def scan_cell(page, wire_leads=None):
     recs = _wire_records(wire_leads)
     if recs:
         s = bc.summarize(recs)
+        # 7th value: the actual GREEN + GOLD addresses (callable leads) from the
+        # backend -- so a FRESH cell yields leads to call, not just a count.
         return (s["green"], s["gold"], s["grey"], s["grey_pct"] / 100.0,
                 s["verdict"], "backend %d recs (cust-undecoded %d)"
-                % (len(recs), s["customer_undecoded"]))
+                % (len(recs), s["customer_undecoded"]),
+                (s.get("green_addresses", []), s.get("gold_addresses", [])))
     dots, gray = find_map_dots(page)
     green = sum(1 for _x, _y, c in dots if c == "GREEN")
     gold = sum(1 for _x, _y, c in dots if c == "GOLD")
     label, gray_share = zone_freshness(green, gold, gray)
-    return green, gold, gray, gray_share, label, "pixel fallback (legend can fake 1 gold)"
+    # pixel path has no addresses (dots only) -- empty lists.
+    return (green, gold, gray, gray_share, label,
+            "pixel fallback (legend can fake 1 gold)", ([], []))
 
 
 def _sturdy_pan(page, direction, tries=3):
@@ -406,6 +411,7 @@ def main():
     load_build_codes()
     os.makedirs(SHOT_DIR, exist_ok=True)
     fresh = []
+    fresh_leads = []   # (cell, verdict, GREEN/GOLD, address) -- callable leads from fresh cells
 
     from playwright.sync_api import sync_playwright
     with sync_playwright() as pw:
@@ -456,7 +462,7 @@ def main():
                 if on_map(page):
                     search_this_area(page)     # load the new view's dots first
                 time.sleep(SEARCH_SETTLE)
-                green, gold, gray, gray_share, label, via = scan_cell(
+                green, gold, gray, gray_share, label, via, cell_addrs = scan_cell(
                     page, cap.pending[mark:])
             except Exception as e:
                 if any(k in str(e).lower() for k in ("closed", "crash", "target")):
@@ -481,6 +487,14 @@ def main():
                 except Exception:
                     shot = ""
                 fresh.append((idx, down, col, green, gold, gray, gray_share, label, shot))
+                # capture the actual callable leads from this fresh cell
+                g_addr, o_addr = cell_addrs
+                for a in g_addr:
+                    if a:
+                        fresh_leads.append(("d%dc%d" % (down, col), label, "GREEN", a))
+                for a in o_addr:
+                    if a:
+                        fresh_leads.append(("d%dc%d" % (down, col), label, "GOLD", a))
 
             if not backend_done and idx >= 8:
                 # push EVERYTHING mid-run (not just at the end) so a run that
@@ -546,6 +560,29 @@ def main():
         write_full_analysis(ws, cap, host)
         push_backend_exchange(cap, host)
         gh_put("optimus/_live/scout_findings.txt", "\n".join(flines))
+
+        # FRESH LEADS: the actual callable green/gold addresses from fresh cells,
+        # written to a "Fresh Leads" tab + fresh_leads.csv + pushed so they can be
+        # read precisely and worked/called. (Green = new fiber, Gold = upgrade.)
+        nga = sum(1 for r in fresh_leads if r[2] == "GREEN")
+        noa = sum(1 for r in fresh_leads if r[2] == "GOLD")
+        llines = ["OPTIMUS FRESH LEADS  %s  host=%s" % (ts1, host),
+                  "green=%d  gold=%d  from %d fresh/working cells" % (nga, noa, len(fresh)),
+                  "", "cell | type | address"]
+        for cell, verd, typ, addr in fresh_leads:
+            llines.append("%s | %s | %s" % (cell, typ, addr))
+        gh_put("optimus/_live/fresh_leads.txt", "\n".join(llines))
+        try:
+            import csv as _csv
+            with open(os.path.join(HERE, "fresh_leads.csv"), "w", newline="") as _f:
+                _w2 = _csv.writer(_f)
+                _w2.writerow(["cell", "verdict", "type", "address"])
+                _w2.writerows(fresh_leads)
+        except Exception:
+            pass
+        lt = _tab(ws, "Fresh Leads", ["Time", "Cell", "Verdict", "Type", "Address"])
+        for cell, verd, typ, addr in fresh_leads:
+            _w(lt, [ts1, cell, verd, typ, addr])
 
         print("\n=========== NEW-FIBER SCOUT RESULTS ===========")
         if not fresh:

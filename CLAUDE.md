@@ -1388,3 +1388,14 @@ the proven mouse_drag a few times; the survey loop tolerates up to 4 consecutive
 (a truly closed window is still caught by the scan try/except via closed/crash/target). Same proven
 motion, just doesn't quit on a blip. Additive; compiles. NOTE: the hunter also removed auto-restart for
 good (2026-07-02) -- the cure is unhangable motion, not restarts; the scout follows that now too.
+
+### 11h-fix9 (2026-07-01) — Scout now SAVES fresh green+gold ADDRESSES (find fresh = get callable leads)
+Q from Patrick: what does the scout do on FRESH, and how to read output precisely. Before: on FRESH the
+scout only logged COUNTS (Fiber Scout tab) + a screenshot; it threw away the addresses. Now scan_cell
+returns a 7th value (green_addresses, gold_addresses from the backend summarize); on a FRESH/WORKING cell
+the scout collects them and at run-end writes them to: "Fresh Leads" sheet tab, optimus/fresh_leads.csv,
+and PUSHES optimus/_live/fresh_leads.txt (format: "cell | type | address", GREEN=new fiber / GOLD=upgrade).
+So finding fresh now yields callable leads directly, supporting the "catch fresh green and call that"
+strategy. HOW CLAUDE READS OUTPUT PRECISELY: the scout auto-pushes to optimus/_live/ via github_token; I
+git-pull the branch and read fresh_leads.txt / backend_analysis.txt / scout_findings.txt. Pixel-fallback
+cells have no addresses (dots only) -- only backend-classified cells yield leads.
