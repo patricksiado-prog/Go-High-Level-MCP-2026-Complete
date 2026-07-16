@@ -177,18 +177,30 @@ def gh_put(path, text):
 
 
 def push_live_counts_hunter(cells, leads, area):
-    """Running total for the HUNTER (backend addresses captured off the wire),
-    pushed to optimus/_live/LIVE_COUNTS_hunter.txt so Claude can read it live."""
+    """Running totals for the HUNTER, pushed to optimus/_live/LIVE_COUNTS_hunter.txt
+    so Claude can read the count live WITHOUT opening the giant sheet (which the
+    connector can't export -- 10MB/first-tab wall). Includes the MATCHED-BUSINESS
+    total (green dot + orange dot business), read from the _BIZ seen-sets, which
+    load the existing matches at start -> this is the CUMULATIVE count (the real
+    'Fiber Green Biz' number), so Claude can diff it against the 1,793 baseline."""
     import socket
+    try:
+        g = len(_BIZ.get("green_seen") or ())
+        o = len(_BIZ.get("orange_seen") or ())
+    except Exception:
+        g = o = 0
     txt = (
         "OPTIMUS HUNTER -- LIVE COUNTS\n"
         "updated: %s   host: %s   area: %s\n"
         "STATUS: hunting (updates every ~15 cells while it runs)\n"
         "----------------------------------------\n"
-        "cells scanned:              %d\n"
-        "ADDRESSES captured this run: %d\n"
+        "cells scanned:                 %d\n"
+        "ADDRESSES captured this run:    %d\n"
+        "MATCHED businesses (green dot): %d   <- 'Fiber Green Biz' cumulative total\n"
+        "MATCHED businesses (orange):    %d   <- 'Upgrade Orange Biz' cumulative total\n"
+        "MATCHED total (green+orange):   %d\n"
         % (time.strftime("%Y-%m-%d %H:%M:%S"), socket.gethostname(),
-           str(area), cells, leads))
+           str(area), cells, leads, g, o, g + o))
     gh_put("optimus/_live/LIVE_COUNTS_hunter.txt", txt)
 
 VIEWPORT = {"width": 1366, "height": 768}

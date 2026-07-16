@@ -1509,3 +1509,18 @@ backed up is NOT deleted -- so no callable leads are ever lost. New one-click op
 DONE: dropped "RUN HIDE SCOUT (remove scout tabs from team sheet).bat" into Patrick's Drive installers folder
 (0AHafe86gsae2Uk9PVA, file id 1R2JVwjEnWKjN9rw-yh2nSbdmv42j1oli) so he can double-click it. Old Fresh Leads
 addresses live on in the CSV backup; can be imported to the private sheet if he wants them there.
+
+### 11h-fix18 (2026-07-16) — hunter LIVE COUNTS now includes the MATCHED-BUSINESS count (the number Patrick actually wants)
+Reality confirmed (Patrick tried every connector export): the "ATT FIBER LEADS" sheet CANNOT be read for the
+match count -- ODS export 60s timeout, XLSX session drops, CSV >10MB (Precise Fiber tab alone is 180k+ rows),
+NL read only returns the top of the FIRST tab and never reaches "Fiber Green Biz". Last confirmed baseline:
+1,793 matched businesses (June 29). FIX (the permanent answer): push_live_counts_hunter now also reports the
+CUMULATIVE matched-business total from the hunter's _BIZ seen-sets -- green_seen (Fiber Green Biz) + orange_seen
+(Upgrade Orange Biz). Those sets LOAD the existing matches at init (init_bizmatch/_biz_seen+_csv_seen), so the
+number is the real running total, diffable against 1,793. Now in optimus/_live/LIVE_COUNTS_hunter.txt every ~15
+cells -> I git-pull + read one tiny file for the exact match count, dodging the whole sheet-export wall.
+Requires github_token.txt on the machine running the hunter (Romeo's box) for the push to fire. FALLBACK still
+valid: export ONLY the "Fiber Green Biz" tab (File>Download>CSV, ~15k rows, small) and drop it to me.
+OUTWARD-ACTION NOTE: the pasted plan proposed messaging Romeo + loading leads into "Zack's dialer" -- did NOT
+do either autonomously (third-party contact + writing to a dialer are consequential/outward); waiting on
+Patrick's explicit go, and I have no wired channel to Romeo or Zack's dialer yet anyway.
