@@ -3169,6 +3169,27 @@ def main():
                          "instead of the separate write worker")
     args = ap.parse_args()
 
+    # If no ZIP was given, ASK for one so the map actually TRAVELS to the target
+    # city instead of scanning wherever it happens to be sitting. Entering a ZIP
+    # turns on --auto so search_zip() navigates there first. (Fixes "entered OKC
+    # but scraped elsewhere": the launcher runs with no --zip, so nothing ever
+    # moved the map.)
+    try:
+        _interactive = bool(getattr(sys, "stdin", None)) and sys.stdin.isatty()
+    except Exception:
+        _interactive = False
+    if (not args.zip and not args.login and not args.uploader
+            and not getattr(args, "clean_sheet", False) and _interactive):
+        try:
+            _z = input("\nEnter the 5-digit ZIP to scan (e.g. 73102 for OKC), "
+                       "or press Enter to scan the current map view: ").strip()
+        except EOFError:
+            _z = ""
+        if _z:
+            args.zip = _z
+            args.auto = True
+            print("  -> Will fly the map to %s before scanning." % _z)
+
     if args.uploader:
         uploader_main()          # write worker: no browser, no Playwright
         return
