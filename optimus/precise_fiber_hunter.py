@@ -2189,44 +2189,58 @@ def safe_goto(page, url):
 
 
 def search_zip(page, zip_code):
-    """Type the ZIP into the AT&T map's search box and submit. Tries the
-    Mapbox geocoder input, visible text inputs, then the textbox role."""
+    """Type the ZIP into the AT&T map's search box, pick the first geocoder
+    suggestion, and fly the map there. Works for ANY market (OKC, Houston,
+    anywhere). Pressing Enter alone often leaves a bare ZIP unresolved so the
+    map never moves and the scan runs on the DEFAULT view -- that was the
+    'entered OKC but scraped elsewhere' bug. Returns True only when a location
+    was entered."""
+    q = str(zip_code).strip()
     selectors = [".mapboxgl-ctrl-geocoder--input",
+                 ".maplibregl-ctrl-geocoder--input",
                  "input[placeholder*='Search' i]",
                  "input[placeholder*='address' i]",
+                 "input[placeholder*='ZIP' i]",
                  "input[type='search']",
-                 "input[type='text']",
-                 "input"]
+                 "input[type='text']"]
+    box = None
     for sel in selectors:
         try:
-            box = page.query_selector(sel)
-            if box and box.is_visible():
-                box.click()
-                box.fill("")
-                box.type(str(zip_code), delay=40)
-                time.sleep(0.6)
-                page.keyboard.press("Enter")
-                time.sleep(3.5)
-                return True
+            el = page.query_selector(sel)
+            if el and el.is_visible():
+                box = el; break
         except Exception:
             continue
-    # last resort: any visible textbox by ARIA role
+    if box is None:
+        try:
+            tb = page.get_by_role("textbox")
+            if tb.count() > 0 and tb.first.is_visible():
+                box = tb.first
+        except Exception:
+            box = None
+    if box is None:
+        return False
     try:
-        tb = page.get_by_role("textbox")
-        if tb.count() > 0:
-            tb.first.click()
-            tb.first.fill(str(zip_code))
-            page.keyboard.press("Enter")
-            time.sleep(3.5)
-            return True
+        box.click(); box.fill(""); box.type(q, delay=60); time.sleep(1.2)
     except Exception:
-        pass
-    return False
+        return False
+    for ss in [".mapboxgl-ctrl-geocoder .suggestions li > a",
+               ".maplibregl-ctrl-geocoder .suggestions li > a",
+               ".suggestions li > a",
+               ".mapboxgl-ctrl-geocoder--suggestion",
+               "ul.suggestions li"]:
+        try:
+            page.wait_for_selector(ss, timeout=3500)
+            sug = page.query_selector(ss)
+            if sug and sug.is_visible():
+                sug.click(); time.sleep(3.5); return True
+        except Exception:
+            continue
+    try:
+        page.keyboard.press("Enter"); time.sleep(4.0); return True
+    except Exception:
+        return False
 
-
-# ----------------------------------------------------------------------------
-# scan: drain each viewport fully, THEN pan; snake across grid
-# ----------------------------------------------------------------------------
 def record_capture(ws, seen, area_label, dry, address, popup_status, ban,
                    dot_status, via, zone_label="WORKING", lat=None, lng=None):
     """Common writer for both the Mapbox fast path and the click path.
@@ -3346,10 +3360,15 @@ def main():
             if args.zip and not searched[0]:
                 print("Searching area: %s" % args.zip)
                 if not search_zip(page, args.zip):
-                    if args.auto:
-                        print("Couldn't find the search box -- scanning the current view.")
-                    else:
-                        print("Couldn't find the search box -- pan to your area by hand.")
+                    print("\n" + "!" * 64)
+                    print("!! WARNING: could NOT enter ZIP %s into the map." % args.zip)
+                    print("!! The map is still on its DEFAULT area -- scanning now would")
+                    print("!! scrape the WRONG location. Type the ZIP into the map's search")
+                    print("!! box BY HAND, wait for it to fly to %s, then let it scan." % args.zip)
+                    print("!" * 64 + "\n")
+                    time.sleep(6.0)
+                else:
+                    searched[0] = True
                 if args.zoom_in:
                     zoom(page, args.zoom_in, "in")
                 if args.zoom_out:
