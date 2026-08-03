@@ -3169,26 +3169,10 @@ def main():
                          "instead of the separate write worker")
     args = ap.parse_args()
 
-    # If no ZIP was given, ASK for one so the map actually TRAVELS to the target
-    # city instead of scanning wherever it happens to be sitting. Entering a ZIP
-    # turns on --auto so search_zip() navigates there first. (Fixes "entered OKC
-    # but scraped elsewhere": the launcher runs with no --zip, so nothing ever
-    # moved the map.)
-    try:
-        _interactive = bool(getattr(sys, "stdin", None)) and sys.stdin.isatty()
-    except Exception:
-        _interactive = False
-    if (not args.zip and not args.login and not args.uploader
-            and not getattr(args, "clean_sheet", False) and _interactive):
-        try:
-            _z = input("\nEnter the 5-digit ZIP to scan (e.g. 73102 for OKC), "
-                       "or press Enter to scan the current map view: ").strip()
-        except EOFError:
-            _z = ""
-        if _z:
-            args.zip = _z
-            args.auto = True
-            print("  -> Will fly the map to %s before scanning." % _z)
+    # NO ZIP PROMPT. With no --zip/--auto (how the launcher runs it) this stays
+    # in MANUAL mode: you pan/search the AT&T map to the spot you want by hand,
+    # then press Enter here to scan THAT view. You control where it scans, so it
+    # can never wander to the wrong area.
 
     if args.uploader:
         uploader_main()          # write worker: no browser, no Playwright
@@ -3414,13 +3398,15 @@ def main():
             # MANUAL mode: let the user get the map where they want it, then
             # scan THAT view (don't auto-jump to a ZIP). They press Enter to go.
             searched[0] = True
-            print("\n  " + "=" * 56)
-            print("  Get the AT&T Fiber Map showing the area you want to scan.")
-            print("  (Log in if needed; pan/zoom to your spot.)")
-            print("  Then come back here and press Enter to START scanning.")
-            print("  " + "=" * 56)
+            print("\n  " + "=" * 60)
+            print("  STEP 1  ->  In the browser, move the AT&T Fiber Map to the")
+            print("              area you want (type your ZIP in the map's search")
+            print("              box, or pan/zoom by hand). Log in first if asked.")
+            print("  STEP 2  ->  When the map is sitting on the right spot, come")
+            print("              back to THIS window and press Enter to scan it.")
+            print("  " + "=" * 60)
             try:
-                input("  Press Enter to start... ")
+                input("  Map on the right spot? Press Enter to START scanning... ")
             except EOFError:
                 pass
 
