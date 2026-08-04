@@ -2969,6 +2969,9 @@ def _log_new_fiber_alert(ws, area, greens, grey_ct):
 
 EMAIL_COOLDOWN = 600       # min seconds between real-time emails (anti-spam)
 _LAST_EMAIL = [0.0]
+# Where new-fiber alerts are emailed by default (overridable with "to" in the
+# optimus_email.json file). Set to Patrick per request.
+DEFAULT_ALERT_TO = "patricksiado@gmail.com"
 
 
 def _email_cfg():
@@ -2990,7 +2993,7 @@ def _email_cfg():
                 if c.get("user") and c.get("password"):
                     c.setdefault("host", "smtp.gmail.com")
                     c.setdefault("port", 587)
-                    c.setdefault("to", c["user"])
+                    c.setdefault("to", DEFAULT_ALERT_TO)
                     return c
         except Exception:
             pass
