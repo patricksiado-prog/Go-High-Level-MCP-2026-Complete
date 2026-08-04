@@ -2952,6 +2952,77 @@ def _log_new_fiber_alert(ws, area, greens, grey_ct):
         gh_put("optimus/_live/NEW_FIBER_ALERTS.txt", body)
     except Exception:
         pass
+    # 3) REAL-TIME email, the moment it's spotted (cooldown-limited so a big
+    #    neighborhood doesn't spam). Needs a local optimus_email.json; without it
+    #    this silently skips and the daily digest still covers it.
+    try:
+        _email_alert(
+            "NEW FIBER: %d eligible homes (%s)" % (len(greens), area),
+            "A freshly-lit fiber block was just found.\n\n"
+            "When: %s\nMachine: %s\nArea: %s\n"
+            "New (green, non-customer) homes in view: %d\n"
+            "Existing customers in view: %d\n\nSample addresses:\n%s\n"
+            % (stamp, host, area, len(greens), grey_ct, "\n".join(greens[:15])))
+    except Exception:
+        pass
+
+
+EMAIL_COOLDOWN = 600       # min seconds between real-time emails (anti-spam)
+_LAST_EMAIL = [0.0]
+
+
+def _email_cfg():
+    """Load real-time email settings from a LOCAL file (never committed):
+    optimus_email.json = {"user":"you@gmail.com","password":"<app password>",
+    "to":"BHOLLAND@thefiberplug.com","host":"smtp.gmail.com","port":587}.
+    Looked for in the same spots as the github token. Returns a dict or None."""
+    import json as _j
+    home = os.path.expanduser("~")
+    for p in [os.path.join(home, "Desktop", "optimus_email.json"),
+              os.path.join(home, "Downloads", "optimus_email.json"),
+              os.path.join(home, "optimus_email.json"),
+              os.path.join(home, "optimus", "optimus_email.json"),
+              os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "optimus_email.json")]:
+        try:
+            if os.path.exists(p):
+                c = _j.load(open(p))
+                if c.get("user") and c.get("password"):
+                    c.setdefault("host", "smtp.gmail.com")
+                    c.setdefault("port", 587)
+                    c.setdefault("to", c["user"])
+                    return c
+        except Exception:
+            pass
+    return None
+
+
+def _email_alert(subject, body):
+    """Send an alert email NOW (best-effort, cooldown-limited). No config file ->
+    silently skip. Never crashes the hunt."""
+    import time as _t
+    if (_t.time() - _LAST_EMAIL[0]) < EMAIL_COOLDOWN:
+        return
+    cfg = _email_cfg()
+    if not cfg:
+        return
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        m = MIMEText(body)
+        m["Subject"] = subject
+        m["From"] = cfg["user"]
+        m["To"] = cfg["to"]
+        s = smtplib.SMTP(cfg["host"], int(cfg["port"]), timeout=20)
+        s.starttls()
+        s.login(cfg["user"], cfg["password"])
+        s.sendmail(cfg["user"], [x.strip() for x in str(cfg["to"]).split(",")],
+                   m.as_string())
+        s.quit()
+        _LAST_EMAIL[0] = _t.time()
+        print("   (real-time email sent to %s)" % cfg["to"])
+    except Exception as e:
+        print("   (real-time email skipped: %s)" % str(e)[:70])
 
 
 # ----------------------------------------------------------------------------
