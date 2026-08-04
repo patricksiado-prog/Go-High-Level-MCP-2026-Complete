@@ -375,6 +375,33 @@ GEO_HIDE_JS = """
 })();
 """
 
+# WebGL-context-loss watchdog. On a low-RAM laptop, after a long run Chromium
+# drops the map's WebGL context ("Too many active WebGL contexts") -> the canvas
+# goes BLANK WHITE and never renders again, but our Python loop keeps sweeping a
+# DEAD map (so the motion watchdog never fires) = the permanent freeze. This
+# listener flips window.__optimusGLLost when the context is lost so the sweep can
+# detect it and RELOAD the page to revive the map.
+GL_WATCH_JS = """
+(() => {
+  window.__optimusGLLost = false;
+  const hook = (cv) => {
+    if (cv.__optimusGLHooked) return;
+    cv.__optimusGLHooked = true;
+    cv.addEventListener('webglcontextlost', (e) => {
+      try { e.preventDefault(); } catch (x) {}
+      window.__optimusGLLost = true;
+    }, false);
+    cv.addEventListener('webglcontextrestored', () => {
+      window.__optimusGLLost = false;
+    }, false);
+  };
+  const scan = () => { try { document.querySelectorAll('canvas').forEach(hook); } catch (e) {} };
+  scan();
+  const t = setInterval(scan, 1000);
+  setTimeout(() => clearInterval(t), 1800000);   // 30 minutes
+})();
+"""
+
 MAPBOX_QUERY_JS = """
 () => {
   const m = (window.__optimusMaps || [])[0];
@@ -2233,6 +2260,10 @@ def sweep_grid(page, ws, seen, area_label, dry, capture):
         if key in done:
             return               # already scanned -> just passing through, fast
         done.add(key)
+        if _map_frozen(page):        # WebGL context lost -> revive it
+            _recover_frozen_map(page, area_label)
+        if tally["cells"] % 5 == 0:
+            _cache_center(page)      # remember the spot for recovery
         if on_map(page):
             search_this_area(page)
         time.sleep(SEARCH_SETTLE)
@@ -2296,6 +2327,72 @@ def sweep_grid(page, ws, seen, area_label, dry, capture):
         return tally["total"]
 
 
+_LAST_CENTER = [None]    # last-known good [lng, lat, zoom] for freeze recovery
+
+
+def _cache_center(page):
+    """Remember where the map is now, so a freeze-reload can jump back to it."""
+    try:
+        c = page.evaluate("() => {const m=(window.__optimusMaps||[])[0];"
+                          " if(m&&m.getCenter){const p=m.getCenter();"
+                          " return [p.lng,p.lat,m.getZoom()];} return null;}")
+        if c:
+            _LAST_CENTER[0] = c
+    except Exception:
+        pass
+
+
+def _map_frozen(page):
+    """True once the map's WebGL context is lost (blank-white permanent freeze)."""
+    try:
+        return bool(page.evaluate("() => window.__optimusGLLost === true"))
+    except Exception:
+        return False
+
+
+def _recover_frozen_map(page, area_label):
+    """Revive a frozen (WebGL-lost) map by RELOADING the page and jumping back to
+    where it froze -- an in-process fix, no full restart, no lost run."""
+    print("\n" + "!" * 60)
+    print("  MAP FROZE (WebGL context lost) -- reloading to revive it...")
+    print("!" * 60)
+    try:
+        safe_goto(page, MAP_URL)
+    except Exception:
+        pass
+    time.sleep(4.0)
+    try:
+        open_map_view(page)
+    except Exception:
+        pass
+    restored = False
+    c = _LAST_CENTER[0]
+    if c:
+        try:
+            page.evaluate("([lng,lat,z]) => {const m=(window.__optimusMaps||[])[0];"
+                          " if(m&&m.jumpTo){m.jumpTo({center:[lng,lat],zoom:z});}}", c)
+            time.sleep(2.0)
+            restored = True
+            print("  restored the map to where it froze.")
+        except Exception:
+            pass
+    if not restored and area_label and str(area_label).isdigit():
+        try:
+            search_zip(page, area_label)
+            time.sleep(2.0)
+            restored = True
+        except Exception:
+            pass
+    try:
+        page.evaluate("() => { window.__optimusGLLost = false; }")
+    except Exception:
+        pass
+    if not restored:
+        print("  reloaded, but couldn't auto-restore the exact spot -- nudge the "
+              "map to your area if needed.")
+    return True
+
+
 def sweep_continuous(page, ws, seen, area_label, dry, capture):
     """Keep sweeping OUTWARD in a spiral, capturing each viewport off the
     backend, until the browser is closed -- no fixed grid. Set it on a spot/ZIP
@@ -2308,6 +2405,10 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
         while True:
             for _arm in range(2):           # spiral: 2 arms per run-length, then grow
                 for _ in range(run):
+                    if _map_frozen(page):       # WebGL context lost -> revive it
+                        _recover_frozen_map(page, area_label)
+                    if cell % 5 == 0:
+                        _cache_center(page)     # remember the spot for recovery
                     if on_map(page):
                         search_this_area(page)
                     time.sleep(SEARCH_SETTLE)
@@ -3785,6 +3886,7 @@ def main():
         )
         ctx.add_init_script(MAPBOX_HOOK_JS)   # hook the map before it loads
         ctx.add_init_script(GEO_HIDE_JS)      # hide the giant geolocation blob
+        ctx.add_init_script(GL_WATCH_JS)      # detect WebGL context loss (freeze)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
 
         # ALWAYS capture network responses now -- the map object is hidden on
