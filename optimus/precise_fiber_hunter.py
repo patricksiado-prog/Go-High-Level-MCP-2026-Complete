@@ -3357,8 +3357,12 @@ def _dd_delete_rows(ws, row_numbers):
 
 
 def _dd_dedupe_tab(sh, tab, key_fn, score_fn=None):
-    """Keep one row per key (highest score, else earliest); delete the rest.
-    Rows with no key are never touched. Returns rows removed."""
+    """Keep one row per key (highest score, else earliest); remove the rest by
+    OVERWRITING the kept rows at the top, then trimming the old trailing rows in
+    ONE contiguous delete. Reliable at ANY scale (2 API calls, not thousands of
+    scattered deletes -- the old way choked on a 17k-dupe tab). Append-safe: a
+    live append lands at row >= N+2, BELOW the trimmed range [K+2 .. N+1], so it
+    survives and just shifts up. Returns rows removed."""
     try:
         ws = sh.worksheet(tab)
     except Exception:
@@ -3366,27 +3370,34 @@ def _dd_dedupe_tab(sh, tab, key_fn, score_fn=None):
     vals = ws.get_all_values()
     if len(vals) < 3:
         return 0
-    rows = vals[1:]
-    best = {}                              # key -> (score, data_index)
+    hdr, rows = vals[0], vals[1:]
+    N = len(rows)
+    best, keyless = {}, []                 # key -> (score, index); keyless kept as-is
     for i, r in enumerate(rows):
         k = key_fn(r)
         if not k:
+            keyless.append(i)
             continue
         s = score_fn(r) if score_fn else 0
         if k not in best or s > best[k][0]:
             best[k] = (s, i)
-    keep = set(v[1] for v in best.values())
-    dup = []
-    for i, r in enumerate(rows):
-        k = key_fn(r)
-        if k and i not in keep:
-            dup.append(i + 2)              # +2: header row + 1-based
-            if len(dup) >= _DEDUPE_MAXDEL:
-                break
-    if not dup:
+    keep_idx = sorted(set(v[1] for v in best.values()) | set(keyless))
+    removed = N - len(keep_idx)
+    if removed <= 0:
         return 0
-    _dd_backup_csv(tab, vals)              # backup BEFORE any delete
-    return _dd_delete_rows(ws, dup)
+    _dd_backup_csv(tab, vals)              # local CSV backup BEFORE any change
+    width = max(len(hdr), max((len(rows[i]) for i in keep_idx), default=len(hdr)))
+    body = [(list(rows[i]) + [""] * width)[:width] for i in keep_idx]
+    K = len(body)
+    # 1) overwrite kept rows starting at row 2 (header stays row 1)
+    ws.batch_update([{"range": "A2", "values": body}], value_input_option="RAW")
+    # 2) trim the OLD trailing rows [K+2 .. N+1]; live appends land at >= N+2, safe
+    lo, hi = K + 2, N + 1
+    if hi >= lo:
+        ws.spreadsheet.batch_update({"requests": [{"deleteDimension": {"range": {
+            "sheetId": ws.id, "dimension": "ROWS",
+            "startIndex": lo - 1, "endIndex": hi}}}]})
+    return removed
 
 
 def _dd_acquire_lock(sh):
