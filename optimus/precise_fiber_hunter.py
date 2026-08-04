@@ -3882,7 +3882,16 @@ def main():
             PROFILE_DIR, headless=False,
             viewport=VIEWPORT,
             device_scale_factor=1,   # screenshot px == click px (HiDPI fix)
-            args=["--start-maximized"],
+            # Flags that PREVENT the WebGL-context-loss freeze on low-RAM laptops:
+            # keep the map rendering even when the window is covered/backgrounded
+            # (Chrome otherwise throttles or discards it, dropping the GL context),
+            # and don't let the tab be memory-saver-discarded mid-run.
+            args=["--start-maximized",
+                  "--disable-background-timer-throttling",
+                  "--disable-renderer-backgrounding",
+                  "--disable-backgrounding-occluded-windows",
+                  "--disable-features=CalculateNativeWinOcclusion,IntensiveWakeUpThrottling,HighEfficiencyModeAvailable",
+                  "--disable-dev-shm-usage"],
         )
         ctx.add_init_script(MAPBOX_HOOK_JS)   # hook the map before it loads
         ctx.add_init_script(GEO_HIDE_JS)      # hide the giant geolocation blob
