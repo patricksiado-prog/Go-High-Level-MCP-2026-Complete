@@ -2260,10 +2260,9 @@ def sweep_grid(page, ws, seen, area_label, dry, capture):
         if key in done:
             return               # already scanned -> just passing through, fast
         done.add(key)
-        if _map_frozen(page):        # WebGL context lost -> revive it
-            _recover_frozen_map(page, area_label)
-        if tally["cells"] % 5 == 0:
-            _cache_center(page)      # remember the spot for recovery
+        if _map_frozen(page):        # WebGL freeze -> alert + stop cleanly
+            _handle_frozen_map(ws, area_label)
+            return
         if on_map(page):
             search_this_area(page)
         time.sleep(SEARCH_SETTLE)
@@ -2327,21 +2326,6 @@ def sweep_grid(page, ws, seen, area_label, dry, capture):
         return tally["total"]
 
 
-_LAST_CENTER = [None]    # last-known good [lng, lat, zoom] for freeze recovery
-
-
-def _cache_center(page):
-    """Remember where the map is now, so a freeze-reload can jump back to it."""
-    try:
-        c = page.evaluate("() => {const m=(window.__optimusMaps||[])[0];"
-                          " if(m&&m.getCenter){const p=m.getCenter();"
-                          " return [p.lng,p.lat,m.getZoom()];} return null;}")
-        if c:
-            _LAST_CENTER[0] = c
-    except Exception:
-        pass
-
-
 def _map_frozen(page):
     """True once the map's WebGL context is lost (blank-white permanent freeze)."""
     try:
@@ -2350,47 +2334,23 @@ def _map_frozen(page):
         return False
 
 
-def _recover_frozen_map(page, area_label):
-    """Revive a frozen (WebGL-lost) map by RELOADING the page and jumping back to
-    where it froze -- an in-process fix, no full restart, no lost run."""
-    print("\n" + "!" * 60)
-    print("  MAP FROZE (WebGL context lost) -- reloading to revive it...")
-    print("!" * 60)
+def _handle_frozen_map(ws, area_label):
+    """The map's WebGL context died (blank-white freeze). It can't be revived
+    automatically -- turning the map back on needs the log-in + 'Fiber
+    Availability Map' clicks. So DON'T reload; just alert loudly, mark it on the
+    status sheet, and stop cleanly so it never sits scanning a dead map."""
+    print("\n" + "!" * 62)
+    print("  MAP FROZE (WebGL context lost -- the blank white map).")
+    print("  It can't be turned back on automatically (needs the log-in +")
+    print("  'Fiber Availability Map' clicks). STOPPING so it doesn't scan a")
+    print("  dead map. Reopen the hunter, click the map back on, press Enter.")
+    print("!" * 62 + "\n")
     try:
-        safe_goto(page, MAP_URL)
+        report_status(ws, area_label, "stopped",
+                      note="map froze (WebGL context lost) -- revive manually")
     except Exception:
         pass
-    time.sleep(4.0)
-    try:
-        open_map_view(page)
-    except Exception:
-        pass
-    restored = False
-    c = _LAST_CENTER[0]
-    if c:
-        try:
-            page.evaluate("([lng,lat,z]) => {const m=(window.__optimusMaps||[])[0];"
-                          " if(m&&m.jumpTo){m.jumpTo({center:[lng,lat],zoom:z});}}", c)
-            time.sleep(2.0)
-            restored = True
-            print("  restored the map to where it froze.")
-        except Exception:
-            pass
-    if not restored and area_label and str(area_label).isdigit():
-        try:
-            search_zip(page, area_label)
-            time.sleep(2.0)
-            restored = True
-        except Exception:
-            pass
-    try:
-        page.evaluate("() => { window.__optimusGLLost = false; }")
-    except Exception:
-        pass
-    if not restored:
-        print("  reloaded, but couldn't auto-restore the exact spot -- nudge the "
-              "map to your area if needed.")
-    return True
+    _STOP[0] = True          # end the sweep + shut down cleanly (no auto-restart)
 
 
 def sweep_continuous(page, ws, seen, area_label, dry, capture):
@@ -2405,10 +2365,9 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
         while True:
             for _arm in range(2):           # spiral: 2 arms per run-length, then grow
                 for _ in range(run):
-                    if _map_frozen(page):       # WebGL context lost -> revive it
-                        _recover_frozen_map(page, area_label)
-                    if cell % 5 == 0:
-                        _cache_center(page)     # remember the spot for recovery
+                    if _map_frozen(page):       # WebGL freeze -> alert + stop
+                        _handle_frozen_map(ws, area_label)
+                        return total
                     if on_map(page):
                         search_this_area(page)
                     time.sleep(SEARCH_SETTLE)
