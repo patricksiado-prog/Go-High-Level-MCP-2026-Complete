@@ -251,6 +251,50 @@ GOLD_CLUSTER_ALERT = 8
 # Alerts' tab so it can trigger a phone notification.
 NEW_FIBER_ALERT = 15
 NEW_FIBER_TAB = "New Fiber Alerts"
+
+# SLAM-TO-STOP: hold the mouse in the very top-left screen corner ~1s to stop the
+# hunt cleanly. The hunter pans from the CENTER of the screen and never parks the
+# cursor in the corner itself, so this can only be triggered by you.
+_STOP = [False]
+
+
+def _start_stop_watcher():
+    """Background watcher: if the mouse sits in the extreme top-left corner for
+    ~1 second, set _STOP so the sweep ends cleanly (closes the browser, no auto-
+    restart). Windows only; a harmless no-op elsewhere."""
+    if os.name != "nt":
+        return
+    import threading
+
+    def _watch():
+        import ctypes
+        import time as _t
+
+        class _PT(ctypes.Structure):
+            _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+        user32 = ctypes.windll.user32
+        held = 0
+        while not _STOP[0]:
+            try:
+                pt = _PT()
+                user32.GetCursorPos(ctypes.byref(pt))
+                if pt.x <= 3 and pt.y <= 3:          # extreme top-left corner
+                    held += 1
+                    if held >= 5:                    # ~1s at 0.2s poll
+                        _STOP[0] = True
+                        print("\n" + "#" * 58)
+                        print("  STOP: mouse held in the TOP-LEFT corner.")
+                        print("  Finishing this cell and shutting down cleanly...")
+                        print("#" * 58 + "\n")
+                        return
+                else:
+                    held = 0
+            except Exception:
+                return
+            _t.sleep(0.2)
+    threading.Thread(target=_watch, daemon=True).start()
+    print("  STOP anytime: slam the mouse into the TOP-LEFT screen corner and "
+          "hold ~1 second.")
 _NET_CAPTURE = [None]    # the always-on network capture (set in main)
 
 JSONL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -2088,6 +2132,8 @@ def mouse_drag(page, direction, quiet=False):
     of the screen -- either way page.mouse moves the map. Drag the content the
     OPPOSITE way you want the viewport to move. quiet=True is a fast, silent
     pass-through pan (used to skate across cells already scanned)."""
+    if _STOP[0]:
+        return False   # top-left-corner STOP gesture -> end the sweep cleanly
     _BEAT[0] = time.time()
     # (auto-restart REMOVED for good, Patrick 2026-07-02: a relaunch can't get
     #  itself back to the right screen -- login/portal need button presses. So
@@ -3926,6 +3972,7 @@ def main():
         if loop_secs and not args.auto:
             print("\n  WATCHING: pan the map by hand to new areas -- it grabs each "
                   "one off the server every %ds. Close the browser to stop.\n" % loop_secs)
+        _start_stop_watcher()          # slam mouse to top-left corner to stop
         passno = 0
         while True:
             passno += 1
@@ -3947,6 +3994,11 @@ def main():
                     print("  staying open, retrying next pass...\n")
                     time.sleep(loop_secs)
                     continue
+                break
+            if _STOP[0]:
+                print("\nStopped by the top-left corner gesture. Closing.")
+                report_status(ws, args.zip or "manual", "stopped", found=n,
+                              note="corner STOP gesture")
                 break
             if loop_secs > 0:
                 report_status(ws, args.zip or "manual", "watching",
