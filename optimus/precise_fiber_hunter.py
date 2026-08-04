@@ -242,6 +242,9 @@ CLICK_OFFSETS = [(0, 0), (3, 0), (-3, 0), (0, 3), (0, -3)]   # retry spiral
 # from the Mapbox backend read instead; --allow-click re-enables the old way.
 ALLOW_CLICK = False
 _AUTO_PROBED = [False]   # run the frame diagnostic at most once per session
+# Alert when this many GOLD (copper->fiber upgrade) dots land in ONE viewport --
+# a dense upgrade pocket is the hottest thing to work. Tune here.
+GOLD_CLUSTER_ALERT = 8
 _NET_CAPTURE = [None]    # the always-on network capture (set in main)
 
 JSONL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -640,8 +643,6 @@ def lead_from_dict(d):
     base = d.get("properties") if isinstance(d.get("properties"), dict) else d
     low = {_nkey(k): v for k, v in base.items()}
     addr = _pick(low, ADDR_KEYS)
-    if not addr or not isinstance(addr, str):
-        return None
     lat, lng = _num(_pick(low, LAT_KEYS)), _num(_pick(low, LNG_KEYS))
     if geom and geom.get("type") == "Point":
         coords = geom.get("coordinates")
@@ -649,6 +650,26 @@ def lead_from_dict(d):
             lng = lng if lng is not None else _num(coords[0])
             lat = lat if lat is not None else _num(coords[1])
     status = _pick(low, NET_STATUS_KEYS)
+    ban = _pick(low, NET_BAN_KEYS)
+    if not addr or not isinstance(addr, str):
+        # AT&T sometimes returns a serviceability dot with a STATUS + COORDINATES
+        # but no inline street address. Those are still real GREEN/GOLD dots, so
+        # capture them by coordinate (the street address can be backfilled later)
+        # instead of silently dropping them -- that drop is a prime suspect for
+        # "the map shows dots but the sheet stays 0." Tightly gated so random
+        # coordinate/UI JSON can never sneak in: needs a US lat/lng AND a fiber
+        # status/ban that classifies GREEN or GOLD (GREY/unknown are not coord-
+        # captured).
+        us_lat = isinstance(lat, (int, float)) and 20.0 <= lat <= 72.0
+        us_lng = isinstance(lng, (int, float)) and -170.0 <= lng <= -50.0
+        has_sig = (isinstance(status, str) and status.strip()) or ban
+        if us_lat and us_lng and has_sig:
+            _c = dot_color(classify_status(
+                text=status if isinstance(status, str) else None, ban=ban))
+            if _c in ("GREEN", "GOLD"):
+                addr = "(%.6f, %.6f)" % (lat, lng)
+        if not addr or not isinstance(addr, str):
+            return None
     # Keep the ORIGINAL record on the lead. The scout's backend classifier reads
     # subscriber_ban + curr_ntwrk_bld_type_cd off ld["raw"] to score GREEN/GOLD/
     # GREY per cell; without this the backend path never fires and every cell
@@ -794,6 +815,24 @@ class NetCapture:
         self.seen_urls = {}          # base url -> [content_type, hits, max_bytes]
         self.tile_keys = set()       # property names seen in vector tiles (schema)
         self.tile_status = {}        # base url -> last decode note (debug aid)
+        # ZERO-CAPTURE DIAGNOSTICS: so a run that writes nothing can say WHY.
+        self.svc_seen = 0            # # of AT&T serviceability 200 responses read
+        self.svc_leads = 0          # # of leads those responses yielded
+        self.svc_empty_keys = None   # top-level keys of a 200 svc reply that had 0 leads
+
+    def diag(self):
+        """One-line reason the sweep can log so 0-capture is never a mystery:
+        no serviceability responses at all => not logged in / map not loading data;
+        responses seen but 0 leads => AT&T's payload shape changed (keys shown)."""
+        if self.svc_seen == 0:
+            return ("NO serviceability responses seen -- the map isn't loading "
+                    "fiber data (check you're LOGGED IN and dots are visible)")
+        if self.svc_leads == 0:
+            return ("saw %d serviceability response(s) but decoded 0 leads -- "
+                    "AT&T payload shape may have changed; top keys: %s"
+                    % (self.svc_seen, self.svc_empty_keys))
+        return "OK: %d serviceability responses -> %d leads" % (
+            self.svc_seen, self.svc_leads)
 
     def handle(self, response):
         try:
@@ -845,6 +884,7 @@ class NetCapture:
                     data = json.loads(body)
                 except Exception:
                     return
+                self.svc_seen += 1
                 leads = extract_leads_from_json(data)
                 # ALSO run the proven extractor (catches the AT&T 'serviceability'
                 # endpoint shape that the working pipeline tools rely on)
@@ -927,9 +967,27 @@ class NetCapture:
             else:
                 return
             if leads:
+                self.svc_leads += len(leads)
                 base = url.split("?")[0]
                 self.endpoints[base] = self.endpoints.get(base, 0) + len(leads)
                 self.pending.extend(leads)
+            elif data_url:
+                # a serviceability 200 that produced NO leads: record its shape
+                # once so we can see exactly how AT&T's payload changed.
+                if self.svc_empty_keys is None:
+                    try:
+                        if isinstance(data, dict):
+                            self.svc_empty_keys = ",".join(list(data.keys())[:12])
+                        elif isinstance(data, list) and data and isinstance(data[0], dict):
+                            self.svc_empty_keys = "[list] item0: " + ",".join(
+                                list(data[0].keys())[:12])
+                        else:
+                            self.svc_empty_keys = type(data).__name__
+                        drive_log("SVC-EMPTY %s :: keys=%s :: %s" % (
+                            url.split("?")[0][:55], self.svc_empty_keys,
+                            json.dumps(data)[:300]))
+                    except Exception:
+                        pass
         except Exception:
             pass
 
@@ -1029,6 +1087,25 @@ class NetCapture:
                                 "via": "network", "lat": ld.get("lat"), "lng": ld.get("lng")})
         if not new_rows:
             return 0
+        # GOLD CLUSTER ALERT: gold = copper-to-fiber UPGRADE prospects (hottest
+        # leads). If an unusually dense pocket shows up in one viewport, call it
+        # out loudly + log it to the status sheet + Drive so it's easy to work.
+        _golds = [r[0] for r in new_rows if r[1] == "GOLD"]
+        if len(_golds) >= GOLD_CLUSTER_ALERT:
+            print("\n" + "*" * 60)
+            print("  ** GOLD CLUSTER: %d gold (upgrade) dots in ONE view **" % len(_golds))
+            print("     e.g. " + " | ".join(_golds[:4]))
+            print("*" * 60 + "\n")
+            try:
+                drive_log("GOLD-CLUSTER %d in one view (area %s): %s" % (
+                    len(_golds), area_label, " | ".join(_golds[:6])))
+            except Exception:
+                pass
+            try:
+                report_status(ws, area_label, "GOLD CLUSTER", found=len(_golds),
+                              note="%d gold upgrade dots in one viewport" % len(_golds))
+            except Exception:
+                pass
         for rec in new_records:        # local backup (no quota)
             append_jsonl(rec)
         try:    # sample addresses to the Drive log so Claude can verify accuracy
@@ -2140,8 +2217,14 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                     cell += 1
                     print("  [cell %d] +%d  (total %d)" % (cell, n, total))
                     if cell % 15 == 0:
-                        report_status(ws, area_label, "watching", found=total,
-                                      note="continuous: %d cells, %d leads" % (cell, total))
+                        note = "continuous: %d cells, %d leads" % (cell, total)
+                        if total == 0:
+                            # nothing captured yet -> say WHY on the status sheet
+                            try:
+                                note += " | " + capture.diag()
+                            except Exception:
+                                pass
+                        report_status(ws, area_label, "watching", found=total, note=note)
                     if not mouse_drag(page, dirs[di]):
                         return total        # canvas gone -> stop
                 di = (di + 1) % 4
