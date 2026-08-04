@@ -245,6 +245,12 @@ _AUTO_PROBED = [False]   # run the frame diagnostic at most once per session
 # Alert when this many GOLD (copper->fiber upgrade) dots land in ONE viewport --
 # a dense upgrade pocket is the hottest thing to work. Tune here.
 GOLD_CLUSTER_ALERT = 8
+# NEW-FIBER alert: this many GREEN (fiber-eligible / NON-customer) dots in ONE
+# viewport AND very little grey (existing fiber customers) = a freshly-lit
+# neighborhood -- brand-new fiber nobody has sold yet. Logged to a 'New Fiber
+# Alerts' tab so it can trigger a phone notification.
+NEW_FIBER_ALERT = 15
+NEW_FIBER_TAB = "New Fiber Alerts"
 _NET_CAPTURE = [None]    # the always-on network capture (set in main)
 
 JSONL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -1062,6 +1068,7 @@ class NetCapture:
             return self.flush_local(seen, area_label, dry)
         self.seen = seen
         new_rows, new_records = [], []
+        grey_ct = 0                        # existing fiber customers in this batch
         while self.pending:
             ld = self.pending.pop()
             addr = (ld.get("address") or "").strip()
@@ -1073,6 +1080,7 @@ class NetCapture:
             seen.add(key)
             dot_status = classify_status(text=ld.get("status"), ban=ld.get("ban"))
             if dot_color(dot_status) == "GREY":
+                grey_ct += 1
                 continue   # GREY = existing fiber customer -> leave out
             ts = time.strftime("%Y-%m-%d %H:%M:%S")
             # clean columns + the business merged inline when the address matches a
@@ -1104,6 +1112,25 @@ class NetCapture:
             try:
                 report_status(ws, area_label, "GOLD CLUSTER", found=len(_golds),
                               note="%d gold upgrade dots in one viewport" % len(_golds))
+            except Exception:
+                pass
+        # NEW-FIBER CLUSTER ALERT: a viewport that is mostly GREEN (fiber eligible /
+        # NON-customer) with hardly any grey (existing customers) = a just-lit
+        # neighborhood. Logged to the 'New Fiber Alerts' tab so a phone alert can fire.
+        _greens = [r[0] for r in new_rows if r[1] == "GREEN"]
+        if len(_greens) >= NEW_FIBER_ALERT and len(_greens) >= 4 * grey_ct:
+            print("\n" + "=" * 60)
+            print("  >> NEW FIBER: %d green (eligible, NON-customer) dots, only %d "
+                  "existing customers -- looks freshly lit <<" % (len(_greens), grey_ct))
+            print("     e.g. " + " | ".join(_greens[:4]))
+            print("=" * 60 + "\n")
+            try:
+                drive_log("NEW-FIBER %d green / %d grey (area %s): %s" % (
+                    len(_greens), grey_ct, area_label, " | ".join(_greens[:6])))
+            except Exception:
+                pass
+            try:
+                _log_new_fiber_alert(ws, area_label, _greens, grey_ct)
             except Exception:
                 pass
         for rec in new_records:        # local backup (no quota)
@@ -2881,6 +2908,50 @@ def report_status(ws, area, state, found="", note=""):
             sws.append_row([stamp, host, str(area), state, str(found), str(note)])
         except Exception:
             pass
+
+
+_NEWFIBER_WS = [None]
+_NEWFIBER_LOG = []      # recent alert lines, mirrored to a public GitHub file
+
+
+def _log_new_fiber_alert(ws, area, greens, grey_ct):
+    """Record a NEW-FIBER cluster so it can trigger a phone notification, TWO ways:
+      1) a row on the 'New Fiber Alerts' sheet tab (needs the Google key), and
+      2) a line pushed to a PUBLIC GitHub file optimus/_live/NEW_FIBER_ALERTS.txt
+         (no key needed) so a scheduled notifier can read it and ping the phone.
+    Columns on the tab: Time | Host | Area | Green(new) | Existing | Sample | Notified."""
+    import socket
+    stamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    host = socket.gethostname()
+    sample = " | ".join(greens[:8])
+    # 1) sheet tab
+    if ws is not None:
+        try:
+            sh = ws.spreadsheet
+            w = _NEWFIBER_WS[0]
+            if w is None:
+                try:
+                    w = sh.worksheet(NEW_FIBER_TAB)
+                except Exception:
+                    w = sh.add_worksheet(title=NEW_FIBER_TAB, rows="500", cols="7")
+                    w.append_row(["Time", "Host", "Area", "Green (new)",
+                                  "Existing customers", "Sample addresses", "Notified"])
+                _NEWFIBER_WS[0] = w
+            w.append_row([stamp, host, str(area), len(greens), grey_ct, sample, ""])
+        except Exception:
+            pass
+    # 2) public GitHub file -> readable by a notifier with no Google key
+    try:
+        _NEWFIBER_LOG.append("%s  host=%s  area=%s  NEW-FIBER green=%d existing=%d :: %s"
+                             % (stamp, host, area, len(greens), grey_ct, sample))
+        body = ("OPTIMUS -- NEW FIBER ALERTS (freshly-lit, mostly-green blocks)\n"
+                "latest: %s   total alerts this run: %d\n"
+                "%s\n----------------------------------------\n%s\n"
+                % (stamp, len(_NEWFIBER_LOG), "=" * 40,
+                   "\n".join(_NEWFIBER_LOG[-40:])))
+        gh_put("optimus/_live/NEW_FIBER_ALERTS.txt", body)
+    except Exception:
+        pass
 
 
 # ----------------------------------------------------------------------------
