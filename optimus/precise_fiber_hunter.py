@@ -349,6 +349,32 @@ MAPBOX_HOOK_JS = """
 })();
 """
 
+# Hide the Mapbox/MapLibre "user location accuracy circle" -- on a laptop (no GPS)
+# the geolocation accuracy is poor, so that translucent circle balloons into a
+# huge blob that covers the map and hides the fiber dots underneath it. It is
+# purely cosmetic (the real fix would be showAccuracyCircle:false, but this is
+# AT&T's site, so we just hide the element in OUR browser). Kills the blob without
+# touching any fiber dot.
+GEO_HIDE_JS = """
+(() => {
+  const css = '.mapboxgl-user-location-accuracy-circle,' +
+              '.maplibregl-user-location-accuracy-circle{display:none !important;}';
+  const add = () => {
+    try {
+      if (document.getElementById('optimus-hide-geo')) return;
+      const s = document.createElement('style');
+      s.id = 'optimus-hide-geo';
+      s.textContent = css;
+      (document.head || document.documentElement).appendChild(s);
+    } catch (e) {}
+  };
+  add();
+  document.addEventListener('DOMContentLoaded', add);
+  const t = setInterval(add, 500);
+  setTimeout(() => clearInterval(t), 120000);
+})();
+"""
+
 MAPBOX_QUERY_JS = """
 () => {
   const m = (window.__optimusMaps || [])[0];
@@ -3758,6 +3784,7 @@ def main():
             args=["--start-maximized"],
         )
         ctx.add_init_script(MAPBOX_HOOK_JS)   # hook the map before it loads
+        ctx.add_init_script(GEO_HIDE_JS)      # hide the giant geolocation blob
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
 
         # ALWAYS capture network responses now -- the map object is hidden on
