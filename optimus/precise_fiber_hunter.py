@@ -273,28 +273,42 @@ def _start_stop_watcher():
         class _PT(ctypes.Structure):
             _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
         user32 = ctypes.windll.user32
+
+        def _down(vk):
+            return bool(user32.GetAsyncKeyState(vk) & 0x8000)
         held = 0
-        while not _STOP[0]:
+        while True:
             try:
+                # HARD KILL SWITCH: Ctrl+Shift+K -> force-quit INSTANTLY, even if
+                # the hunt is frozen on a hung AT&T request (this runs in its own
+                # thread and os._exit doesn't wait for the stuck main thread, so
+                # you never have to restart the PC). Ctrl=0x11 Shift=0x10 K=0x4B.
+                if _down(0x11) and _down(0x10) and _down(0x4B):
+                    print("\n" + "#" * 58)
+                    print("  KILL SWITCH (Ctrl+Shift+K): force-quitting now.")
+                    print("#" * 58 + "\n")
+                    os._exit(0)          # immediate; launcher sees 0 = no restart
+                # GENTLE STOP: mouse held in the extreme top-left corner ~1s.
                 pt = _PT()
                 user32.GetCursorPos(ctypes.byref(pt))
-                if pt.x <= 3 and pt.y <= 3:          # extreme top-left corner
+                if pt.x <= 3 and pt.y <= 3:
                     held += 1
                     if held >= 5:                    # ~1s at 0.2s poll
                         _STOP[0] = True
                         print("\n" + "#" * 58)
                         print("  STOP: mouse held in the TOP-LEFT corner.")
                         print("  Finishing this cell and shutting down cleanly...")
+                        print("  (If it's frozen, hit Ctrl+Shift+K to force-quit.)")
                         print("#" * 58 + "\n")
                         return
                 else:
                     held = 0
             except Exception:
-                return
-            _t.sleep(0.2)
+                pass
+            _t.sleep(0.15)
     threading.Thread(target=_watch, daemon=True).start()
-    print("  STOP anytime: slam the mouse into the TOP-LEFT screen corner and "
-          "hold ~1 second.")
+    print("  STOP: slam the mouse into the TOP-LEFT screen corner (~1s).")
+    print("  FORCE-QUIT (even if frozen): press Ctrl+Shift+K.")
 _NET_CAPTURE = [None]    # the always-on network capture (set in main)
 
 JSONL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
