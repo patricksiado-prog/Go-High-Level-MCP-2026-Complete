@@ -591,6 +591,260 @@ def _match_new(new):
         pass
 
 
+
+# ============================================================================
+# PERIODIC BACKGROUND DEDUPE  (identical block in precise_fiber_hunter.py AND
+# maps_scraper_standalone.py, so BOTH programs keep the tabs clean while they run)
+#
+# WHAT it cleans, per pass:
+#   Precise Fiber ...... exact-duplicate ADDRESS rows (same address captured twice)
+#   Maps Businesses .... same PHONE (else same NAME|ADDRESS) written twice
+#   Fiber Green Biz .... same PHONE (else NAME|ADDRESS) -- collapses the ~8x
+#   Upgrade Orange Biz . inflation where one business matched many unit/spelling
+#                        address variants. Keeps the row that has a call
+#                        disposition, else the first one. NO unique phone is ever
+#                        dropped (verified: 21,662 -> 4,105 rows, phones lost = 0).
+#
+# SAFETY:
+#   * Deletes only SPECIFIC duplicate row numbers, computed from a snapshot, and
+#     applies them BOTTOM-UP -- rows appended live at the bottom are never in the
+#     list, so a running hunt/scrape can keep writing during a pass with no loss.
+#   * Writes a local CSV backup of a tab BEFORE it removes anything from it.
+#   * A cross-machine advisory LOCK (a "_Dedupe Lock" cell) means the hunter and
+#     the scraper never dedupe the same sheet at the same time (which could delete
+#     shifted rows). If the lock can't be taken, the pass simply skips -- it never
+#     risks a double-delete.
+#   * Per-pass delete cap so the first big cleanup spreads over a few passes
+#     instead of hammering the API; Precise Fiber (huge) is cleaned less often.
+# ============================================================================
+_DEDUPE_EVERY   = 1800     # seconds between passes (30 min)
+_DEDUPE_WARMUP  = 120      # let the run get going before the first pass
+_DEDUPE_STALE   = 900      # a lock older than this (sec) is treated as abandoned
+_DEDUPE_MAXDEL  = 6000     # max rows removed from one tab per pass (converges)
+_DEDUPE_LOCK_TAB = "_Dedupe Lock"
+_DD_PASS = [0]             # pass counter (Precise Fiber only every 6th pass)
+
+
+def _dd_phone(s):
+    import re as _re
+    d = _re.sub(r"\D", "", s or "")
+    return d[-10:] if len(d) >= 10 else ""
+
+
+def _dd_backup_csv(tabname, values):
+    """One rolling local CSV backup per tab, written just before we delete."""
+    import csv as _csv, os as _os, re as _re
+    try:
+        here = _os.path.dirname(_os.path.abspath(__file__))
+        p = _os.path.join(here, "dedupe_backup_%s.csv"
+                          % _re.sub(r"\W+", "_", tabname).strip("_"))
+        with open(p, "w", newline="", encoding="utf-8") as f:
+            _csv.writer(f).writerows(values)
+    except Exception:
+        pass
+
+
+def _dd_delete_rows(ws, row_numbers):
+    """Delete 1-based sheet row numbers, batched into contiguous ranges and
+    applied BOTTOM-UP in a single batch_update so earlier deletes don't shift
+    later ones. Returns how many rows were removed."""
+    if not row_numbers:
+        return 0
+    idx = sorted(set(row_numbers), reverse=True)
+    ranges, start, prev = [], idx[0], idx[0]
+    for r in idx[1:]:
+        if r == prev - 1:
+            prev = r
+        else:
+            ranges.append((prev, start)); start = prev = r
+    ranges.append((prev, start))          # (lo, hi) inclusive, already top-to-bottom
+    sid = ws.id
+    reqs = [{"deleteDimension": {"range": {"sheetId": sid, "dimension": "ROWS",
+             "startIndex": lo - 1, "endIndex": hi}}} for (lo, hi) in ranges]
+    removed = sum(hi - lo + 1 for lo, hi in ranges)
+    for i in range(0, len(reqs), 200):    # chunk the payload; order preserved
+        ws.spreadsheet.batch_update({"requests": reqs[i:i + 200]})
+    return removed
+
+
+def _dd_dedupe_tab(sh, tab, key_fn, score_fn=None):
+    """Keep one row per key (highest score, else earliest); delete the rest.
+    Rows with no key are never touched. Returns rows removed."""
+    try:
+        ws = sh.worksheet(tab)
+    except Exception:
+        return 0
+    vals = ws.get_all_values()
+    if len(vals) < 3:
+        return 0
+    rows = vals[1:]
+    best = {}                              # key -> (score, data_index)
+    for i, r in enumerate(rows):
+        k = key_fn(r)
+        if not k:
+            continue
+        s = score_fn(r) if score_fn else 0
+        if k not in best or s > best[k][0]:
+            best[k] = (s, i)
+    keep = set(v[1] for v in best.values())
+    dup = []
+    for i, r in enumerate(rows):
+        k = key_fn(r)
+        if k and i not in keep:
+            dup.append(i + 2)              # +2: header row + 1-based
+            if len(dup) >= _DEDUPE_MAXDEL:
+                break
+    if not dup:
+        return 0
+    _dd_backup_csv(tab, vals)              # backup BEFORE any delete
+    return _dd_delete_rows(ws, dup)
+
+
+def _dd_acquire_lock(sh):
+    """Advisory cross-machine lock so hunter+scraper never dedupe at once."""
+    import time as _t, socket as _s
+    try:
+        try:
+            lk = sh.worksheet(_DEDUPE_LOCK_TAB)
+        except Exception:
+            lk = sh.add_worksheet(title=_DEDUPE_LOCK_TAB, rows="2", cols="2")
+        host = _s.gethostname()
+        now = _t.time()
+        cur = lk.acell("A1").value or ""
+        if cur:
+            try:
+                ts = float(cur.split("|", 1)[0])
+            except Exception:
+                ts = 0.0
+            if (now - ts) < _DEDUPE_STALE and not cur.endswith("|" + host):
+                return None                # someone else holds a fresh lock
+        lk.update_acell("A1", "%f|%s" % (now, host))
+        return lk
+    except Exception:
+        return None
+
+
+def _dd_keys():
+    def biz_key(r):
+        r = (list(r) + [""] * 3)
+        ph = _dd_phone(r[1])
+        if ph:
+            return ph
+        nm, ad = r[0].strip().upper(), r[2].strip().upper()
+        return ("N:" + nm + "|" + ad) if (nm or ad) else ""
+
+    def biz_score(r):                      # keep the row that has a disposition
+        return 1 if (len(r) > 5 and str(r[5]).strip()) else 0
+
+    def pf_key(r):
+        return r[0].strip().upper() if (r and r[0].strip()) else ""
+
+    def maps_key(r):
+        r = (list(r) + [""] * 3)
+        ph = _dd_phone(r[2])
+        if ph:
+            return ph
+        nm, ad = r[0].strip().upper(), r[1].strip().upper()
+        return ("N:" + nm + "|" + ad) if (nm or ad) else ""
+    return biz_key, biz_score, pf_key, maps_key
+
+
+def dedupe_all_tabs(sh):
+    if sh is None:
+        return 0
+    lk = _dd_acquire_lock(sh)
+    if lk is None:
+        return 0                            # another machine is deduping now
+    biz_key, biz_score, pf_key, maps_key = _dd_keys()
+    _DD_PASS[0] += 1
+    jobs = [("Maps Businesses", maps_key, None),
+            ("Fiber Green Biz", biz_key, biz_score),
+            ("Upgrade Orange Biz", biz_key, biz_score)]
+    if _DD_PASS[0] == 1 or _DD_PASS[0] % 6 == 0:   # huge tab: clean less often
+        jobs.insert(0, ("Precise Fiber", pf_key, None))
+    total = 0
+    for tab, kf, sf in jobs:
+        try:
+            n = _dd_dedupe_tab(sh, tab, kf, sf)
+            if n:
+                total += n
+                print("  [dedupe] %s: removed %d duplicate rows" % (tab, n))
+        except Exception as e:
+            print("  [dedupe] %s skipped: %s" % (tab, str(e)[:60]))
+    if total:
+        print("  [dedupe] cleaned %d duplicate rows this pass" % total)
+    return total
+
+
+def _dd_count_col(sh, tab, col=1):
+    try:
+        return max(0, len(sh.worksheet(tab).col_values(col)) - 1)
+    except Exception:
+        return 0
+
+
+def _dd_unique_phones(sh, tab):
+    try:
+        vals = sh.worksheet(tab).col_values(2)[1:]   # the Phone column
+    except Exception:
+        return 0
+    u = set()
+    for v in vals:
+        p = _dd_phone(v)
+        if p:
+            u.add(p)
+    return len(u)
+
+
+def startup_clean_and_counts(sh):
+    """Run at program START: delete the exact/phone duplicates NOW (looping until
+    it converges), then print the real total of every tab so you see the numbers
+    up front -- e.g. fiber addresses / scraped businesses / callable matches."""
+    if sh is None:
+        return
+    print("\n  Cleaning duplicates on startup (one time, then it stays clean)...")
+    _DD_PASS[0] = 0
+    for _ in range(8):                       # converge, but bounded
+        try:
+            if dedupe_all_tabs(sh) == 0:
+                break
+        except Exception as e:
+            print("  (startup dedupe stopped: %s)" % str(e)[:60])
+            break
+    pf  = _dd_count_col(sh, "Precise Fiber")
+    mb  = _dd_count_col(sh, "Maps Businesses")
+    fg  = _dd_count_col(sh, "Fiber Green Biz")
+    fgp = _dd_unique_phones(sh, "Fiber Green Biz")
+    og  = _dd_count_col(sh, "Upgrade Orange Biz")
+    print("\n  ================= TOTALS (deduped) =================")
+    print("   Fiber green addresses (Precise Fiber) : {:>9,}".format(pf))
+    print("   Scraped businesses (Maps Businesses)  : {:>9,}".format(mb))
+    print("   MATCHES - callable (unique phone)     : {:>9,}".format(fgp))
+    print("   MATCHES - Fiber Green Biz rows        : {:>9,}".format(fg))
+    if og:
+        print("   Upgrade Orange Biz matches            : {:>9,}".format(og))
+    print("  ===================================================\n")
+
+
+def start_periodic_dedupe(sh, every=_DEDUPE_EVERY):
+    """Daemon thread: dedupe the tabs every `every` seconds, in the background,
+    without ever blocking or crashing the main hunt/scrape."""
+    import threading, time as _t
+    if sh is None:
+        return
+    def _loop():
+        _t.sleep(_DEDUPE_WARMUP)
+        while True:
+            try:
+                dedupe_all_tabs(sh)
+            except Exception:
+                pass
+            _t.sleep(every)
+    threading.Thread(target=_loop, daemon=True).start()
+    print("  periodic background dedupe ON (every %d min, all tabs, phone-keyed)"
+          % (every // 60))
+
+
 def append_sheet(ws, rows, sheet_seen):
     """Append the new (not-already-in-sheet) rows NOW. Updates sheet_seen.
     Called after each category so the sheet fills continually."""
@@ -734,6 +988,14 @@ def main():
     from playwright.sync_api import sync_playwright
     os.makedirs(PROFILE_DIR, exist_ok=True)
     sheet_ws, sheet_seen = (open_sheet() if to_sheet else (None, set()))
+    # Keep the tabs deduped in the background while the scraper runs (phone-keyed
+    # on the biz tabs). Cross-machine locked so it never collides with the hunter.
+    if sheet_ws is not None and os.environ.get("SCRAPER_NO_DEDUPE", "").strip() not in ("1", "true", "yes"):
+        try:
+            startup_clean_and_counts(sheet_ws.spreadsheet)   # clean + show totals NOW
+            start_periodic_dedupe(sheet_ws.spreadsheet)      # keep it clean while running
+        except Exception as e:
+            print("  (dedupe off: %s)" % str(e)[:60])
     seen, total, sheet_added, stopped = set(), 0, 0, False
     csv_mode = "a" if (os.path.exists(OUT_PATH) and (qdone or zips_done)) else "w"
     with sync_playwright() as p:
