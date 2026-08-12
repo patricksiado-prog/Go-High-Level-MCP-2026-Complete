@@ -3205,7 +3205,8 @@ _BIZ_UNIT_RE = re.compile(r"\b(APT|APARTMENT|UNIT|STE|SUITE|#|BLDG|BUILDING|FL|"
 
 # live state: business index + the two output tabs + the Maps Businesses worksheet
 _BIZ = {"index": None, "green_ws": None, "orange_ws": None, "maps_ws": None,
-        "green_seen": set(), "orange_seen": set()}
+        "green_seen": set(), "orange_seen": set(),
+        "green_ph": set(), "orange_ph": set()}
 _BIZ_RELOAD = [0]   # flush counter -> reload the business index every 20 flushes
 
 
@@ -3229,6 +3230,15 @@ def _norm_addr(addr):
     rest = ["N" if t == "NORTH" else "S" if t == "SOUTH" else "E" if t == "EAST"
             else "W" if t == "WEST" else t for t in rest]
     return "%s|%s" % (house, " ".join(rest))
+
+
+def _biz_ph10(s):
+    """Last-10-digit phone key (the dialer key) or '' if not a real 10-digit US
+    number. Same normalization the scraper uses so both sides dedup identically."""
+    d = re.sub(r"\D", "", s or "")
+    if len(d) == 11 and d.startswith("1"):
+        d = d[1:]
+    return d if len(d) == 10 else ""
 
 
 def _ensure_biz_tab(sh, title):
@@ -3270,6 +3280,32 @@ def _csv_seen(path):
             for row in _csv.reader(f):
                 if len(row) > 2 and row[2].strip():
                     s.add(row[2].strip().upper())
+    except Exception:
+        pass
+    return s
+
+
+def _biz_seen_ph(ws):
+    """Seed the phone-dedup set from an existing result tab (col B = Phone)."""
+    if ws is None:
+        return set()
+    try:
+        return set(p for p in (_biz_ph10(r[1]) for r in ws.get_all_values()[1:]
+                               if len(r) > 1) if p)
+    except Exception:
+        return set()
+
+
+def _csv_seen_ph(path):
+    s = set()
+    try:
+        import csv as _csv
+        with open(path, newline="") as f:
+            for row in _csv.reader(f):
+                if len(row) > 1:
+                    p = _biz_ph10(row[1])
+                    if p:
+                        s.add(p)
     except Exception:
         pass
     return s
@@ -3318,6 +3354,8 @@ def init_bizmatch(ws):
     _BIZ["orange_ws"] = _ensure_biz_tab(sh, ORANGE_BIZ_TAB)
     _BIZ["green_seen"] = _biz_seen(_BIZ["green_ws"]) | _csv_seen(GREEN_CSV)
     _BIZ["orange_seen"] = _biz_seen(_BIZ["orange_ws"]) | _csv_seen(ORANGE_CSV)
+    _BIZ["green_ph"] = _biz_seen_ph(_BIZ["green_ws"]) | _csv_seen_ph(GREEN_CSV)
+    _BIZ["orange_ph"] = _biz_seen_ph(_BIZ["orange_ws"]) | _csv_seen_ph(ORANGE_CSV)
     dst = ("the '%s'/'%s' tabs" % (GREEN_BIZ_TAB, ORANGE_BIZ_TAB)
            if _BIZ["green_ws"] else "local CSV (sheet is full)")
     print("  business match ON: %d businesses loaded -> matches go to %s, live."
@@ -3395,15 +3433,28 @@ def match_leads_to_biz(new_records):
             continue
         addr = ld.get("address") or ""
         au = addr.strip().upper()
+        ph = _biz_ph10(b.get("phone"))          # dialer key: last-10-digit phone
         row = [b.get("name") or "", b.get("phone") or "", addr,
                b.get("website") or "", b.get("category") or ""]
         if (ld.get("dot_status") or "").lower() == "copper_upgrade":
-            if au in _BIZ["orange_seen"]:
+            # Dedup by PHONE when the business has one (one business = one row, no
+            # matter how many address/unit/spelling variants matched the dot) --
+            # this is what stopped the ~8x row inflation. No phone -> fall back to
+            # the raw-address guard so no-phone matches still don't double-write.
+            if ph:
+                if ph in _BIZ["orange_ph"]:
+                    continue
+                _BIZ["orange_ph"].add(ph)
+            elif au in _BIZ["orange_seen"]:
                 continue
             _BIZ["orange_seen"].add(au)
             o_rows.append(row)
         else:
-            if au in _BIZ["green_seen"]:
+            if ph:
+                if ph in _BIZ["green_ph"]:
+                    continue
+                _BIZ["green_ph"].add(ph)
+            elif au in _BIZ["green_seen"]:
                 continue
             _BIZ["green_seen"].add(au)
             g_rows.append(row)
