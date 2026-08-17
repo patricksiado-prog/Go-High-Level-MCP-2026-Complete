@@ -59,6 +59,21 @@
 > precise_fiber_hunter.py (git+HTTPS fallback, 5fde2f6), maps_scraper_standalone.py (already raw-self-
 > update). Audit dialer_loader/scout/zip_reader to the same two-path standard when next touched.
 
+> **★★★ RULE — THIS CLAUDE.md BRAIN (in GitHub) IS THE ONE MEMORY / RECORD OF RECORD. NO DELTAS ON DRIVE
+> (Patrick, 2026-08-17).** Every change, decision, discovery, fix, and handoff goes HERE, in this CLAUDE.md,
+> committed to GitHub — this is the memory system, period (the common, standard "markdown-in-the-repo"
+> approach; it's shared with the whole team via the repo, git-versioned, and auto-loaded every session).
+> **STOP creating separate "delta" / "handoff" / notes docs on Google Drive** — they fragment the record and
+> go stale. Google Drive is ONLY for: (1) team-facing RUNNABLE files (the installer .bat) and (2) DATA (the
+> leads Sheet, the service-account key). It is NOT a place to log work. When you create or change a Drive
+> runnable/data file, record its purpose + id HERE in the brain (don't write the narrative on Drive).
+> The old Drive handoff docs ("Optimus — Precise Hunter Fix Handoff", "Optimus Fiber Pipeline — Handoff &
+> Operating Guide", the "precise hunter" docs, etc.) are SUPERSEDED by this brain — treat this file as truth,
+> not them. This makes the earlier "mark it in the notes, going forward" operating rule a hard rule: notes
+> live in CLAUDE.md on GitHub, nowhere else. Drive artifacts created this session (for reference, per this
+> rule): installer bootstrap doc `1WdHXIDDFSOwm_1xVIeYikUC4_jmXWqIF-XzW_rKtPKI`; in-place updater
+> `1ul_wZHgZYKdJHyJ78a59AMeFdWKMRpx-`; known-path installer `13iO3xCmXEmTzI7JeLRqczC5wyp1I8nso`.
+
 > **★★★ RULE — DON'T BREAK MOTION (Patrick, 2026-07-02).** The hunter's pan loop keeps moving no
 > matter what — nothing (sheet reads/writes, matching, verification, empty ground, missing buttons)
 > gets to pause, slow, or end it; closing the browser is the only off switch. That's the whole rule.
