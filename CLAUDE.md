@@ -1771,4 +1771,19 @@ remaining launchers need the honest-verify port. When adding ANY new program: co
 self_update + the RUN_HUNTER.bat honest-verify launcher. Do not invent a new scheme.
 Drive: posted "▶ UPDATE OPTIMUS HUNTER — run this (ONN PC)" doc (id 1WdHXIDDFSOwm_1xVIeYikUC4_jmXWqIF-XzW_rKtPKI)
 in My Drive with the permanent installer release link + steps, so Patrick can run the one-time bootstrap on
-the stale ONN box.
+the stale ONN box. Also posted "UPDATE HUNTER - run once (no install).bat" (id 1ul_wZHgZYKdJHyJ78a59AMeFdWKMRpx-)
+— an in-place code refresh (no Python install/package). NOTE: the Drive "INSTALL OPTIMUS V200K UPDATE - CLICK
+HERE.bat" (id 13iO3xCmXEmTzI7JeLRqczC5wyp1I8nso) ALREADY force-curls the latest hunter .py off the deploy
+branch, so re-running THAT existing file is the known-path update too (it verifies with the stale
+"COMBO MATCH ON" marker + doesn't grab build_codes.json — the launcher covers the json; harmless).
+
+### 11h-fix25 (2026-08-17) — GOLD CAPTURE CONFIRMED WORKING LIVE ✅
+On the HP PC (gold build) over a GOLD-dot area (Coolshire Ln / Wimbledon Ln, Houston) the map showed green +
+several ORANGE/gold dots + a little grey, and the leads sheet was actively GROWING (modifiedTime advancing,
+fileSize 5,366,567 → 5,369,014 bytes within minutes) — i.e. it's writing leads in real time over gold ground.
+Earlier "+0 Upgrade Orange Biz" was NOT a bug — it was green-only ground (Prestonwood). So gold capture works
+end-to-end: over gold dots, copper-upgrade dots write as ORANGE to Precise Fiber → cross-match to Upgrade
+Orange Biz. Tell for confirming on any PC: top banner `CODE UPDATED 2026-08-17 — GOLD CAPTURE ON` + a console
+`ORANGE`/`+N Upgrade Orange Biz` line while sweeping gold. Definitive per-machine proof still ideally comes
+from the tiny live-counts push (needs github_token.txt on the box) or the console; the huge sheet can't be
+green-vs-gold counted remotely (180k rows truncate).
