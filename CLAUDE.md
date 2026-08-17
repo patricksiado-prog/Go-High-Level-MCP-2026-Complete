@@ -1817,3 +1817,21 @@ Orange Biz. Tell for confirming on any PC: top banner `CODE UPDATED 2026-08-17 �
 `ORANGE`/`+N Upgrade Orange Biz` line while sweeping gold. Definitive per-machine proof still ideally comes
 from the tiny live-counts push (needs github_token.txt on the box) or the console; the huge sheet can't be
 green-vs-gold counted remotely (180k rows truncate).
+
+### 11h-fix26 (2026-08-17) — VERIFY-THE-SOURCE check: prove GitHub is serving the current build (do this to confirm "is the update out there?")
+Fast way to prove the update PIPELINE is live and correct WITHOUT a Windows PC: `curl` the exact raw file the
+launchers pull and grep it for the current-build markers. Verified 2026-08-17 that the served file IS the gold
+build:
+```
+curl -sL "https://raw.githubusercontent.com/patricksiado-prog/Go-High-Level-MCP-2026-Complete/claude/optimus-map-tools-setup-6dcl6o/optimus/precise_fiber_hunter.py?cb=$RANDOM" -o /tmp/h.py
+grep 'BUILD_DATE = ' /tmp/h.py          # -> 2026-08-17
+grep -c 'GOLD CAPTURE ON' /tmp/h.py     # -> 1  (current-build marker present)
+grep 'STEP 1' /tmp/h.py                 # -> new STEP 1/STEP 2 prompt present
+grep 'def _raw_refresh' /tmp/h.py       # -> HTTPS self-update present
+# also confirm build_codes.json serves: curl .../optimus/build_codes.json (fiber + copper code lists)
+```
+Result confirmed all markers present. MEANING: the SOURCE is correct — ANY PC that successfully downloads from
+GitHub gets gold. So "everything is updatable" is TRUE; the only remaining failure point is a LOCAL download
+not landing on a given PC (network blip / CDN cache / an old icon that doesn't curl). Use this check whenever
+you push or someone asks "is the latest actually out there" — it's the fastest source-side proof, independent
+of any machine. (Per-machine proof still comes from that PC's console banner / the live-counts push.)
