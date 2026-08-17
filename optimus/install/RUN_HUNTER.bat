@@ -27,13 +27,39 @@ cd /d "%APP%"
 :runloop
 echo Checking for the latest version...
 set "CB=%RANDOM%%RANDOM%"
-curl -L -s -o precise_fiber_hunter.py "%RAW%/precise_fiber_hunter.py?cb=!CB!"
-curl -L -s -o optimus_dot_detect.py   "%RAW%/optimus_dot_detect.py?cb=!CB!"
-curl -L -s -o optimus_api_capture.py  "%RAW%/optimus_api_capture.py?cb=!CB!"
-curl -L -s -o hunter_fixes.py         "%RAW%/hunter_fixes.py?cb=!CB!"
-curl -L -s -o backend_classifier.py   "%RAW%/backend_classifier.py?cb=!CB!"
-curl -L -s -o build_codes.json        "%RAW%/build_codes.json?cb=!CB!"
-findstr /C:"COMBO MATCH ON" precise_fiber_hunter.py >nul 2>&1 && echo   (on the latest version) || echo   (could not refresh -- running the copy you have)
+REM download to a TEMP name first, and ONLY replace the real file if the download
+REM actually succeeded (-f = fail on HTTP error) AND the new file is really the
+REM current build. A failed/cached curl must NOT masquerade as "latest" -- that
+REM silent lie is exactly what stranded PCs on old code. (goto-based, not
+REM &&/|| nesting, so the batch parser can't choke on it.)
+set "DLOK=1"
+curl -L -sf -o precise_fiber_hunter.py.new "%RAW%/precise_fiber_hunter.py?cb=!CB!" || set "DLOK=0"
+curl -L -sf -o optimus_dot_detect.py.new  "%RAW%/optimus_dot_detect.py?cb=!CB!"  || set "DLOK=0"
+curl -L -sf -o optimus_api_capture.py.new "%RAW%/optimus_api_capture.py?cb=!CB!" || set "DLOK=0"
+curl -L -sf -o hunter_fixes.py.new        "%RAW%/hunter_fixes.py?cb=!CB!"        || set "DLOK=0"
+curl -L -sf -o backend_classifier.py.new  "%RAW%/backend_classifier.py?cb=!CB!"  || set "DLOK=0"
+curl -L -sf -o build_codes.json.new       "%RAW%/build_codes.json?cb=!CB!"       || set "DLOK=0"
+if not "!DLOK!"=="1" goto :dlfail
+REM only trust the download if the fresh main file is really the current build
+findstr /C:"GOLD CAPTURE ON" precise_fiber_hunter.py.new >nul 2>&1 || goto :dlbad
+move /y precise_fiber_hunter.py.new precise_fiber_hunter.py >nul
+move /y optimus_dot_detect.py.new   optimus_dot_detect.py   >nul
+move /y optimus_api_capture.py.new  optimus_api_capture.py  >nul
+move /y hunter_fixes.py.new         hunter_fixes.py         >nul
+move /y backend_classifier.py.new   backend_classifier.py   >nul
+move /y build_codes.json.new        build_codes.json        >nul
+for /f "delims=" %%L in ('findstr /C:"BUILD_DATE = " precise_fiber_hunter.py') do echo   UPDATED to latest -- %%L
+goto :dldone
+:dlbad
+echo   *** Update looked stale/partial ^(GitHub cache^) -- keeping the copy you have. ***
+echo   *** If this shows an OLD build, wait 60s and relaunch, or re-run INSTALL_OPTIMUS.bat. ***
+goto :dldone
+:dlfail
+echo   *** COULD NOT REACH GITHUB -- running the copy you already have. ***
+echo   *** If this window shows an OLD build, get on the internet and relaunch, ***
+echo   *** or re-run INSTALL_OPTIMUS.bat to force a clean update. ***
+:dldone
+del /q *.new 2>nul
 
 echo.
 set "PYCMD=python"

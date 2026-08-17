@@ -47,13 +47,19 @@ curl -L -o "%HUNTER%\optimus_dot_detect.py"   "%RAW%/optimus_dot_detect.py?cb=%C
 curl -L -o "%HUNTER%\optimus_api_capture.py"  "%RAW%/optimus_api_capture.py?cb=%CB%"
 curl -L -o "%HUNTER%\hunter_fixes.py"         "%RAW%/hunter_fixes.py?cb=%CB%"
 curl -L -o "%HUNTER%\backend_classifier.py"   "%RAW%/backend_classifier.py?cb=%CB%"
-REM VERIFY we actually got the new code (the new build says "COMBO MATCH ON").
-findstr /C:"COMBO MATCH ON" "%HUNTER%\precise_fiber_hunter.py" >nul 2>&1
+REM build_codes.json is REQUIRED for gold vs grey: without it every fiber
+REM customer would misclassify. Download it here too (not just in the launcher).
+curl -L -o "%HUNTER%\build_codes.json"        "%RAW%/build_codes.json?cb=%CB%"
+REM VERIFY we actually got the CURRENT build (only new code says "GOLD CAPTURE ON").
+REM The old marker "COMBO MATCH ON" lived in stale code too, so a failed/cached
+REM download looked like success -- that is exactly what stranded people on old code.
+findstr /C:"GOLD CAPTURE ON" "%HUNTER%\precise_fiber_hunter.py" >nul 2>&1
 if errorlevel 1 (
-  echo     ^*^* WARNING: still got OLD hunter code ^(GitHub cache^). Wait 60 seconds
-  echo        and run this installer again -- it will pick up the new version.
+  echo     ^*^* WARNING: still got OLD hunter code ^(GitHub cache or no internet^).
+  echo        Wait 60 seconds and run this installer again -- it will pick up the
+  echo        new version once GitHub's cache clears.
 ) else (
-  echo     OK - newest Fiber Hunter code confirmed ^(COMBO MATCH ON^).
+  for /f "delims=" %%L in ('findstr /C:"BUILD_DATE = " "%HUNTER%\precise_fiber_hunter.py"') do echo     OK - newest Fiber Hunter confirmed -- %%L
 )
 
 echo [3/7] Downloading the Maps Scraper from GitHub...
