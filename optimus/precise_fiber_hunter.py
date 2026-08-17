@@ -233,6 +233,57 @@ DOT_COLOR = {"lead": "GREEN", "copper_upgrade": "ORANGE", "customer": "GREY"}
 def dot_color(dot_status):
     """Legend color word for a classified dot status (defaults to GREEN)."""
     return DOT_COLOR.get((dot_status or "").lower(), "GREEN")
+
+
+# --- GOLD vs GREY on the wire path (build_codes.json tiebreak) ---------------
+# The serviceability/wire capture has no pixel color, and a copper customer
+# HAS a Subscriber BAN -- so classify_status(ban=...) called every customer
+# GREY and the write path skipped them all. Result: 436k GREEN and ZERO
+# gold/orange rows in the sheet while the map plainly shows gold dots.
+# build_codes.json (decoded 2026-07-01 from a live 19.5k-record capture)
+# breaks the tie: fttn-bp / ip-rt = COPPER customer -> copper_upgrade
+# (ORANGE in the sheet, the hottest upgrade lead -- WRITE IT); fttp-gpon =
+# FIBER customer -> customer (GREY, skip). No BAN = not a customer = the
+# normal classify_status path (GREEN).
+_BLD_CODES = {"fiber": (), "copper": ()}
+try:
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "build_codes.json")) as _bcf:
+        _bc = json.load(_bcf)
+    _BLD_CODES["fiber"] = tuple(str(x).lower() for x in _bc.get("fiber", []))
+    _BLD_CODES["copper"] = tuple(str(x).lower() for x in _bc.get("copper", []))
+except Exception:
+    pass
+
+
+def _bld_code(raw):
+    """Pull the network build-type code (curr_ntwrk_bld_type_cd or kin) off a
+    wire record's original JSON, tolerant of key formatting."""
+    if not isinstance(raw, dict):
+        return ""
+    for k, v in raw.items():
+        nk = re.sub(r"[^a-z0-9]", "", str(k).lower())
+        if "bldtype" in nk or ("ntwrk" in nk and "typecd" in nk):
+            return str(v or "").strip().lower()
+    return ""
+
+
+def classify_wire(status, ban, raw):
+    """classify_status + the build-code tiebreak, for wire-captured dots."""
+    code = _bld_code(raw)
+    if ban and code:
+        if any(c in code for c in _BLD_CODES["copper"]):
+            return "copper_upgrade"      # GOLD dot -> ORANGE row -> upgrade lead
+        if any(c in code for c in _BLD_CODES["fiber"]):
+            return "customer"            # GREY -> existing fiber customer, skip
+    return classify_status(text=status, ban=ban)
+
+
+def classify_lead(ld):
+    """Build-code-aware classification for a captured lead dict."""
+    return classify_wire(
+        ld.get("status") if isinstance(ld.get("status"), str) else None,
+        ld.get("ban"), ld.get("raw"))
 POPUP_POLL_INTERVAL = 0.12    # poll the popup instead of fixed sleeps
 POPUP_POLL_TIMEOUT = 2.0      # per click attempt
 CLICK_OFFSETS = [(0, 0), (3, 0), (-3, 0), (0, 3), (0, -3)]   # retry spiral
@@ -781,8 +832,8 @@ def lead_from_dict(d):
         us_lng = isinstance(lng, (int, float)) and -170.0 <= lng <= -50.0
         has_sig = (isinstance(status, str) and status.strip()) or ban
         if us_lat and us_lng and has_sig:
-            _c = dot_color(classify_status(
-                text=status if isinstance(status, str) else None, ban=ban))
+            _c = dot_color(classify_wire(
+                status if isinstance(status, str) else None, ban, base))
             if _c in ("GREEN", "GOLD"):
                 addr = "(%.6f, %.6f)" % (lat, lng)
         if not addr or not isinstance(addr, str):
@@ -1189,7 +1240,7 @@ class NetCapture:
             if key in seen:
                 continue
             seen.add(key)
-            dot_status = classify_status(text=ld.get("status"), ban=ld.get("ban"))
+            dot_status = classify_lead(ld)
             if dot_color(dot_status) == "GREY":
                 grey_ct += 1
                 continue   # GREY = existing fiber customer -> leave out
@@ -1209,7 +1260,7 @@ class NetCapture:
         # GOLD CLUSTER ALERT: gold = copper-to-fiber UPGRADE prospects (hottest
         # leads). If an unusually dense pocket shows up in one viewport, call it
         # out loudly + log it to the status sheet + Drive so it's easy to work.
-        _golds = [r[0] for r in new_rows if r[1] == "GOLD"]
+        _golds = [r[0] for r in new_rows if r[1] in ("GOLD", "ORANGE")]
         if len(_golds) >= GOLD_CLUSTER_ALERT:
             print("\n" + "*" * 60)
             print("  ** GOLD CLUSTER: %d gold (upgrade) dots in ONE view **" % len(_golds))
@@ -1289,7 +1340,7 @@ class NetCapture:
             if key in seen:
                 continue
             seen.add(key)
-            dot_status = classify_status(text=ld.get("status"), ban=ld.get("ban"))
+            dot_status = classify_lead(ld)
             if dot_color(dot_status) == "GREY":
                 continue
             ts = time.strftime("%Y-%m-%d %H:%M:%S")
