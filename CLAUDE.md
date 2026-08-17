@@ -1673,3 +1673,38 @@ itself. The old "WinError 2" line only still appears on the CURRENT running copy
 new one. STANDING RULE going forward (Patrick's "keep updating like that"): every runnable program keeps this
 two-path self-update (git first, HTTPS raw fallback) so nobody ever runs stale code — wire it into any NEW
 program the same way.
+
+### 11h-fix23 (2026-08-17) — WHY PEOPLE WERE STUCK ON OLD CODE: the launcher's freshness check was a LIE (fixed)
+Patrick: "fix the update cuz peeps are using that old version." A team laptop (ONN monitor) was proven OLD
+live — the definitive tell was the **manual-mode prompt wording**: OLD code prints "Get the AT&T Fiber Map
+showing the area you want to scan / press Enter to START scanning"; CURRENT code prints the "STEP 1 -> ... /
+STEP 2 -> ... / Map on the right spot? Press Enter to START scanning..." block AND the "CODE UPDATED
+2026-08-17 -- GOLD CAPTURE ON" banner. That box had neither (and showed `+0 Upgrade Orange Biz` = gold OFF).
+ROOT CAUSE of the stale-code leak (two bugs in the launcher/installer, not the program):
+1. **The freshness check keyed on a marker that was in OLD code too.** `RUN_HUNTER.bat` and
+   `INSTALL_OPTIMUS.bat` verified the download by `findstr "COMBO MATCH ON"` — but that string has been in the
+   file for over a month, so a **failed or CDN-cached curl** kept the stale file and STILL printed "(on the
+   latest version)". The success message was a lie; nobody could tell they were behind.
+2. **Silent curl failures.** `curl -s` (no `-f`) swallows HTTP errors, so an offline/blocked/again-cached
+   fetch looked identical to a good one and overwrote nothing while claiming success.
+FIX (commit 49ce4ee):
+- `RUN_HUNTER.bat` now downloads each core file to a `.new` temp with `curl -sf` (fail on HTTP error);
+  requires ALL six to succeed AND the fresh main file to contain the **current-build** marker
+  `GOLD CAPTURE ON` before it `move`s them into place; prints the actual `BUILD_DATE` line it's about to run;
+  and on any failure prints a LOUD "COULD NOT REACH GITHUB / re-run INSTALL_OPTIMUS.bat" instead of a false
+  "latest". Rewrote it goto-based (no fragile `&&(...)||(...)` nesting) so the batch parser can't choke.
+- `INSTALL_OPTIMUS.bat` gets the same honest verify (marker `GOLD CAPTURE ON`, echoes BUILD_DATE) AND now
+  also downloads **build_codes.json** (it wasn't before — required for gold-vs-grey: without it classify_wire
+  can't confirm fiber, so grey/gold separation breaks; the launcher already fetched it, now the installer does
+  too as defense-in-depth).
+- The permanent installer release link auto-republishes via the `make-installer-release.yml` Action on every
+  push that touches INSTALL_OPTIMUS.bat (the first run 2026-08-17 hit a transient GitHub 5xx "no server
+  available" and was re-run).
+WHY OLD BOXES STILL NEED ONE MANUAL STEP: an already-stale program can't pull the fix itself (its OLD updater
+is git-only and dies on WinError 2 — the chicken-and-egg from §6), and its desktop shortcut may point at an
+OLD launcher that predates the auto-curl. So the ONE-TIME cure for a stale PC stays: **re-run
+INSTALL_OPTIMUS.bat** (the permanent release link). After that, the honest launcher keeps it current every
+launch and TELLS the user (with the real BUILD_DATE) instead of silently lying. TELL for "am I current?":
+the console must show the `STEP 1/STEP 2` prompt + `CODE UPDATED 2026-08-17 -- GOLD CAPTURE ON` + an
+`UPDATED to latest -- BUILD_DATE = "..."` line; if it shows "COULD NOT REACH GITHUB" or the old one-line
+prompt, it's stale → re-run the installer.
