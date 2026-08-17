@@ -14,29 +14,50 @@
 > without his say. Compliance/audience is Patrick's call, not mine — never gate him on
 > it. Everything else = move fast, ship, tell him after.
 
-> **RULE — EVERY distributed program MUST auto-update from GitHub on launch.** No
-> recipient should ever run stale code. Each program calls `self_update()` as the
-> first line of `main()`: from inside the repo it does `git fetch` + `reset --hard
-> origin/<branch>` (via `_find_git()` so it works even when git isn't on PATH); a
-> standalone single-file copy re-downloads itself from the GitHub raw URL; then it
-> re-execs once (guarded by a `*_NO_UPDATE=1` env var). Launchers also pull each run.
-> Covered: precise_fiber_hunter.py, maps_scraper_standalone.py, dialer_loader.py.
-> When you add ANY new runnable program, wire in self_update the same way.
-
-> **RULE — "JUST REINSTALL" IS THE UNIVERSAL FIX (Patrick, 2026-07-01).** The installer
-> (`optimus/install/INSTALL_OPTIMUS.bat`) must ALWAYS pull the newest code from GitHub and set up the
-> self-updating programs, so that **re-running the installer fixes ANY broken/stale install**, and
-> from then on it **auto-updates every launch**. So the standing answer to "it's broken / on old code"
-> is simply: RE-RUN THE INSTALLER. Keep the installer able to do this (force-overwrite the code, keep
-> the raw-refresh self-updater intact). Distribution = the permanent GitHub release link
+> ## ★★★ THE UNIVERSAL UPDATE PATH — CANONICAL, ONE PATH, DO NOT INVENT NEW ONES (locked 2026-08-17)
+> Patrick: "figure out a universal update path and stick to it." This SUPERSEDES the old two
+> contradictory rules (the "self_update on launch" rule AND the separate "just reinstall is the
+> universal fix" rule — they fought each other and caused churn). There is now ONE path:
+>
+> **NORMAL UPDATE = RELAUNCH. Nobody re-installs to get new code.** Closing and reopening the desktop
+> icon updates the program. Two layers make that true, both pulling from the SAME place:
+> 1. **Program self-updates at the top of `main()`** via a TWO-PATH `self_update()`:
+>    (a) `git fetch` + `reset --hard origin/<branch>` when git is present (via `_find_git()`), else
+>    (b) **HTTPS raw re-download** of the core files with stdlib `urllib` when git is missing/fails
+>    (the WinError-2 no-git case) — then re-exec ONCE, guarded by `*_NO_UPDATE=1`. So the PROGRAM
+>    self-heals on ANY machine (git clone OR no-git ZIP, launcher OR bare `python …`).
+> 2. **The desktop launcher (`RUN_HUNTER.bat` etc.) also curls the core files each launch**
+>    (belt-and-suspenders): download each to a `.new` temp with `curl -sf`, and ONLY swap them in if
+>    the download succeeded AND the fresh main file contains the **current-build marker**; then print
+>    the real `BUILD_DATE`. On failure it says so LOUDLY — it must NEVER print a false "on the latest
+>    version."
+>
+> **FRESHNESS MARKER = the CURRENT-BUILD stamp** (`BUILD_DATE` line / the live banner string, e.g.
+> `GOLD CAPTURE ON`). NEVER verify with a marker that also exists in old code (that exact bug —
+> `findstr "COMBO MATCH ON"`, present in month-old code — is what let stale copies pass as "latest").
+> Bump/parallel the marker whenever the build's identity changes.
+>
+> **SOURCE OF TRUTH:** deploy branch `claude/optimus-map-tools-setup-6dcl6o`; raw base
+> `https://raw.githubusercontent.com/patricksiado-prog/Go-High-Level-MCP-2026-Complete/<branch>/optimus`.
+> Every program + every launcher pulls from exactly this. Don't point one at a different branch.
+>
+> **REINSTALL = BOOTSTRAP / RECOVERY ONLY — NOT the normal update.** Re-running the permanent
+> installer link is for a BRAND-NEW PC, or a machine whose icon is so old it doesn't self-curl (the
+> chicken-and-egg: a stale program's OLD updater is git-only and dies on WinError 2, so it can't pull
+> its own fix; and an ancient icon may predate the auto-curl). After ONE reinstall the two layers
+> above keep it current forever by relaunch. Permanent link (auto-republished by
+> `make-installer-release.yml` on every push touching INSTALL_OPTIMUS.bat):
 > `github.com/patricksiado-prog/Go-High-Level-MCP-2026-Complete/releases/download/installer/INSTALL_OPTIMUS.bat`
-> (auto-republished by the `make-installer-release.yml` Action on every push) + a Drive copy for the
-> team. Never tell Patrick or the team to hand-run curl commands as the normal path — "reinstall" is
-> the one instruction.
-
-> **PREFERENCE — auto-update is preferred (Patrick, 2026-07-01).** Lean toward keeping the programs
-> self-updating (pull from GitHub / self_update) so fixes reach everyone by just running the program.
-> A preference to keep in mind, not a hard gate — use judgment.
+>
+> **"AM I CURRENT?" TELL:** the console shows the current-build banner (`CODE UPDATED <date> — …`),
+> the `STEP 1/STEP 2 … Map on the right spot?` prompt, and `UPDATED to latest — BUILD_DATE = "…"`.
+> If it shows `COULD NOT REACH GITHUB` or an OLD prompt, it's stale → relaunch (with internet); only
+> if a clean relaunch is still old does that ONE PC need the installer (old icon).
+>
+> **STANDING RULE:** every NEW runnable program gets the IDENTICAL two-path `self_update()` + the same
+> honest launcher pattern. DO NOT invent a new update mechanism — extend this one. Covered today:
+> precise_fiber_hunter.py (git+HTTPS fallback, 5fde2f6), maps_scraper_standalone.py (already raw-self-
+> update). Audit dialer_loader/scout/zip_reader to the same two-path standard when next touched.
 
 > **★★★ RULE — DON'T BREAK MOTION (Patrick, 2026-07-02).** The hunter's pan loop keeps moving no
 > matter what — nothing (sheet reads/writes, matching, verification, empty ground, missing buttons)
