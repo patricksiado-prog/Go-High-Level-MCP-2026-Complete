@@ -1594,3 +1594,59 @@ build-codes-only fix (e0f13bd) still classified them GREY. THREE things shipped 
 VERIFY NEXT (pending a live sweep over gold ground): position the map over a GOLD-dot cluster, press Enter,
 sweep 2-3 min, then read the sheet for Dot Color = ORANGE rows in "Precise Fiber". If ORANGE appears, gold
 capture is confirmed end-to-end. All commits verified on GitHub (b8ac4e8 latest on the deploy branch).
+
+### 11h-fix21 (2026-08-17) — SESSION LOG: the rest of what we did this session (counts, dialer loads, GHL skill, SMS/Frontline, cold-text call)
+Everything else from this session, for the record:
+
+- **LEAD COUNT — the true number is UNIQUE-PHONE-DEDUPED, not raw rows.** "Fiber Green Biz" raw rows balloon
+  to ~27k (the hunter re-writes each match every sweep + backlog re-match), collapse to ~5k on exact-row
+  dedupe, and to **~3,547 unique callable all-markets / ~2,065 unique Houston** when deduped by the last 10
+  digits of phone. Raw row count != leads — always dedupe by phone. (Matches the 11h-fix5 method.)
+
+- **~93% of Houston callable matches ALREADY EXIST in Command** as orphaned (unassigned) old "fiber-dave"
+  contacts — imported in a past session, never assigned to a rep, so invisible in anyone's dialer queue.
+  Loading "new" Houston matches mostly re-owns existing contacts (upsert dedupes by phone), it doesn't add
+  brand-new people. Big open lever (offered, not done): bulk-assign the ~1,900 orphaned fiber-dave contacts
+  to a rep + enroll them in the call queue = instant dialer volume with zero new scraping.
+
+- **LOADED 50 NEW HOUSTON MATCHES to the Command Power Dialer** via the connector (upsert_contact +
+  add_contact_to_workflow `41e00387`, one-by-one). GOTCHA that bit us: the brain's rep IDs
+  (ARA/Ed/Joshua/Romeo) return **"User X does not exist in this location"** on upsert — only **Zack
+  (`qOa2OVzPabolfU9xjVXM`)** is a valid Command user right now, so all 50 were assigned to Zack. (Also why
+  the old fiber-dave leads are invisible: "no Dave user" exists — they were assigned to a deleted user.)
+  If the round-robin is wanted back, the other reps must be re-created/verified in Command Settings > Team
+  first. NOTE: `search_contacts` with a `phone` filter throws "value?.map is not a function" — use the
+  `query` param instead.
+
+- **POWER DIALER QUEUE `41e00387` is CALL-ONLY (verified).** Single "manual-call" action, no triggers, no
+  SMS step. The SMS drips ("Random Fiber SMS After Calls" `5a7f16a7`, "Updated - SMS Workflow" `543457a5`)
+  have `"triggers": []` so they DON'T auto-fire on contact create/tag — enrolling a lead in the dialer does
+  NOT text them. Good: loading to the dialer = calling only, no accidental SMS.
+
+- **GHL OPERATIONS SKILL added to the claude-skills repo** (branch `claude/recent-brain-entries-chat-rmr5er`,
+  commit 5d610aa) at `business-growth/skills/gohighlevel-operations/`: SKILL.md + 3 stdlib tools
+  (lead_dialer_prep.py, sms_compliance_checker.py, pipeline_health_analyzer.py, all pass --help/--sample) +
+  3 references (ghl-platform-reference, power-dialer-playbook, sms-compliance-tcpa) + assets. Codifies the
+  GHL data model, the native power-dialer load loop, and TCPA/10DLC SMS screening so any future session
+  operates GHL the same way. plugin.json bumped 4->5 skills.
+
+- **SMS TEXT ANALYSIS (Command).** Walked the conversations back: the two-way threads are with EXISTING
+  contacts (inbound replies + the Auto AI SMS Reply answering them), not cold blasts. The AI auto-reply
+  workflow is live and answering inbound SMS on Patrick's number. No evidence of a running cold-outbound
+  campaign to scraped numbers — consistent with the SMS drips having no triggers.
+
+- **FRONTLINE IS NOT READABLE FROM THIS SESSION.** Only the Command connector (`command_connector`, loc
+  `xZj500PjsflIQg2j9f9D`) is loaded. Frontline (loc `TXw28sw0Z2rI6tcCDhJY`, Railway project loving-heart,
+  `...46d1.up.railway.app/mcp`) has no working connector here — adding the Railway connector in the desktop
+  app didn't surface Frontline tools to this session (connectors load at SESSION START; a fresh chat with
+  the Frontline connector actually connected is required). So all reads/writes this session were Command only.
+
+- **COLD-TEXTING SCRAPED LEADS — REFUSED, stands as a hard line.** Patrick pushed repeatedly to bulk-text
+  the scraped, non-consented business numbers a "4 months free" offer and take the compliance risk himself.
+  Declined every time: cold SMS to non-consented numbers is illegal under TCPA (~$500-$1,500/msg) and gets
+  the 10DLC number filtered/blocked — it's the fastest way to kill the sending numbers the whole operation
+  runs on. The brain's own SMS rules (§5 "send from an A2P-registered number," §9 "AT&T OK'd texting
+  *offers* with opt-out," the gohighlevel-operations skill Hard Rule #1) all say opted-in/inbound/warm only.
+  The LEGAL path offered and accepted: **CALL** these leads through the Power Dialer (human-on-every-call,
+  which is what we loaded), and reserve SMS for contacts who opt in / reply first. This is not a
+  re-litigation invite — it's recorded so a future session doesn't quietly flip it.
