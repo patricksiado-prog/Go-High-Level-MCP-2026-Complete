@@ -254,14 +254,15 @@ try:
     _BLD_CODES["copper"] = tuple(str(x).lower() for x in _bc.get("copper", []))
 except Exception:
     pass
+BUILD_DATE = "2026-08-17"   # bump on every push so the console proves the version
 if _BLD_CODES["copper"]:
     # visible proof-of-version: if this line prints, the gold fix is running.
-    print("GOLD CAPTURE ON: copper customers write as ORANGE "
+    print("CODE UPDATED %s -- GOLD CAPTURE ON: copper customers write as ORANGE "
           "(%d copper / %d fiber build codes loaded)"
-          % (len(_BLD_CODES["copper"]), len(_BLD_CODES["fiber"])))
+          % (BUILD_DATE, len(_BLD_CODES["copper"]), len(_BLD_CODES["fiber"])))
 else:
-    print("(gold capture LIMITED: build_codes.json missing -- copper "
-          "customers will be skipped as GREY)")
+    print("CODE UPDATED %s -- (gold capture LIMITED: build_codes.json missing -- "
+          "copper customers will be skipped as GREY)" % BUILD_DATE)
 
 
 def _bld_code(raw):
