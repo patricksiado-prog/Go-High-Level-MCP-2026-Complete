@@ -74,6 +74,21 @@
 > rule): installer bootstrap doc `1WdHXIDDFSOwm_1xVIeYikUC4_jmXWqIF-XzW_rKtPKI`; in-place updater
 > `1ul_wZHgZYKdJHyJ78a59AMeFdWKMRpx-`; known-path installer `13iO3xCmXEmTzI7JeLRqczC5wyp1I8nso`.
 
+> **★★★ PATRICK'S GOALS & PRIORITIES (posted 2026-08-17 — keep current; this is the goals list for the
+> recurring update email).** Format for the daily/weekly brief: a MOTIVATIONAL QUOTE on top, then SHORT-TERM
+> and LONG-TERM goals, then progress.
+> **SHORT-TERM:** (1) **Hire an assistant** to DRIVE the software + help with GHL + run ads on Craigslist +
+> US job boards ("the other job thing"). (2) **Email out the former-employees list** (re-engage / rehire).
+> (3) **Fix credit.** (4) **Find which ZIP codes new fiber is going to** → aim the hunter/scraper there first
+> (use the `fiber-signals` skill: FCC National Broadband Map / BDC API, free — this is the parked
+> new-fiber-finder, un-parked as a goal now).
+> **LONG-TERM:** (1) **Develop commercial (COM) solar sub-teams.** (2) **Scale the fiber op nationwide**
+> (new-fiber + fresh-green focus — see §5 build priorities + the nationwide-signals note).
+> Sample quote to rotate in the brief: "Discipline is the bridge between goals and accomplishment." — Jim Rohn.
+> NOTE (privacy): this repo is PUBLIC + team-shared, so the goal HEADLINES live here but keep any sensitive
+> detail (the actual former-employee list, credit specifics) OUT of the public brain — those go in a private
+> place, not committed here.
+
 > **★★★ RULE — DON'T BREAK MOTION (Patrick, 2026-07-02).** The hunter's pan loop keeps moving no
 > matter what — nothing (sheet reads/writes, matching, verification, empty ground, missing buttons)
 > gets to pause, slow, or end it; closing the browser is the only off switch. That's the whole rule.
