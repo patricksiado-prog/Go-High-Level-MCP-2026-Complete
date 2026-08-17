@@ -1729,3 +1729,46 @@ launch and TELLS the user (with the real BUILD_DATE) instead of silently lying. 
 the console must show the `STEP 1/STEP 2` prompt + `CODE UPDATED 2026-08-17 -- GOLD CAPTURE ON` + an
 `UPDATED to latest -- BUILD_DATE = "..."` line; if it shows "COULD NOT REACH GITHUB" or the old one-line
 prompt, it's stale → re-run the installer.
+
+### 11h-fix24 (2026-08-17) — AUDIT: how EVERY program variant updates (measured against the canonical two-path)
+Patrick: "research how all the program variants update ... put that in brain and stick to it." Read every
+runnable program's update code. Canonical target (see the top ★★★ UNIVERSAL UPDATE PATH rule): program
+self_update at top of main() = git fetch+reset if git present, else HTTPS raw re-download, then re-exec once;
+PLUS the desktop launcher curls each launch with an honest current-build-marker verify. Findings:
+
+PROGRAMS (in-process self_update):
+- **precise_fiber_hunter.py** — ✅ CANONICAL. self_update(): git (`_find_git`) THEN `_raw_refresh()` HTTPS
+  fallback over stdlib urllib for the 6 core files, re-exec once (guard OPTIMUS_NO_UPDATE=1). Added 5fde2f6.
+- **standalone/maps_scraper_standalone.py** — ✅ CANONICAL (single-file variant). self_update(): git, else
+  urllib download of `SCRAPER_RAW`, relaunch (guard SCRAPER_NO_UPDATE=1). Self-heals with or without git.
+- **zip_reader.py** — ✅ inherits canonical: imports + calls the hunter's `self_update()` (so it gets the
+  git+HTTPS two-path for free) AND has `_self_heal_deps()` to raw-download any MISSING helper at import.
+- **att_test.py** — ✅ calls the hunter's `self_update()` (git+HTTPS).
+- **dialer_loader.py** — ⚠️ git-ONLY (returns early `if not .git`). NO HTTPS fallback → on a no-git PC it
+  silently doesn't update. ACCEPTABLE TODAY because it runs from a git CLONE (`START DIALER.bat` clones the
+  repo, so git is present), but it VIOLATES the canonical rule for a no-git box. TODO: add `_raw_refresh`
+  like the hunter when next touched.
+- **fiber_scout.py** — ⚠️ INTENTIONAL EXCEPTION: the in-process `self_update()` re-exec was REMOVED on
+  purpose (11h-fix13 — a relaunch made Patrick re-login + re-center the map). Scout keeps only
+  `_self_heal_deps()` (raw-download MISSING deps at import); its actual CODE refresh comes ONLY from
+  `RUN_SCOUT.bat` curling the latest .py each launch. So scout is LAUNCHER-ONLY by design — do NOT re-add the
+  self-relaunch without Patrick's ok.
+- maps_scraper.py (in-suite, non-standalone), fiber_zone_scanner.py, fiber_precise_pipeline.py,
+  backend_probe.py, clean_sheet.py, dedupe_sheet.py, enrich_phones.py, business_score.py, ghl_loader.py,
+  commercial_split.py — N/A: helper modules / dev-only ZIP scanners, not team-distributed entry points.
+
+LAUNCHERS (.bat curl layer — belt-and-suspenders, and the ONLY path for a no-git or old-icon box):
+- **RUN_HUNTER.bat** — ✅ FIXED (49ce4ee): curl `-sf` to `.new`, require success + current-build marker
+  `GOLD CAPTURE ON` before swap, print real BUILD_DATE, LOUD failure (no false "latest"), goto-based.
+- **INSTALL_OPTIMUS.bat** — ✅ FIXED: same honest verify + now downloads build_codes.json.
+- **RUN_SCRAPER.bat / RUN_SCOUT.bat / RUN_ZIPS.bat / START DIALER.bat / RUN_V200K.bat** — ❌ NOT yet brought
+  to the honest-verify pattern; they likely still curl silently and/or verify with a stale marker. FOLLOW-UP:
+  port the RUN_HUNTER.bat `.new`+marker+loud-fail block to each (use each program's own current-build marker).
+
+STICK-TO-IT SUMMARY: hunter + standalone scraper + zip_reader + att_test = fully canonical. dialer_loader =
+git-only but runs from a clone (fix when touched). scout = deliberately launcher-only (leave it). The
+remaining launchers need the honest-verify port. When adding ANY new program: copy the hunter's two-path
+self_update + the RUN_HUNTER.bat honest-verify launcher. Do not invent a new scheme.
+Drive: posted "▶ UPDATE OPTIMUS HUNTER — run this (ONN PC)" doc (id 1WdHXIDDFSOwm_1xVIeYikUC4_jmXWqIF-XzW_rKtPKI)
+in My Drive with the permanent installer release link + steps, so Patrick can run the one-time bootstrap on
+the stale ONN box.
