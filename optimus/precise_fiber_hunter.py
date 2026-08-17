@@ -2816,12 +2816,61 @@ def _find_git():
     return "git"   # last resort -- subprocess will raise, caught upstream
 
 
+# Core files a fresh launch must have current -- the SAME set RUN_HUNTER.bat curls.
+_CORE_FILES = ("precise_fiber_hunter.py", "optimus_dot_detect.py",
+               "optimus_api_capture.py", "hunter_fixes.py",
+               "backend_classifier.py", "build_codes.json")
+
+
+def _raw_refresh(here):
+    """HTTPS raw-download fallback for when git isn't installed (the WinError 2
+    case). Re-downloads the core files straight from GitHub raw with stdlib
+    urllib -- no git, no launcher needed, so the PROGRAM self-heals to the latest
+    code every launch on ANY machine. Returns True if THIS file's bytes changed
+    (caller then re-execs once). Best-effort; every failure is swallowed."""
+    import urllib.request, time
+    base = ("https://raw.githubusercontent.com/%s/%s/optimus"
+            % (GH_REPO, GH_BRANCH))
+    cb = str(int(time.time()))        # cache-bust so a CDN copy can't pin us stale
+    d = os.path.dirname(here)
+    changed = False
+    got_main = False
+    for name in _CORE_FILES:
+        url = "%s/%s?cb=%s" % (base, name, cb)
+        dest = os.path.join(d, name)
+        try:
+            req = urllib.request.Request(url, headers={"Cache-Control": "no-cache"})
+            new = urllib.request.urlopen(req, timeout=30).read()
+            if not new:
+                continue
+            old = b""
+            if os.path.exists(dest):
+                old = open(dest, "rb").read()
+            if new != old:
+                open(dest, "wb").write(new)
+                if os.path.abspath(dest) == os.path.abspath(here):
+                    changed = True
+            if name == "precise_fiber_hunter.py":
+                got_main = True
+        except Exception:
+            continue      # offline / 404 / one file failed -- keep the rest
+    if got_main:
+        print("(auto-update: refreshed core files over HTTPS -- no git needed)")
+    return changed
+
+
 def self_update():
     """On launch, pull the newest code from GitHub so a restart always runs the
     latest version. If THIS file actually changed, relaunch once with the new
     code. Guards: OPTIMUS_NO_UPDATE=1 (set on the relaunch) stops an infinite
     re-exec loop; GIT_TERMINAL_PROMPT=0 stops a hang on a credential prompt;
-    any failure (offline, no git) is non-fatal -- we just keep running."""
+    any failure (offline, no git) is non-fatal -- we just keep running.
+
+    Two update paths so it self-heals on ANY machine: (1) git fetch+reset when
+    git is present (a full clone install); (2) if git is missing/fails -- the
+    common WinError 2 on a no-git PC -- fall back to an HTTPS raw re-download of
+    the core files (like the scraper), so the PROGRAM updates itself with no git
+    and no launcher. Either way, if this file's bytes changed, we re-exec once."""
     import subprocess
     if os.environ.get("OPTIMUS_NO_UPDATE") == "1" or "--no-update" in sys.argv:
         return
@@ -2829,6 +2878,7 @@ def self_update():
     repo_root = os.path.dirname(os.path.dirname(here))
     env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
     git = _find_git()           # works even when git isn't on this shell's PATH
+    changed = False
     try:
         before = open(here, "rb").read()
         # fetch + hard reset to origin so a local edit / conflict / divergence
@@ -2839,11 +2889,18 @@ def self_update():
                         "origin/" + REPO_BRANCH],
                        env=env, timeout=60, capture_output=True, text=True)
         after = open(here, "rb").read()
+        changed = (after != before)
     except Exception as e:
-        print("(auto-update skipped: %s -- run START OPTIMUS.bat to force the "
-              "update, or: git pull)" % str(e)[:80])
-        return
-    if after != before:
+        # No git (WinError 2) or a git failure -- fall back to HTTPS raw download
+        # so the program STILL self-updates. This is the no-git-PC self-heal.
+        print("(git update unavailable: %s -- using HTTPS raw fallback)"
+              % str(e)[:60])
+        try:
+            changed = _raw_refresh(here)
+        except Exception:
+            print("(auto-update skipped -- run START OPTIMUS.bat to force it)")
+            return
+    if changed:
         print("Pulled newer code from GitHub -- relaunching once with it...\n")
         child_env = dict(os.environ, OPTIMUS_NO_UPDATE="1")
         try:
