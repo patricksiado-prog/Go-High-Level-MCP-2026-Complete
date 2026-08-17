@@ -278,14 +278,24 @@ def _bld_code(raw):
 
 
 def classify_wire(status, ban, raw):
-    """classify_status + the build-code tiebreak, for wire-captured dots."""
-    code = _bld_code(raw)
-    if ban and code:
-        if any(c in code for c in _BLD_CODES["copper"]):
-            return "copper_upgrade"      # GOLD dot -> ORANGE row -> upgrade lead
-        if any(c in code for c in _BLD_CODES["fiber"]):
-            return "customer"            # GREY -> existing fiber customer, skip
-    return classify_status(text=status, ban=ban)
+    """classify_status + build-code tiebreak, for wire-captured dots.
+
+    The map legend has only three states, keyed off two fields:
+      * subscriber_ban EMPTY            -> GREEN (fiber-eligible non-customer)
+      * ban present + confirmed FIBER   -> GREY  (fttp-gpon/ftth = already on fiber)
+      * ban present + NOT on fiber      -> GOLD  (copper/DSL/other customer = the
+                                                  upgrade lead)
+    So a customer is GREY only when we can CONFIRM fiber; every other customer is
+    a copper-upgrade GOLD. This catches copper dots whose build code is a value we
+    never enumerated (e.g. 'unavailable', a DSL variant) -- the earlier version
+    required an explicit copper code and silently dropped those as GREY, which is
+    why a gold-dot-heavy view still wrote zero ORANGE."""
+    if ban:
+        code = _bld_code(raw)
+        if code and any(c in code for c in _BLD_CODES["fiber"]):
+            return "customer"            # GREY -> confirmed fiber customer, skip
+        return "copper_upgrade"          # GOLD dot -> ORANGE row -> upgrade lead
+    return classify_status(text=status, ban=ban)   # no ban -> GREEN (eligible)
 
 
 def classify_lead(ld):
@@ -1074,17 +1084,22 @@ class NetCapture:
                                           "ban": f.get("ban"), "props": {}})
                     except Exception:
                         pass
-                # save the RAW serviceability JSON once, so we can inspect exactly
-                # what AT&T sent (every field) -- locally + a sample to Drive.
-                if leads and not _SAVED_RAW[0]:
-                    _SAVED_RAW[0] = True
+                # save the RAW serviceability JSON so we can inspect exactly what
+                # AT&T sent (every field). Overwrite EVERY capture (cheap, local)
+                # so the file always reflects the CURRENT area -- the once-only
+                # gate left it stuck on the first area forever, useless for
+                # diagnosing a gold-heavy view captured later. Drive log stays
+                # once-only (that's the expensive push).
+                if leads:
                     try:
                         here = os.path.dirname(os.path.abspath(__file__))
                         with open(os.path.join(here, "serviceability_raw.json"), "w") as f:
                             json.dump(data, f)
-                        print("  (saved raw AT&T response -> serviceability_raw.json)")
                     except Exception:
                         pass
+                if leads and not _SAVED_RAW[0]:
+                    _SAVED_RAW[0] = True
+                    print("  (saved raw AT&T response -> serviceability_raw.json)")
                     try:
                         drive_log("RAW %s :: %s" % (url.split("?")[0][:55],
                                                     json.dumps(data)[:480]))
