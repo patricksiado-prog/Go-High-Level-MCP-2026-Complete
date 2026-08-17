@@ -1650,3 +1650,26 @@ Everything else from this session, for the record:
   The LEGAL path offered and accepted: **CALL** these leads through the Power Dialer (human-on-every-call,
   which is what we loaded), and reserve SMS for contacts who opt in / reply first. This is not a
   re-litigation invite — it's recorded so a future session doesn't quietly flip it.
+
+### 11h-fix22 (2026-08-17) — HTTPS self-update fallback so the hunter self-heals WITHOUT git (kills the WinError 2 dependency on the launcher)
+Patrick: "did u fix the update thing? how was it updating? keep updating like that." HONEST STATE it exposed:
+before this fix, the ONLY thing updating the no-git PC was **RUN_HUNTER.bat curling 6 files** from GitHub raw
+before launch. The program's in-process `self_update()` was **git-only** — on a PC with no git it raised
+`[WinError 2] The system cannot find the file specified`, printed "auto-update skipped", and did nothing (the
+brain §6/ad04844 SAID it should have an HTTPS raw fallback, but that got wiped when the file was restored to
+the June-18 build on 7/02). So a launch that DIDN'T go through the .bat (raw `python precise_fiber_hunter.py`)
+ran stale forever.
+FIX (commit 5fde2f6): added `_raw_refresh(here)` + rewired `self_update()`. New flow: try git fetch+reset as
+before; if git is missing/fails, **fall back to an HTTPS raw re-download** of the SAME 6 core files the
+launcher curls (`_CORE_FILES` = precise_fiber_hunter.py, optimus_dot_detect.py, optimus_api_capture.py,
+hunter_fixes.py, backend_classifier.py, build_codes.json) via **stdlib urllib** (cache-busted `?cb=<epoch>`,
+30s timeout, best-effort per file), then re-exec once if THIS file's bytes changed (guard OPTIMUS_NO_UPDATE=1).
+NET: the PROGRAM now self-updates on ANY machine — git clone OR no-git ZIP, launcher OR bare python command —
+so the "auto-update skipped: WinError 2 → stale forever" trap is gone. Same pattern the standalone scraper
+already uses. Console tell on the no-git path: `(git update unavailable: ... -- using HTTPS raw fallback)` then
+`(auto-update: refreshed core files over HTTPS -- no git needed)`. DEPLOY: it reaches the machine the usual way
+(next RUN_HUNTER icon double-click curls this new file); from THEN on the program keeps itself current by
+itself. The old "WinError 2" line only still appears on the CURRENT running copy until it relaunches on the
+new one. STANDING RULE going forward (Patrick's "keep updating like that"): every runnable program keeps this
+two-path self-update (git first, HTTPS raw fallback) so nobody ever runs stale code — wire it into any NEW
+program the same way.
