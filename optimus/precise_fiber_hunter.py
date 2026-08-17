@@ -358,15 +358,35 @@ def _start_stop_watcher():
                     print("  KILL SWITCH (Ctrl+Shift+K): force-quitting now.")
                     print("#" * 58 + "\n")
                     os._exit(0)          # immediate; launcher sees 0 = no restart
-                # GENTLE STOP: mouse held in the extreme top-left corner ~1s.
+                # GENTLE STOP (keyboard): Ctrl+Shift+S -> finish this cell, close
+                # the browser cleanly, no restart. Keyboard beats the corner
+                # gesture because the hunter OWNS the mouse (it moves the cursor
+                # every pan), so you can't hold the pointer still in a corner --
+                # but a key combo is read straight off the keyboard state.
+                # Ctrl=0x11 Shift=0x10 S=0x53.
+                if _down(0x11) and _down(0x10) and _down(0x53):
+                    _STOP[0] = True
+                    print("\n" + "#" * 58)
+                    print("  STOP (Ctrl+Shift+S): finishing this cell, closing cleanly.")
+                    print("  (If it's frozen, hit Ctrl+Shift+K to force-quit.)")
+                    print("#" * 58 + "\n")
+                    return
+                # GENTLE STOP (mouse): jam the pointer into ANY screen corner and
+                # hold ~0.6s. Wider 10px zone; works in the brief idle window
+                # between pans. If it won't catch (the hunter keeps grabbing the
+                # cursor), use Ctrl+Shift+S instead.
                 pt = _PT()
                 user32.GetCursorPos(ctypes.byref(pt))
-                if pt.x <= 3 and pt.y <= 3:
+                sw = user32.GetSystemMetrics(0); sh = user32.GetSystemMetrics(1)
+                near = 10
+                in_corner = ((pt.x <= near or pt.x >= sw - near) and
+                             (pt.y <= near or pt.y >= sh - near))
+                if in_corner:
                     held += 1
-                    if held >= 5:                    # ~1s at 0.2s poll
+                    if held >= 3:                    # ~0.6s at 0.2s poll
                         _STOP[0] = True
                         print("\n" + "#" * 58)
-                        print("  STOP: mouse held in the TOP-LEFT corner.")
+                        print("  STOP: mouse held in a screen CORNER.")
                         print("  Finishing this cell and shutting down cleanly...")
                         print("  (If it's frozen, hit Ctrl+Shift+K to force-quit.)")
                         print("#" * 58 + "\n")
@@ -377,7 +397,8 @@ def _start_stop_watcher():
                 pass
             _t.sleep(0.15)
     threading.Thread(target=_watch, daemon=True).start()
-    print("  STOP: slam the mouse into the TOP-LEFT screen corner (~1s).")
+    print("  STOP (reliable): press Ctrl+Shift+S -- finishes the cell, closes clean.")
+    print("  STOP (mouse): jam the pointer into any screen CORNER, hold ~1s.")
     print("  FORCE-QUIT (even if frozen): press Ctrl+Shift+K.")
 _NET_CAPTURE = [None]    # the always-on network capture (set in main)
 
@@ -2318,6 +2339,8 @@ def sweep_backend(page, ws, seen, area_label, dry, cols, rows, capture):
     total = 0
     for r in range(rows):
         for c in range(cols):
+            if _STOP[0]:                       # gentle stop -> quit within a cell
+                return total
             if on_map(page):
                 search_this_area(page)        # belt+suspenders fetch trigger
             time.sleep(SEARCH_SETTLE)
@@ -2349,6 +2372,8 @@ def sweep_grid(page, ws, seen, area_label, dry, capture):
         if key in done:
             return               # already scanned -> just passing through, fast
         done.add(key)
+        if _STOP[0]:                 # gentle stop -> quit within a cell
+            return
         if _map_frozen(page):        # WebGL freeze -> alert + stop cleanly
             _handle_frozen_map(ws, area_label)
             return
@@ -2454,6 +2479,8 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
         while True:
             for _arm in range(2):           # spiral: 2 arms per run-length, then grow
                 for _ in range(run):
+                    if _STOP[0]:                # gentle stop -> quit within a cell
+                        return total
                     if _map_frozen(page):       # WebGL freeze -> alert + stop
                         _handle_frozen_map(ws, area_label)
                         return total
