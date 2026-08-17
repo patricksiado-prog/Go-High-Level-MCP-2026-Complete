@@ -1544,3 +1544,53 @@ skipped: [WinError 2]" = git not found on that PC, so the in-process git self-up
 relaunch via the DESKTOP RUN_HUNTER icon (the .bat curls the newest .py straight from GitHub raw) to get this
 fix; a plain rerun of the same on-disk copy won't. Also close any zombie Chromium first (holds att_profile).
 The Google-side "batch write error 503" is SEPARATE + already safe (failed batches queue + retry, no freeze).
+
+### 11h-fix20 (2026-08-17) — GOLD DOT CAPTURE turned ON in the hunter + reliable STOP button + update-path confirmed
+Patrick: "I wanna add gold dots column can u do that? ... Grey old gold green new." The hunter was only writing
+GREEN (leads); GOLD (copper-upgrade customers) fell through to GREY/skip in this area because the local gold
+dots carry a BLANK or "unavailable" build code (not an explicit copper code like fttn-bp), so the first
+build-codes-only fix (e0f13bd) still classified them GREY. THREE things shipped this session on deploy branch
+`claude/optimus-map-tools-setup-6dcl6o`:
+
+1. **GOLD CAPTURE ON (commits e0f13bd -> 1bd8fa0, the money fix).** Added `_BLD_CODES` loader (build_codes.json)
+   + `_bld_code(raw)` (pulls curr_ntwrk_bld_type_cd tolerant of key formatting) + `classify_wire(status, ban,
+   raw)` + `classify_lead(ld)`. FINAL rule (1bd8fa0): if `subscriber_ban` present (a customer) -> look up the
+   build code; if it's a FIBER code (fttp-gpon/fttp/gpon/ftth) it's an existing fiber customer = GREY/skip;
+   **ANY OTHER customer (copper code OR blank/unavailable) = GOLD/ORANGE upgrade lead.** No ban = GREEN
+   (classify_status). So gold now writes even when the dot's code is empty — that was the miss. `DOT_COLOR`
+   map is `{"lead":"GREEN","copper_upgrade":"ORANGE","customer":"GREY"}`; ORANGE rows land in the "Precise
+   Fiber" tab (Dot Color column) and cross-match to "Upgrade Orange Biz" like before. Legend confirmed with
+   Patrick: GREEN=new eligible non-customer, GOLD/ORANGE=copper customer to upgrade (NEW fiber tell when
+   clustered), GREY=existing fiber customer (skip / mature ground).
+
+2. **VISIBLE BUILD STAMP so we can PROVE the running version (commits 8ea3345 + a9e9f15).** main() now prints
+   `CODE UPDATED 2026-08-17 -- GOLD CAPTURE ON: copper customers write as ORANGE (9 copper / 4 fiber build
+   codes loaded)` at startup. This is how we confirmed the update reached the machine (see #4). Also:
+   serviceability_raw.json now OVERWRITES every capture (was once-per-run) so the latest backend sample is
+   always fresh.
+
+3. **RELIABLE STOP BUTTON (commit b8ac4e8).** The mouse-to-corner gesture ALONE didn't work because the hunter
+   OWNS the physical mouse (it moves the cursor every pan via raw Windows input), so Patrick can't hold the
+   pointer in a corner. Root cause #2: `_STOP` was only checked between full passes, not per cell. FIXES:
+   (a) added a GENTLE keyboard stop **Ctrl+Shift+S** (sets `_STOP[0]=True`, clean exit that returns the total);
+   (b) widened the corner gesture to ANY screen corner (10px, held ~0.6s) instead of just upper-left;
+   (c) kept **Ctrl+Shift+K** as the instant force-quit even if frozen; (d) added `if _STOP[0]: return total`
+   at the top of every cell iteration in sweep_backend / sweep_grid(capture_here) / sweep_continuous so a stop
+   lands within one cell, not one pass. Startup banner now lists all three stops. **Ctrl+Shift+S is the
+   reliable one to tell the team** (keyboard beats fighting the hunter for the mouse).
+
+4. **UPDATE-PATH CONFIRMED — the launcher curl IS the working updater, not git (resolves "are u not updating
+   the right program?").** Patrick's console showed BOTH the new `CODE UPDATED 2026-08-17 / GOLD CAPTURE ON`
+   stamp AND `auto-update skipped: [WinError 2]`. Those are two DIFFERENT update paths and only the second
+   failed: the program's in-process `self_update()` is git-only and dies on a no-git PC (WinError 2), BUT
+   RUN_HUNTER.bat curls the latest precise_fiber_hunter.py + optimus_dot_detect.py + optimus_api_capture.py +
+   hunter_fixes.py + backend_classifier.py + build_codes.json from raw.githubusercontent BEFORE the program
+   starts. So the launcher already did the update; the git skip is cosmetic. TELL: the new stamp printing =
+   proof the machine is on today's code. To force an update on a stale box: re-double-click the DESKTOP
+   RUN_HUNTER icon (curls fresh); a plain rerun of the on-disk copy won't. (Still-open hardening, not blocking:
+   add an HTTPS raw-download fallback to self_update() so the program self-heals even when launched without the
+   .bat — like the scraper already does.)
+
+VERIFY NEXT (pending a live sweep over gold ground): position the map over a GOLD-dot cluster, press Enter,
+sweep 2-3 min, then read the sheet for Dot Color = ORANGE rows in "Precise Fiber". If ORANGE appears, gold
+capture is confirmed end-to-end. All commits verified on GitHub (b8ac4e8 latest on the deploy branch).
