@@ -1972,3 +1972,40 @@ gold dots on a PC with google_creds: `python precise_fiber_hunter.py --backfill-
 FIRST (Patrick's point): a gold/copper customer already has AT&T — the pitch is just "upgrade your line to fiber,"
 an easier call/close than a cold new-customer green. So the Gold Dots tab doubles as the priority upgrade call
 list AND the new-fiber tell (dense gold cluster = freshly-lit area, per the field rule in 11g).
+
+### 11h-fix32 (2026-08-18) — GOLD strategy: upgrade RESIDENTIAL is the play (biz-upgrade is rare); + startup version tell + how Claude reads the gold dots
+Patrick clarified the gold strategy: **"upgrade biz not common, upgrade resi is easy — we can call those."** This
+matches the data — the "Upgrade Orange Biz" tab has only ~9 business matches (gold dots that landed on a scraped
+business), because most gold (copper-upgrade) dots are HOUSES, not businesses. So the play is **residential
+upgrades**: gold/copper customers already have AT&T on a copper line, the pitch is just "upgrade to fiber" (easy
+call/close vs a cold green new-customer). The new **"Gold Dots" tab (11h-fix31) = the residential upgrade list** —
+every gold address, mostly homes. CONTACT CAVEAT (not a gate, his call): residential gold dots are ADDRESS-ONLY
+(no free public phone — houses never have one; brain §5/§6 "houses have NO free number"), so to CALL resi
+upgrades he needs numbers via **skip-trace** (like the La Porte 319-row upload) or a **door route**; the addresses
++ lat/lng are captured, sourcing the phone is the separate step. Business gold dots (the rare ones) DO carry a
+phone (from the scraper match) and flow to Upgrade Orange Biz → the dialer already.
+
+**WHERE NEW FIBER IS = gold clusters.** Dense gold (copper-not-yet-upgraded) with little grey = a freshly-lit
+area (field-confirmed, 11g). So the Gold Dots tab is also the **new-fiber map**: group the gold addresses by
+street to see the hot streets, point the hunter/scraper there next.
+
+**HOW CLAUDE ACTUALLY SEES THE GOLD DOTS (the read path, given the 446k-row wall):** Claude CANNOT read the giant
+"ATT FIBER LEADS" sheet whole (Drive export = "File too large"; 274k-char truncation reads only the top of the
+first tab), and the **Autosheet range-MCP is per-session — it must be connected in the CURRENT chat** (it was
+added in a past chat; a fresh chat needs it reconnected). The reliable, always-available path is the small
+**"OPTIMUS DATA SUMMARY"** sheet that `optimus_summary.py` writes: it now (2026-08-18) reads the dedicated **Gold
+Dots** tab first (small, isolated) — falling back to scanning Precise Fiber for ORANGE — and writes a **"Gold Dot
+Addresses"** tab + a **"Gold Hotspots"** tab (top ~50 gold streets, the new-fiber tell). That summary sheet is a
+SEPARATE small file Claude reads fully via Drive `search_files`(title "OPTIMUS DATA SUMMARY") → `read_file_content`.
+So the loop is: Patrick runs `RUN_SUMMARY.bat` (or the hunter spawns it on start) on a PC with google_creds →
+Claude reads OPTIMUS DATA SUMMARY → reports the gold hotspots / where new fiber is. To fill the tab with the
+HISTORY once: `python precise_fiber_hunter.py --backfill-gold`.
+
+**STARTUP VERSION TELL (what I saw / how to confirm a PC is on the gold build):** at launch the console must print
+`CODE UPDATED 2026-08-18 — GOLD CAPTURE ON: copper customers write as ORANGE (…codes loaded)` AND the new
+`GOLD DOTS TAB ON: every gold (upgrade) dot address -> 'Gold Dots' tab` line, plus the launcher's
+`UPDATED to latest -- BUILD_DATE = "2026-08-18"`. If a PC shows an older BUILD_DATE or is missing the GOLD DOTS
+TAB line, it's stale → relaunch via the RUN_HUNTER desktop icon (curls the latest); only if a clean relaunch is
+still old does that one PC need the installer (old icon). Source-side proof (any machine, no PC needed): curl the
+raw `precise_fiber_hunter.py` on the deploy branch and grep for `BUILD_DATE = "2026-08-18"`, `def write_gold_dots`,
+`GOLD_TAB = `, and `GOLD DOTS TAB ON` — all four confirmed present/served 2026-08-18.

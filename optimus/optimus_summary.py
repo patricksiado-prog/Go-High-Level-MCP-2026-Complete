@@ -28,6 +28,10 @@ try:
     from precise_fiber_hunter import (
         find_creds, SHEET_ID, SCOPES, OUT_TAB, MAPS_TAB,
         GREEN_BIZ_TAB, ORANGE_BIZ_TAB, self_update)
+    try:
+        from precise_fiber_hunter import GOLD_TAB
+    except Exception:
+        GOLD_TAB = "Gold Dots"
 except Exception as _e:  # pragma: no cover - only if run outside the suite
     print("Could not import hunter helpers (%s). Run this from the optimus folder."
           % str(_e)[:120])
@@ -212,25 +216,42 @@ def collect_gold_addresses(client, cap=20000):
     """Pull JUST the GOLD (ORANGE) dot addresses out of the big Precise Fiber tab
     -- a small slice (most dots are green) -- so Claude can see WHERE the gold is
     and spot new-fiber clusters. Returns (unique gold addresses, top gold streets).
-    Reads two columns (Address + Dot Color); ORANGE = copper-upgrade = the tell."""
+    Reads two columns (Address + Dot Color); ORANGE = copper-upgrade = the tell.
+    PREFERS the dedicated 'Gold Dots' tab (small, address-only) when it exists;
+    falls back to scanning the big Precise Fiber tab for ORANGE rows."""
     sh = client.open_by_key(SHEET_ID)
-    ws = sh.worksheet(OUT_TAB)
-    header = ws.row_values(1)
-    ai = _col_idx(header, "Address") or 1
-    ci = _col_idx(header, "Dot Color") or 2
-    addrs = ws.col_values(ai)[1:]
-    colors = ws.col_values(ci)[1:]
     gold, seen = [], set()
-    for a, c in zip(addrs, colors):
-        if (c or "").strip().upper() != "ORANGE":
-            continue
-        a = (a or "").strip()
-        if not a or a.upper() in seen:
-            continue
-        seen.add(a.upper())
-        gold.append(a)
-        if len(gold) >= cap:
-            break
+    # fast path: the dedicated Gold Dots tab (every gold dot, already isolated)
+    try:
+        gw = sh.worksheet(GOLD_TAB)
+        for a in gw.col_values(1)[1:]:       # col A = Address, skip header
+            a = (a or "").strip()
+            if not a or a.upper() in seen:
+                continue
+            seen.add(a.upper())
+            gold.append(a)
+            if len(gold) >= cap:
+                break
+    except Exception:
+        gold = []
+    # fallback: scan Precise Fiber for ORANGE rows (before --backfill-gold is run)
+    if not gold:
+        ws = sh.worksheet(OUT_TAB)
+        header = ws.row_values(1)
+        ai = _col_idx(header, "Address") or 1
+        ci = _col_idx(header, "Dot Color") or 2
+        addrs = ws.col_values(ai)[1:]
+        colors = ws.col_values(ci)[1:]
+        for a, c in zip(addrs, colors):
+            if (c or "").strip().upper() != "ORANGE":
+                continue
+            a = (a or "").strip()
+            if not a or a.upper() in seen:
+                continue
+            seen.add(a.upper())
+            gold.append(a)
+            if len(gold) >= cap:
+                break
     clusters = {}
     for a in gold:
         core = _street_core(a)
