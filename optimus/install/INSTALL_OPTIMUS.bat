@@ -81,20 +81,21 @@ echo [7/7] Creating the two Desktop icons...
 if not exist "%LAUNCH%" mkdir "%LAUNCH%"
 curl -L -o "%LAUNCH%\RUN_HUNTER.bat"  "%BASE%/RUN_HUNTER.bat"
 curl -L -o "%LAUNCH%\RUN_SCRAPER.bat" "%BASE%/RUN_SCRAPER.bat"
-curl -L -o "%LAUNCH%\RUN_V200K.bat"   "%BASE%/RUN_V200K.bat"
 curl -L -o "%LAUNCH%\hunter.ico"  "%BASE%/icons/hunter.ico"
 curl -L -o "%LAUNCH%\scraper.ico" "%BASE%/icons/scraper.ico"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$w=New-Object -ComObject WScript.Shell; $d=[Environment]::GetFolderPath('Desktop'); $a=$w.CreateShortcut((Join-Path $d 'Optimus Fiber Hunter.lnk')); $a.TargetPath=(Join-Path $env:USERPROFILE 'optimus\launchers\RUN_HUNTER.bat'); $a.IconLocation=(Join-Path $env:USERPROFILE 'optimus\launchers\hunter.ico'); $a.WorkingDirectory=(Join-Path $env:USERPROFILE 'optimus\launchers'); $a.Save(); $b=$w.CreateShortcut((Join-Path $d 'Optimus Maps Scraper.lnk')); $b.TargetPath=(Join-Path $env:USERPROFILE 'optimus\launchers\RUN_SCRAPER.bat'); $b.IconLocation=(Join-Path $env:USERPROFILE 'optimus\launchers\scraper.ico'); $b.WorkingDirectory=(Join-Path $env:USERPROFILE 'optimus\launchers'); $b.Save(); $c=$w.CreateShortcut((Join-Path $d 'Optimus Hunter V200K (June build).lnk')); $c.TargetPath=(Join-Path $env:USERPROFILE 'optimus\launchers\RUN_V200K.bat'); $c.IconLocation=(Join-Path $env:USERPROFILE 'optimus\launchers\hunter.ico'); $c.WorkingDirectory=(Join-Path $env:USERPROFILE 'optimus\launchers'); $c.Save()"
+REM ONE hunter icon only -- the old "V200K (June build)" third icon was dropped
+REM (Patrick, 2026-08-17: it confused the team and kept people on the frozen old
+REM build). Clean up a stale V200K shortcut from a prior install if present.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$d=[Environment]::GetFolderPath('Desktop'); Remove-Item (Join-Path $d 'Optimus Hunter V200K (June build).lnk') -Force -ErrorAction SilentlyContinue"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$w=New-Object -ComObject WScript.Shell; $d=[Environment]::GetFolderPath('Desktop'); $a=$w.CreateShortcut((Join-Path $d 'Optimus Fiber Hunter.lnk')); $a.TargetPath=(Join-Path $env:USERPROFILE 'optimus\launchers\RUN_HUNTER.bat'); $a.IconLocation=(Join-Path $env:USERPROFILE 'optimus\launchers\hunter.ico'); $a.WorkingDirectory=(Join-Path $env:USERPROFILE 'optimus\launchers'); $a.Save(); $b=$w.CreateShortcut((Join-Path $d 'Optimus Maps Scraper.lnk')); $b.TargetPath=(Join-Path $env:USERPROFILE 'optimus\launchers\RUN_SCRAPER.bat'); $b.IconLocation=(Join-Path $env:USERPROFILE 'optimus\launchers\scraper.ico'); $b.WorkingDirectory=(Join-Path $env:USERPROFILE 'optimus\launchers'); $b.Save()"
 
 echo.
 echo  ============================================================
 echo   DONE! Python + the tools are installed.
-echo   THREE icons are now on your Desktop:
-echo      - Optimus Fiber Hunter            ^(current build^)
-echo      - Optimus Hunter V200K ^(June build^) ^(the exact program that
-echo        pulled the 200k green dots -- frozen, never changes^)
-echo      - Optimus Maps Scraper            ^(type ZIP codes when it asks^)
-echo   Double-click any one to run.
+echo   TWO icons are now on your Desktop:
+echo      - Optimus Fiber Hunter   ^(this is THE hunter -- always the latest^)
+echo      - Optimus Maps Scraper   ^(type ZIP codes when it asks^)
+echo   Double-click either one to run.
 echo  ============================================================
 echo.
 pause
