@@ -2014,3 +2014,29 @@ his Drive installers folder as **"GET GOLD DOTS - run once (OPTIMUS).bat"** (id 
 folder `0AHafe86gsae2Uk9PVA`). After he runs it once: the Gold Dots tab holds the upgrade call list, and Claude
 reads the "OPTIMUS DATA SUMMARY" sheet (Gold Hotspots) via Drive to report where the new fiber is. `optimus_summary.
 collect_gold_addresses` now reads the Gold Dots tab first (fallback: scan Precise Fiber ORANGE) + accepts `--no-update`.
+
+### 11h-fix33 (2026-08-18) — SUPERSEDES fix32's read path: gold dots go to a SMALL STANDALONE sheet, hunter self-fills, NO extra program
+Patrick: **"I don't want an extra program w the summary."** So the summary/RUN_GOLD path in fix32 is RETIRED as a
+requirement. New design (commit 0d8f50b): the **hunter itself** writes every gold (copper-upgrade) dot to a SMALL
+STANDALONE spreadsheet **"OPTIMUS GOLD DOTS"** — its OWN file, NOT a tab in the 446k-row monster — because Claude
+can read a small sheet whole via the Drive MCP but the giant one exports "File too large". Details:
+- `write_gold_dots()` now targets the standalone sheet via `_ensure_gold_tab(sh)` → `sh.client.open/create(
+  "OPTIMUS GOLD DOTS")`, `.share(patricksiado@gmail.com, writer)` on first create, tab "Gold Dots", cols
+  `Address | Captured At | Lat | Lng | Business | Phone`, deduped by address (seen-set seeded from col A).
+- **History backfill folded INTO the hunter (no extra program):** `_auto_backfill_gold_once(ws)` runs ONCE at
+  startup in `uploader_main()` (the sole gold writer in the default split mode) — if the gold sheet is empty it
+  seeds it from Precise Fiber's ORANGE rows via `_backfill_gold_from()`. `--backfill-gold` CLI still exists for a
+  manual/no-split run. Placed only in the uploader to avoid a cross-process double-write race (in --no-split the
+  in-process `flush()` is the writer; use the flag there).
+- Deleted `optimus/install/RUN_GOLD.bat` and trashed the Drive "GET GOLD DOTS - run once" file — not needed.
+  `optimus_summary.py` stays in the repo (harmless, no longer required for the gold read).
+- **HOW CLAUDE READS IT NOW:** Drive `search_files`(title = 'OPTIMUS GOLD DOTS') → `read_file_content` → cluster
+  the gold addresses by street to report where the new fiber is. The sheet is small (gold ⋘ the 446k green), so
+  no truncation. The service account owns it + shares to Patrick's Gmail, so it shows in his Drive AND Claude
+  reads it. It ONLY exists after the hunter has run once on a PC with google_creds (the service account creates
+  it on first gold write / backfill) — until then, `search_files` returns nothing (nothing to read yet).
+- **AUTOSHEET is per-SESSION:** Patrick has the Autosheet MCP set to "Always" on his phone (Start/Get/Follow-up/
+  Stop agent tools), but connectors attach at CHAT START — a chat opened BEFORE he added it does NOT have the
+  Autosheet tools (confirmed: ToolSearch finds no `mcp__Autosheet__*` in such a session). To range-read the LIVE
+  446k sheet directly, use a FRESH chat where Autosheet is connected. The standalone gold sheet is the read path
+  that needs no connector (plain Drive MCP), so it works in any session.
