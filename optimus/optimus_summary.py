@@ -201,6 +201,45 @@ def collect_leads(client, cap=8000):
     return header, rows
 
 
+def _street_core(addr):
+    """Strip the leading house number -> street name, for clustering gold dots."""
+    a = (addr or "").strip()
+    m = re.match(r"^\s*\d+\s+(.*)$", a)
+    return (m.group(1) if m else a).strip().upper()
+
+
+def collect_gold_addresses(client, cap=20000):
+    """Pull JUST the GOLD (ORANGE) dot addresses out of the big Precise Fiber tab
+    -- a small slice (most dots are green) -- so Claude can see WHERE the gold is
+    and spot new-fiber clusters. Returns (unique gold addresses, top gold streets).
+    Reads two columns (Address + Dot Color); ORANGE = copper-upgrade = the tell."""
+    sh = client.open_by_key(SHEET_ID)
+    ws = sh.worksheet(OUT_TAB)
+    header = ws.row_values(1)
+    ai = _col_idx(header, "Address") or 1
+    ci = _col_idx(header, "Dot Color") or 2
+    addrs = ws.col_values(ai)[1:]
+    colors = ws.col_values(ci)[1:]
+    gold, seen = [], set()
+    for a, c in zip(addrs, colors):
+        if (c or "").strip().upper() != "ORANGE":
+            continue
+        a = (a or "").strip()
+        if not a or a.upper() in seen:
+            continue
+        seen.add(a.upper())
+        gold.append(a)
+        if len(gold) >= cap:
+            break
+    clusters = {}
+    for a in gold:
+        core = _street_core(a)
+        if core:
+            clusters[core] = clusters.get(core, 0) + 1
+    top = sorted(clusters.items(), key=lambda kv: -kv[1])[:50]
+    return gold, top
+
+
 def _open_summary_sheet(client):
     """Create/reuse the 'OPTIMUS DATA SUMMARY' sheet and share it with Patrick."""
     sh = None
@@ -273,6 +312,22 @@ def run_once(client):
               % len(lead_rows))
     except Exception as e:
         print("  (leads tab hiccup: %s)" % str(e)[:120])
+    # GOLD DOT ADDRESSES -- where the new fiber is. The actual ORANGE addresses
+    # (a small slice of the 418k) + the streets with the most gold (new-fiber
+    # clusters). This is what lets Claude say "new fiber is hitting X street/area."
+    try:
+        gold_addrs, gold_streets = collect_gold_addresses(client)
+        addr_rows = [["Gold Dot Address (copper upgrade = new-fiber tell)"]]
+        addr_rows += [[a] for a in gold_addrs]
+        _write_tab(sh, "Gold Dot Addresses", addr_rows)
+        hot = [["GOLD HOTSPOTS -- streets with the most gold (new fiber)", ""],
+               ["Street", "Gold dots"]]
+        hot += [[s, n] for s, n in gold_streets]
+        _write_tab(sh, "Gold Hotspots", hot)
+        print("Wrote %d gold-dot addresses + %d hotspot streets."
+              % (len(gold_addrs), len(gold_streets)))
+    except Exception as e:
+        print("  (gold-address tab hiccup: %s)" % str(e)[:120])
     print("Summary sheet '%s' (id %s) -- shared with %s."
           % (SUMMARY_TITLE, sh.id, OWNER_EMAIL))
     return out
