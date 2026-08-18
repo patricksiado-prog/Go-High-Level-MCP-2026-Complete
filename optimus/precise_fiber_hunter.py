@@ -1547,26 +1547,48 @@ def _sheet_is_full(sh):
 
 
 # ---------------------------------------------------------------------------
-# GOLD DOTS TAB -- every gold (copper-upgrade) dot, all of them, not just the
+# GOLD DOTS -- every gold (copper-upgrade) dot, all of them, not just the
 # business matches. Copper customers are the hottest UPGRADE leads (easy call:
 # "upgrade your line to fiber"), so Patrick wants them all in one place to
 # analyze where new fiber is and to call for upgrades first (2026-08-18).
+#
+# They go to a SMALL STANDALONE spreadsheet ("OPTIMUS GOLD DOTS"), NOT a tab in
+# the 446k-row monster -- because Claude can read a small sheet whole via Drive
+# but the giant one exports "File too large". So the hunter fills this inline as
+# it sweeps (NO extra program), and Claude reads it directly to report where the
+# new fiber is. It's shared to Patrick's Gmail so it's also his upgrade call list.
 # ---------------------------------------------------------------------------
+GOLD_SHEET_TITLE = "OPTIMUS GOLD DOTS"
+GOLD_OWNER_EMAIL = "patricksiado@gmail.com"
 _GOLD = {"ws": None, "seen": None}
+_GOLD_HEADER = ["Address", "Captured At", "Lat", "Lng", "Business", "Phone"]
 
 
 def _ensure_gold_tab(sh):
-    """Get (or create) the 'Gold Dots' worksheet, seed the seen-set from column A
-    once so we never write the same address twice. Cached for the process."""
+    """Get/create the SMALL standalone 'OPTIMUS GOLD DOTS' spreadsheet (its own
+    file, shared to Patrick), seed the seen-set so we never double-write. Cached.
+    `sh` is any open gspread Spreadsheet -- we borrow its authorized client."""
     if _GOLD["ws"] is not None:
         return _GOLD["ws"]
+    client = sh.client
     try:
-        gw = sh.worksheet(GOLD_TAB)
+        gsh = client.open(GOLD_SHEET_TITLE)          # reuse by title
     except Exception:
-        gw = sh.add_worksheet(title=GOLD_TAB, rows="5000", cols="6")
-        gw.append_row(["Address", "Captured At", "Lat", "Lng", "Business", "Phone"])
+        gsh = client.create(GOLD_SHEET_TITLE)        # first run: make it + share
+        try:
+            gsh.share(GOLD_OWNER_EMAIL, perm_type="user", role="writer")
+        except Exception:
+            pass
+    try:
+        gw = gsh.worksheet(GOLD_TAB)
+    except Exception:
+        gw = gsh.sheet1
+        try:
+            gw.update_title(GOLD_TAB)
+        except Exception:
+            pass
     if not gw.get_all_values():
-        gw.append_row(["Address", "Captured At", "Lat", "Lng", "Business", "Phone"])
+        gw.append_row(_GOLD_HEADER)
     try:
         col = gw.col_values(1)[1:]      # skip the header row
         _GOLD["seen"] = set(a.strip().upper() for a in col if a and a.strip())
@@ -1577,8 +1599,8 @@ def _ensure_gold_tab(sh):
 
 
 def write_gold_dots(sh, records):
-    """Append EVERY gold (copper-upgrade) dot to the 'Gold Dots' tab -- all of
-    them, deduped by address, business + phone merged inline when we have it.
+    """Append EVERY gold (copper-upgrade) dot to the standalone 'OPTIMUS GOLD
+    DOTS' sheet -- all of them, deduped by address, business + phone inline.
     `records` = the same dicts flush()/the uploader build (address, dot_status,
     ts, lat, lng, optional biz_name/biz_phone). Best-effort: never raises into
     the sweep. Returns how many new gold rows were written."""
@@ -1616,33 +1638,24 @@ def write_gold_dots(sh, records):
     return len(rows)
 
 
-def backfill_gold_dots():
-    """One-time: seed the 'Gold Dots' tab from every ORANGE (gold/upgrade) row
-    already captured in 'Precise Fiber'. Reads just the Address + Dot Color
-    columns (not the whole huge tab), dedupes, batches the write. Run once with
-    --backfill-gold; new runs keep the tab current on their own."""
-    import gspread
-    from google.oauth2.service_account import Credentials
-    creds = find_creds()
-    if not creds:
-        print("No google_creds.json found -- can't backfill the Gold Dots tab.")
-        return
-    client = gspread.authorize(
-        Credentials.from_service_account_file(creds, scopes=SCOPES))
-    sh = client.open_by_key(SHEET_ID)
+def _backfill_gold_from(sh, log=print):
+    """Core: seed the standalone gold sheet from every ORANGE (gold/upgrade) row
+    already captured in 'Precise Fiber' on the big sheet `sh`. Reads just the
+    Address + color columns, dedupes against what's already in the gold sheet,
+    batches the write. Returns rows written. Best-effort."""
     try:
         pf = sh.worksheet(OUT_TAB)
     except Exception:
-        print("No '%s' tab -- nothing to backfill." % OUT_TAB)
-        return
-    print("Reading Precise Fiber address + color columns (this can take a minute "
-          "on a big sheet)...")
+        log("No '%s' tab -- nothing to backfill." % OUT_TAB)
+        return 0
+    log("Reading Precise Fiber address + color columns (one-time; can take a "
+        "minute on a big sheet)...")
     addrs = pf.col_values(1)      # column A = Address
     colors = pf.col_values(2)     # column B = Dot Color
     ts_col = pf.col_values(3)     # column C = Captured At
     biz_col = pf.col_values(4)    # column D = Business
     ph_col = pf.col_values(5)     # column E = Phone
-    gw = _ensure_gold_tab(sh)
+    gw = _ensure_gold_tab(sh)     # the SMALL standalone sheet
     seen = _GOLD["seen"]
     rows = []
     n = max(len(addrs), len(colors))
@@ -1660,13 +1673,49 @@ def backfill_gold_dots():
                      biz_col[i] if i < len(biz_col) else "",
                      ph_col[i] if i < len(ph_col) else ""])
     if not rows:
-        print("No ORANGE/gold rows found in Precise Fiber to backfill.")
-        return
-    print("Writing %d historical gold (upgrade) addresses to the '%s' tab..."
-          % (len(rows), GOLD_TAB))
+        log("No ORANGE/gold rows found in Precise Fiber to backfill.")
+        return 0
+    log("Writing %d historical gold (upgrade) addresses to '%s'..."
+        % (len(rows), GOLD_SHEET_TITLE))
     for i in range(0, len(rows), 500):
         gw.append_rows(rows[i:i + 500], value_input_option="RAW")
-    print("Done. The '%s' tab now holds %d gold addresses." % (GOLD_TAB, len(rows)))
+    log("Done. '%s' now holds %d gold addresses." % (GOLD_SHEET_TITLE, len(rows)))
+    return len(rows)
+
+
+def _auto_backfill_gold_once(sh):
+    """Fold the history backfill INTO the hunter (no extra program): the first
+    time the standalone gold sheet is empty, seed it from Precise Fiber's ORANGE
+    rows. Runs at startup (before the browser), guarded + best-effort so it can
+    never touch the sweep. After the first run the sheet stays current on its own."""
+    if sh is None:
+        return
+    try:
+        gw = _ensure_gold_tab(sh)
+    except Exception:
+        return
+    # only backfill when the gold sheet is fresh (just the header, nothing seeded)
+    if _GOLD.get("seen"):
+        return
+    try:
+        _backfill_gold_from(sh, log=lambda m: print("  [gold backfill] " + m))
+    except Exception as e:
+        print("  (gold backfill skipped: %s)" % str(e)[:80])
+
+
+def backfill_gold_dots():
+    """One-time CLI (--backfill-gold): open the big sheet and seed the standalone
+    gold sheet from its ORANGE rows. New runs keep it current on their own."""
+    import gspread
+    from google.oauth2.service_account import Credentials
+    creds = find_creds()
+    if not creds:
+        print("No google_creds.json found -- can't backfill the gold dots.")
+        return
+    client = gspread.authorize(
+        Credentials.from_service_account_file(creds, scopes=SCOPES))
+    sh = client.open_by_key(SHEET_ID)
+    _backfill_gold_from(sh)
 
 
 def open_sheet():
@@ -3262,6 +3311,13 @@ def uploader_main():
         init_bizmatch(ws)
     except Exception as e:
         _ulog("biz match init skipped: %s" % str(e)[:80])
+    try:
+        # ONE-TIME: fold the gold history backfill into the hunter (no extra
+        # program) -- if the standalone gold sheet is empty, seed it from the
+        # ORANGE rows already in Precise Fiber. Runs once, before shipping starts.
+        _auto_backfill_gold_once(ws)
+    except Exception as e:
+        _ulog("gold backfill skipped: %s" % str(e)[:80])
     try:
         offset = int(os.environ.get("OPTIMUS_OUTBOX_OFFSET", "0") or 0)
     except ValueError:
