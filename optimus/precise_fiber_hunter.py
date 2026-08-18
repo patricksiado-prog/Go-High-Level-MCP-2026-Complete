@@ -1558,6 +1558,9 @@ def _sheet_is_full(sh):
 # it sweeps (NO extra program), and Claude reads it directly to report where the
 # new fiber is. It's shared to Patrick's Gmail so it's also his upgrade call list.
 # ---------------------------------------------------------------------------
+# Kept only so older references/log lines still resolve. Gold now lives in a
+# TAB in the main sheet (GOLD_TAB), because the service account cannot create
+# a standalone file -- see _ensure_gold_tab().
 GOLD_SHEET_TITLE = "OPTIMUS GOLD DOTS"
 GOLD_OWNER_EMAIL = "patricksiado@gmail.com"
 _GOLD = {"ws": None, "seen": None}
@@ -1565,28 +1568,30 @@ _GOLD_HEADER = ["Address", "Captured At", "Lat", "Lng", "Business", "Phone"]
 
 
 def _ensure_gold_tab(sh):
-    """Get/create the SMALL standalone 'OPTIMUS GOLD DOTS' spreadsheet (its own
-    file, shared to Patrick), seed the seen-set so we never double-write. Cached.
-    `sh` is any open gspread Spreadsheet -- we borrow its authorized client."""
+    """Get/create the 'Gold Dots' TAB inside the main ATT FIBER LEADS sheet.
+
+    WAS: this opened/created a SEPARATE spreadsheet ("OPTIMUS GOLD DOTS").
+    That could never work. The service account has ZERO Drive storage quota --
+    it can READ and UPDATE files already shared with it, but it cannot CREATE
+    a new file. So client.create() always threw, write_gold_dots() swallowed
+    the exception and returned 0, and gold silently never appeared anywhere
+    while green kept writing fine. (Confirmed 2026-08-18: no such spreadsheet
+    exists in Drive; the limit is documented in SESSION_SUMMARY_2026-04-30.)
+
+    NOW: the tab lives in `sh` -- the main sheet, which already exists and is
+    already shared with the service account. add_worksheet() on an existing
+    spreadsheet needs no Drive quota, so this works.
+
+    `sh` is the open gspread Spreadsheet the hunter is already writing to.
+    """
     if _GOLD["ws"] is not None:
         return _GOLD["ws"]
-    client = sh.client
     try:
-        gsh = client.open(GOLD_SHEET_TITLE)          # reuse by title
+        gw = sh.worksheet(GOLD_TAB)
     except Exception:
-        gsh = client.create(GOLD_SHEET_TITLE)        # first run: make it + share
-        try:
-            gsh.share(GOLD_OWNER_EMAIL, perm_type="user", role="writer")
-        except Exception:
-            pass
-    try:
-        gw = gsh.worksheet(GOLD_TAB)
-    except Exception:
-        gw = gsh.sheet1
-        try:
-            gw.update_title(GOLD_TAB)
-        except Exception:
-            pass
+        gw = sh.add_worksheet(title=GOLD_TAB, rows="5000",
+                              cols=str(len(_GOLD_HEADER)))
+        print("   created '%s' tab in the main sheet" % GOLD_TAB)
     if not gw.get_all_values():
         gw.append_row(_GOLD_HEADER)
     try:
@@ -1599,8 +1604,8 @@ def _ensure_gold_tab(sh):
 
 
 def write_gold_dots(sh, records):
-    """Append EVERY gold (copper-upgrade) dot to the standalone 'OPTIMUS GOLD
-    DOTS' sheet -- all of them, deduped by address, business + phone inline.
+    """Append EVERY gold (copper-upgrade) dot to the 'Gold Dots' TAB in the main
+    sheet -- all of them, deduped by address, business + phone inline.
     `records` = the same dicts flush()/the uploader build (address, dot_status,
     ts, lat, lng, optional biz_name/biz_phone). Best-effort: never raises into
     the sweep. Returns how many new gold rows were written."""
@@ -1612,7 +1617,10 @@ def write_gold_dots(sh, records):
         return 0
     try:
         gw = _ensure_gold_tab(sh)
-    except Exception:
+    except Exception as e:
+        # Never silent again. A gold write that cannot happen must SAY so --
+        # this failing quietly is exactly what hid the bug for weeks.
+        print("   (GOLD TAB FAILED: %s)" % str(e)[:120])
         return 0
     seen = _GOLD["seen"]
     rows = []
@@ -1639,7 +1647,7 @@ def write_gold_dots(sh, records):
 
 
 def _backfill_gold_from(sh, log=print):
-    """Core: seed the standalone gold sheet from every ORANGE (gold/upgrade) row
+    """Core: seed the 'Gold Dots' tab from every ORANGE (gold/upgrade) row
     already captured in 'Precise Fiber' on the big sheet `sh`. Reads just the
     Address + color columns, dedupes against what's already in the gold sheet,
     batches the write. Returns rows written. Best-effort."""
@@ -1655,7 +1663,7 @@ def _backfill_gold_from(sh, log=print):
     ts_col = pf.col_values(3)     # column C = Captured At
     biz_col = pf.col_values(4)    # column D = Business
     ph_col = pf.col_values(5)     # column E = Phone
-    gw = _ensure_gold_tab(sh)     # the SMALL standalone sheet
+    gw = _ensure_gold_tab(sh)     # the 'Gold Dots' tab in this same sheet
     seen = _GOLD["seen"]
     rows = []
     n = max(len(addrs), len(colors))
@@ -1676,10 +1684,10 @@ def _backfill_gold_from(sh, log=print):
         log("No ORANGE/gold rows found in Precise Fiber to backfill.")
         return 0
     log("Writing %d historical gold (upgrade) addresses to '%s'..."
-        % (len(rows), GOLD_SHEET_TITLE))
+        % (len(rows), GOLD_TAB))
     for i in range(0, len(rows), 500):
         gw.append_rows(rows[i:i + 500], value_input_option="RAW")
-    log("Done. '%s' now holds %d gold addresses." % (GOLD_SHEET_TITLE, len(rows)))
+    log("Done. '%s' tab now holds %d gold addresses." % (GOLD_TAB, len(rows)))
     return len(rows)
 
 

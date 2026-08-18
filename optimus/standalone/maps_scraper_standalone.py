@@ -986,11 +986,13 @@ def main():
     if not zips:
         print("No ZIPs entered. Exiting.")
         return
-    print("\nWhere should the results go?")
-    print("  [1] CSV file  (businesses.csv)")
-    print("  [2] Google Sheet  ('%s' tab)" % SHEET_TAB)
-    dest = (input("Choose 1 or 2 (press Enter for 1): ").strip() or "1")
-    to_sheet = dest.startswith("2")
+    # Results ALWAYS go to the Google Sheet. The old prompt offered a CSV and
+    # defaulted to it, so anyone who just pressed Enter scraped into a local
+    # file on their own PC and nothing ever reached the sheet. businesses.csv
+    # is still written quietly as a local backup, so a run is never lost if the
+    # sheet is unreachable -- but it is no longer something you can pick.
+    to_sheet = True
+    print("\nResults go to the Google Sheet: '%s' tab." % SHEET_TAB)
     print("\nHow deep should it search?")
     print("  [1] Light  (~20 categories - fastest)")
     print("  [2] Heavy  (~47 categories)")
