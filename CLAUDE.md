@@ -1867,3 +1867,23 @@ green/gold/unique/ZIP numbers without ever touching the giant sheet. STATUS: shi
 (no creds/network in the sandbox) -- first run on a machine with google_creds will create the summary sheet;
 verify the numbers look right, then it's the permanent analysis channel. NOTE: still could add per-run
 freshness + OKC/Houston split; v1 covers the counts Patrick keeps asking for ("how many gold/green").
+
+### 11h-fix29 (2026-08-17) — SOLVED: Claude can now read the live sheet directly via the Autosheet MCP connector (range-based, no export wall)
+The real fix for "Claude can't read the 446k-row sheet" (researched: known Claude/Sheets limit): the Drive
+connector EXPORTS THE WHOLE WORKBOOK (dies on "File too large"), but a range-based Google Sheets MCP reads by
+tab + cell range, so the giant tab never blocks it. Patrick added the **Autosheet** connector (Claude
+Connectors -> Directory -> search "sheets" -> Autosheet "Community/New" -> Connect to Claude -> Google OAuth
+via "GPT for Sheets and Docs" -> Allow). It's an AGENT-style MCP: tools `mcp__Autosheet__
+autosheet_start_agent_google_sheets_spreadsheet` (give it the SHEET_ID/URL + a plain-English task; it reads/
+inspects/reports, can also write), `autosheet_get_agent` (poll busy->available), `autosheet_follow_up_agent`.
+CONFIRMED WORKING 2026-08-17: started an agent on SHEET_ID 1FhO2BTM... -> it read the "Upgrade Orange Biz" tab
+by range and pulled the dot-color column across all rows. FINDINGS from that first run: Precise Fiber is now
+~446,399 rows; "Upgrade Orange Biz" tab has only ~9 rows (very few gold BUSINESS matches so far -- gold capture
+is new + needs the scraper to cover the same gold ground). PERF NOTE: a full-column pull of 446k cells in ONE
+read is heavy (took minutes / the get_agent endpoint threw transient 503s) -- query NARROW ranges or ask the
+agent to count in blocks for fast answers; don't pull the whole 446k column at once. HOW TO USE GOING FORWARD:
+to answer "how many gold / show gold matches / where's new fiber," start an Autosheet agent with a targeted
+prompt (name the tab + what to return), poll get_agent, report. This SUPERSEDES the converter (optimus_summary.py)
+as the primary read path -- the converter still works as a no-connector fallback, but the MCP reads the LIVE
+sheet directly. Autosheet is a COMMUNITY connector (routes through their server + the "GPT for Sheets and Docs"
+Google app) -- fine for the fiber leads (not sensitive), noted for the record.
