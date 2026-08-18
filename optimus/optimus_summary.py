@@ -359,6 +359,8 @@ def main():
     ap = argparse.ArgumentParser(description="Optimus data summary converter")
     ap.add_argument("--loop", type=float, default=0,
                     help="refresh every N minutes (0 = run once)")
+    ap.add_argument("--no-update", action="store_true",
+                    help="skip the self-update (the launcher already curled fresh)")
     args = ap.parse_args()
 
     client = _client()
