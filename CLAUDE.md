@@ -1847,3 +1847,23 @@ PC that still shows the "Optimus Fiber Hunter V2" icon, right-click → Delete i
 only the plain "Optimus Fiber Hunter". The frozen v200k program files still exist in the repo (optimus/v200k/)
 if ever needed, but it's no longer surfaced as an icon. Release link auto-republished. This is the "consistent
 installer" Patrick asked for: one hunter icon, always the latest gold build.
+
+### 11h-fix28 (2026-08-17) — DATA SUMMARY CONVERTER: how Claude analyzes the 180k-row sheet (it can't read it whole)
+Patrick: "I need u to analyze the data all the time ... convert to xl and look yourself?" TESTED + CONFIRMED
+the wall: `download_file_content` on the leads sheet returns **"File too large for export"** — Google itself
+refuses to export the 180k+ row / 10MB+ "ATT FIBER LEADS" sheet, so Claude CANNOT read or convert it whole
+(web-researched: this is a known Claude/Sheets connector limit — the fix everyone uses is "summarize at the
+source, don't move the whole sheet"). SOLUTION BUILT: `optimus/optimus_summary.py` (commit a5b39fa) runs ON
+THE MACHINE (gspread pages the sheet with NO size limit), computes the analysis, and writes a SMALL sheet
+titled **"OPTIMUS DATA SUMMARY"** that Claude reads fully in one shot. It uses the SAME google_creds the
+hunter uses (NO github token, NO new setup); the service account creates+owns the summary sheet and shares it
+with patricksiado@gmail.com, so Claude finds it by its fixed TITLE (search_files title='OPTIMUS DATA SUMMARY')
+and reads it. Stats computed: Precise Fiber total + GREEN/ORANGE/GREY counts (one column read, not the whole
+tab); Fiber Green Biz + Upgrade Orange Biz raw rows + UNIQUE-by-phone; Maps Businesses total + top 15 ZIPs.
+Launcher `install/RUN_SUMMARY.bat` runs it in the hunter folder and refreshes every 15 min (`--loop 15`);
+reuses the hunter's find_creds/SHEET_ID/tab-names/self_update (canonical two-path update). HOW CLAUDE READS IT
+GOING FORWARD: Drive search for the "OPTIMUS DATA SUMMARY" sheet by title -> read it fully -> report live
+green/gold/unique/ZIP numbers without ever touching the giant sheet. STATUS: shipped, NOT yet live-tested
+(no creds/network in the sandbox) -- first run on a machine with google_creds will create the summary sheet;
+verify the numbers look right, then it's the permanent analysis channel. NOTE: still could add per-run
+freshness + OKC/Houston split; v1 covers the counts Patrick keeps asking for ("how many gold/green").
