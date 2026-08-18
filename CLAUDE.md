@@ -1835,3 +1835,15 @@ GitHub gets gold. So "everything is updatable" is TRUE; the only remaining failu
 not landing on a given PC (network blip / CDN cache / an old icon that doesn't curl). Use this check whenever
 you push or someone asks "is the latest actually out there" — it's the fastest source-side proof, independent
 of any machine. (Per-machine proof still comes from that PC's console banner / the live-counts push.)
+### 11h-fix27 (2026-08-17) — DROP the V200K (June build) desktop icon: one hunter icon, consistent installer
+Patrick: "I don't want that v2!! ... I want consistent installer." The installer had been dropping THREE
+desktop icons — Optimus Fiber Hunter (latest), Optimus Maps Scraper, AND "Optimus Hunter V200K (June build)"
+(the frozen June-18 build, kept per 11f). That third icon was the SOURCE of the "stuck on old code" confusion:
+the team kept opening the V200K icon (frozen old on purpose) and seeing the old prompt / +0 orange, thinking
+the hunter was broken. FIX (commit 8a2a8e7): INSTALL_OPTIMUS.bat no longer downloads RUN_V200K.bat or creates
+the V200K shortcut — it makes ONLY "Optimus Fiber Hunter" (always latest) + "Optimus Maps Scraper", and it
+REMOVES a stale V200K shortcut from any prior install. DONE-message updated THREE→TWO. Team instruction: on a
+PC that still shows the "Optimus Fiber Hunter V2" icon, right-click → Delete it (safe — just a shortcut), keep
+only the plain "Optimus Fiber Hunter". The frozen v200k program files still exist in the repo (optimus/v200k/)
+if ever needed, but it's no longer surfaced as an icon. Release link auto-republished. This is the "consistent
+installer" Patrick asked for: one hunter icon, always the latest gold build.
