@@ -1944,3 +1944,31 @@ optimizer. The real scale unlock is Phase 1->3 (auth + backend HTTP), not the ma
 prerequisite for everything else. Then Phase 2 (queue) for hands-off national runs. Phase 3 (HTTP reader) last,
 for max speed. All three keep the canonical two-path self-update. SECURITY: att_login.json holds Patrick's AT&T
 creds -> gitignore it, never commit (same rule as serviceability_request_FULL.json).
+
+### 11h-fix31 (2026-08-18) — GOLD DOTS get their OWN tab (every upgrade dot, not just biz matches)
+Patrick: "add a gold dot tab please I want ALL the gold dots for analysis, also it's easy to call them to do the
+upgrade, that's first." Before this, gold (copper-upgrade / ORANGE) dots only landed in **Precise Fiber** mixed
+with green, and in **Upgrade Orange Biz** ONLY when a scraped business matched the address — so most gold dots
+(no business match) had no clean place to analyze/call. FIX (commit 9ae197e, deploy branch, BUILD_DATE bumped to
+2026-08-18): new **"Gold Dots"** tab holding EVERY gold dot address. Cols = `Address | Captured At | Lat | Lng |
+Business | Phone` (business+phone merged inline when known, blank otherwise — most gold dots are addresses only).
+Implementation in `precise_fiber_hunter.py`:
+- `GOLD_TAB = "Gold Dots"`; `_GOLD` cache; `_ensure_gold_tab(sh)` (creates tab + header, seeds seen-set from
+  column A so it never double-writes); `write_gold_dots(sh, records)` — filters records to ORANGE via
+  `dot_color()`, dedupes by address, batched `append_rows` (chunk 500), fully best-effort (never raises into the
+  sweep). Uses `ws.spreadsheet` to reach the parent workbook from the Precise Fiber worksheet.
+- Wired into BOTH write paths: the in-process `flush()` (records now also carry `biz_name`/`biz_phone`) AND the
+  split-mode `uploader_main()` loop (enriches each JSONL record, writes gold after shipping the batch). So gold
+  dots reach the tab whether the hunter runs June's in-process write or the default split/uploader mode.
+- `clean_sheet` `pipeline_tabs` now includes GOLD_TAB so the auto-clean never deletes it. Startup prints
+  `GOLD DOTS TAB ON: every gold (upgrade) dot address -> 'Gold Dots' tab` (the `GOLD CAPTURE ON` launcher marker
+  is kept intact).
+- **BACKFILL for history:** `--backfill-gold` (new flag → `backfill_gold_dots()`) reads Precise Fiber's Address +
+  Dot Color columns and seeds Gold Dots from every existing ORANGE row (lat/lng blank — not stored in Precise
+  Fiber). Run ONCE to capture the historical gold dots; live runs keep it current after that.
+DEPLOY: reaches machines the usual way (RUN_HUNTER icon curls the new .py; verified live on GitHub raw —
+BUILD_DATE 2026-08-18 + `def write_gold_dots` + `GOLD_TAB` + `GOLD DOTS TAB ON` all present). To backfill the old
+gold dots on a PC with google_creds: `python precise_fiber_hunter.py --backfill-gold` (one time). WHY UPGRADES
+FIRST (Patrick's point): a gold/copper customer already has AT&T — the pitch is just "upgrade your line to fiber,"
+an easier call/close than a cold new-customer green. So the Gold Dots tab doubles as the priority upgrade call
+list AND the new-fiber tell (dense gold cluster = freshly-lit area, per the field rule in 11g).
