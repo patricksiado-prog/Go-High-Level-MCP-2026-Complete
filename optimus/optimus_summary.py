@@ -157,11 +157,55 @@ def render_rows(out):
     return rows
 
 
-def write_summary(client, rows):
-    """Create/reuse the small 'OPTIMUS DATA SUMMARY' sheet, share w/ Patrick, write."""
+def collect_leads(client, cap=8000):
+    """Read the callable lead tabs IN FULL, dedup by phone, tag GREEN/GOLD.
+    These tabs are small (a few thousand rows) so the REAL rows -- not a summary --
+    fit in a sheet Claude reads completely. GREEN = new-fiber lead, GOLD = copper
+    upgrade. Deduped by last-10-of-phone so each business appears once."""
+    sh = client.open_by_key(SHEET_ID)
+    header = ["Type", "Business Name", "Phone", "Address", "Website", "Category"]
+    seen = set()
+    rows = []
+    for tab, typ in ((GREEN_BIZ_TAB, "GREEN"), (ORANGE_BIZ_TAB, "GOLD")):
+        try:
+            vals = sh.worksheet(tab).get_all_values()
+        except Exception:
+            continue
+        if not vals:
+            continue
+        hdr = vals[0]
+
+        def ci(name):
+            for i, h in enumerate(hdr):
+                if (h or "").strip().lower() == name.lower():
+                    return i
+            return None
+
+        bi, pi, ai = ci("Business Name"), ci("Phone"), ci("Address")
+        wi, cti = ci("Website"), ci("Category")
+
+        def g(r, i):
+            return (r[i] if (i is not None and i < len(r)) else "") or ""
+
+        for r in vals[1:]:
+            ph = _last10(g(r, pi))
+            key = ph or (g(r, bi) + "|" + g(r, ai)).lower()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            rows.append([typ, g(r, bi), g(r, pi), g(r, ai), g(r, wi), g(r, cti)])
+            if len(rows) >= cap:
+                break
+        if len(rows) >= cap:
+            break
+    return header, rows
+
+
+def _open_summary_sheet(client):
+    """Create/reuse the 'OPTIMUS DATA SUMMARY' sheet and share it with Patrick."""
     sh = None
     try:
-        sh = client.open(SUMMARY_TITLE)      # reuse by title
+        sh = client.open(SUMMARY_TITLE)          # reuse by title
     except Exception:
         sh = None
     if sh is None:
@@ -175,35 +219,62 @@ def write_summary(client, rows):
         sh.share(OWNER_EMAIL, perm_type="user", role="writer")
     except Exception:
         pass
+    return sh
+
+
+def _write_tab(sh, title, rows, first=False):
+    """Overwrite one tab with rows (clear + write). first=True reuses sheet1."""
+    ws = None
     try:
-        ws = sh.sheet1
+        ws = sh.worksheet(title)
     except Exception:
-        ws = sh.get_worksheet(0)
+        ws = None
+    if ws is None:
+        if first:
+            ws = sh.sheet1
+            try:
+                ws.update_title(title)
+            except Exception:
+                pass
+        else:
+            need = max(len(rows) + 5, 100)
+            wide = max((len(r) for r in rows), default=2)
+            ws = sh.add_worksheet(title=title, rows=str(need), cols=str(wide))
     try:
         ws.clear()
     except Exception:
         pass
-    # gspread's update() signature changed across versions -- try both orders.
+    if not rows:
+        rows = [["(none)"]]
     try:
-        ws.update(values=rows, range_name="A1")
+        ws.update(values=rows, range_name="A1")     # newer gspread
     except TypeError:
-        ws.update("A1", rows)
-    return sh.id
+        ws.update("A1", rows)                         # older gspread
 
 
 def run_once(client):
     out = compute(client)
-    rows = render_rows(out)
-    # print a human-readable copy to the console too
+    stat_rows = render_rows(out)
     print("\n==================== OPTIMUS DATA SUMMARY ====================")
-    for r in rows:
+    for r in stat_rows:
         a = str(r[0]); b = "" if len(r) < 2 else str(r[1])
         print(("  %-42s %s" % (a, b)).rstrip())
     print("==============================================================")
-    sid = write_summary(client, rows)
-    if sid:
-        print("Wrote summary sheet '%s' (id %s) -- shared with %s."
-              % (SUMMARY_TITLE, sid, OWNER_EMAIL))
+
+    sh = _open_summary_sheet(client)
+    if sh is None:
+        return out
+    _write_tab(sh, "Summary", stat_rows, first=True)
+    # the REAL deduped leads (not a summary) -- Claude reads these row by row
+    try:
+        lead_hdr, lead_rows = collect_leads(client)
+        _write_tab(sh, "Callable Leads", [lead_hdr] + lead_rows)
+        print("Wrote %d unique callable leads to the 'Callable Leads' tab."
+              % len(lead_rows))
+    except Exception as e:
+        print("  (leads tab hiccup: %s)" % str(e)[:120])
+    print("Summary sheet '%s' (id %s) -- shared with %s."
+          % (SUMMARY_TITLE, sh.id, OWNER_EMAIL))
     return out
 
 
