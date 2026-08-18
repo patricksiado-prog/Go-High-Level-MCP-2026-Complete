@@ -110,6 +110,9 @@ PROFILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "att_prof
 
 SHEET_ID = "1FhO2BTMXGefm1tLwKbbMPXvzT1160882Auauzep7ooA"  # ATT FIBER LEADS (production)
 OUT_TAB = "Precise Fiber"
+GOLD_TAB = "Gold Dots"         # EVERY gold (copper-upgrade) dot address -- all of
+                               # them, not just business matches. For analysis +
+                               # calling the upgrades first (Patrick, 2026-08-18).
 STATUS_TAB = "Hunter Status"   # live "what it's doing" log, on Drive in the same sheet
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
           "https://www.googleapis.com/auth/drive"]
@@ -254,7 +257,7 @@ try:
     _BLD_CODES["copper"] = tuple(str(x).lower() for x in _bc.get("copper", []))
 except Exception:
     pass
-BUILD_DATE = "2026-08-17"   # bump on every push so the console proves the version
+BUILD_DATE = "2026-08-18"   # bump on every push so the console proves the version
 if _BLD_CODES["copper"]:
     # visible proof-of-version: if this line prints, the gold fix is running.
     print("CODE UPDATED %s -- GOLD CAPTURE ON: copper customers write as ORANGE "
@@ -263,6 +266,8 @@ if _BLD_CODES["copper"]:
 else:
     print("CODE UPDATED %s -- (gold capture LIMITED: build_codes.json missing -- "
           "copper customers will be skipped as GREY)" % BUILD_DATE)
+# every gold dot also lands in its own 'Gold Dots' tab for analysis + upgrade calls
+print("GOLD DOTS TAB ON: every gold (upgrade) dot address -> 'Gold Dots' tab")
 
 
 def _bld_code(raw):
@@ -1299,7 +1304,9 @@ class NetCapture:
             new_records.append({"address": addr, "dot_status": dot_status,
                                 "zone_label": "WORKING", "popup_status": ld.get("status"),
                                 "ban": ld.get("ban"), "area": area_label, "ts": ts,
-                                "via": "network", "lat": ld.get("lat"), "lng": ld.get("lng")})
+                                "via": "network", "lat": ld.get("lat"), "lng": ld.get("lng"),
+                                "biz_name": (_b or {}).get("name", ""),
+                                "biz_phone": (_b or {}).get("phone", "")})
         if not new_rows:
             return 0
         # GOLD CLUSTER ALERT: gold = copper-to-fiber UPGRADE prospects (hottest
@@ -1356,6 +1363,15 @@ class NetCapture:
                     ws.append_rows(new_rows[i:i + 500], value_input_option="RAW")
             except Exception as e:
                 print("   batch write error: %s" % str(e)[:120])
+        # GOLD DOTS: write EVERY gold (copper-upgrade) dot to its own tab -- all
+        # of them, not just business matches. Upgrade leads are the easiest call.
+        if not (dry or ws is None):
+            try:
+                ng = write_gold_dots(ws.spreadsheet, new_records)
+                if ng:
+                    print("   + %d gold (upgrade) dots -> '%s' tab" % (ng, GOLD_TAB))
+            except Exception as e:
+                print("   (gold dots skipped: %s)" % str(e)[:80])
         # COMBO: match these just-captured leads against the scraped businesses and
         # write any hits to the green/gold business tabs -- live, as we sweep.
         try:
@@ -1530,6 +1546,129 @@ def _sheet_is_full(sh):
                 or "increase the number of cells" in m)
 
 
+# ---------------------------------------------------------------------------
+# GOLD DOTS TAB -- every gold (copper-upgrade) dot, all of them, not just the
+# business matches. Copper customers are the hottest UPGRADE leads (easy call:
+# "upgrade your line to fiber"), so Patrick wants them all in one place to
+# analyze where new fiber is and to call for upgrades first (2026-08-18).
+# ---------------------------------------------------------------------------
+_GOLD = {"ws": None, "seen": None}
+
+
+def _ensure_gold_tab(sh):
+    """Get (or create) the 'Gold Dots' worksheet, seed the seen-set from column A
+    once so we never write the same address twice. Cached for the process."""
+    if _GOLD["ws"] is not None:
+        return _GOLD["ws"]
+    try:
+        gw = sh.worksheet(GOLD_TAB)
+    except Exception:
+        gw = sh.add_worksheet(title=GOLD_TAB, rows="5000", cols="6")
+        gw.append_row(["Address", "Captured At", "Lat", "Lng", "Business", "Phone"])
+    if not gw.get_all_values():
+        gw.append_row(["Address", "Captured At", "Lat", "Lng", "Business", "Phone"])
+    try:
+        col = gw.col_values(1)[1:]      # skip the header row
+        _GOLD["seen"] = set(a.strip().upper() for a in col if a and a.strip())
+    except Exception:
+        _GOLD["seen"] = set()
+    _GOLD["ws"] = gw
+    return gw
+
+
+def write_gold_dots(sh, records):
+    """Append EVERY gold (copper-upgrade) dot to the 'Gold Dots' tab -- all of
+    them, deduped by address, business + phone merged inline when we have it.
+    `records` = the same dicts flush()/the uploader build (address, dot_status,
+    ts, lat, lng, optional biz_name/biz_phone). Best-effort: never raises into
+    the sweep. Returns how many new gold rows were written."""
+    if sh is None or not records:
+        return 0
+    golds = [r for r in records
+             if dot_color(r.get("dot_status")) in ("GOLD", "ORANGE")]
+    if not golds:
+        return 0
+    try:
+        gw = _ensure_gold_tab(sh)
+    except Exception:
+        return 0
+    seen = _GOLD["seen"]
+    rows = []
+    for r in golds:
+        addr = (r.get("address") or "").strip()
+        if not addr:
+            continue
+        k = addr.upper()
+        if k in seen:
+            continue
+        seen.add(k)
+        rows.append([addr, r.get("ts") or "",
+                     r.get("lat") if r.get("lat") is not None else "",
+                     r.get("lng") if r.get("lng") is not None else "",
+                     r.get("biz_name") or "", r.get("biz_phone") or ""])
+    if not rows:
+        return 0
+    try:
+        for i in range(0, len(rows), 500):
+            gw.append_rows(rows[i:i + 500], value_input_option="RAW")
+    except Exception:
+        return 0
+    return len(rows)
+
+
+def backfill_gold_dots():
+    """One-time: seed the 'Gold Dots' tab from every ORANGE (gold/upgrade) row
+    already captured in 'Precise Fiber'. Reads just the Address + Dot Color
+    columns (not the whole huge tab), dedupes, batches the write. Run once with
+    --backfill-gold; new runs keep the tab current on their own."""
+    import gspread
+    from google.oauth2.service_account import Credentials
+    creds = find_creds()
+    if not creds:
+        print("No google_creds.json found -- can't backfill the Gold Dots tab.")
+        return
+    client = gspread.authorize(
+        Credentials.from_service_account_file(creds, scopes=SCOPES))
+    sh = client.open_by_key(SHEET_ID)
+    try:
+        pf = sh.worksheet(OUT_TAB)
+    except Exception:
+        print("No '%s' tab -- nothing to backfill." % OUT_TAB)
+        return
+    print("Reading Precise Fiber address + color columns (this can take a minute "
+          "on a big sheet)...")
+    addrs = pf.col_values(1)      # column A = Address
+    colors = pf.col_values(2)     # column B = Dot Color
+    ts_col = pf.col_values(3)     # column C = Captured At
+    biz_col = pf.col_values(4)    # column D = Business
+    ph_col = pf.col_values(5)     # column E = Phone
+    gw = _ensure_gold_tab(sh)
+    seen = _GOLD["seen"]
+    rows = []
+    n = max(len(addrs), len(colors))
+    for i in range(1, n):         # skip header row 0
+        color = (colors[i].strip().upper() if i < len(colors) and colors[i] else "")
+        if color not in ("ORANGE", "GOLD"):
+            continue
+        addr = (addrs[i].strip() if i < len(addrs) and addrs[i] else "")
+        if not addr or addr.upper() in seen:
+            continue
+        seen.add(addr.upper())
+        rows.append([addr,
+                     ts_col[i] if i < len(ts_col) else "",
+                     "", "",     # lat/lng not stored in Precise Fiber
+                     biz_col[i] if i < len(biz_col) else "",
+                     ph_col[i] if i < len(ph_col) else ""])
+    if not rows:
+        print("No ORANGE/gold rows found in Precise Fiber to backfill.")
+        return
+    print("Writing %d historical gold (upgrade) addresses to the '%s' tab..."
+          % (len(rows), GOLD_TAB))
+    for i in range(0, len(rows), 500):
+        gw.append_rows(rows[i:i + 500], value_input_option="RAW")
+    print("Done. The '%s' tab now holds %d gold addresses." % (GOLD_TAB, len(rows)))
+
+
 def open_sheet():
     """Open the production sheet and the Precise Fiber tab. We do NOT create a new
     sheet -- if it's full, AUTO-CLEAN this one (delete junk tabs, trim) so it accepts
@@ -1579,7 +1718,7 @@ def clean_sheet():
     from google.oauth2.service_account import Credentials
     # The Optimus pipeline tabs -- everything ELSE is junk (old MapMan run, test
     # rows) and is safe to delete to reclaim cells.
-    pipeline_tabs = {OUT_TAB, MAPS_TAB, GREEN_BIZ_TAB, ORANGE_BIZ_TAB,
+    pipeline_tabs = {OUT_TAB, GOLD_TAB, MAPS_TAB, GREEN_BIZ_TAB, ORANGE_BIZ_TAB,
                      "Enriched Leads", STATUS_TAB}
     creds = find_creds()
     if not creds:
@@ -3167,6 +3306,8 @@ def uploader_main():
                     queued_rows.append([addr, dot_color(ds), d.get("ts") or "",
                                         (_b or {}).get("name", ""),
                                         (_b or {}).get("phone", "")])
+                    d["biz_name"] = (_b or {}).get("name", "")
+                    d["biz_phone"] = (_b or {}).get("phone", "")
                     new_records.append(d)
         except Exception as e:
             _ulog("outbox read error: %s" % str(e)[:80])
@@ -3181,6 +3322,12 @@ def uploader_main():
                 _ulog("write failed (%s) -- %d rows stay queued for retry"
                       % (str(e)[:60], len(queued_rows)))
             if new_records:
+                try:
+                    ng = write_gold_dots(ws.spreadsheet, new_records)
+                    if ng:
+                        _ulog("shipped %d gold (upgrade) dots to '%s'" % (ng, GOLD_TAB))
+                except Exception as e:
+                    _ulog("gold dots error: %s" % str(e)[:60])
                 try:
                     match_leads_to_biz(new_records)
                 except Exception as e:
@@ -4016,6 +4163,9 @@ def main():
     ap.add_argument("--slow", action="store_true",
                     help="restore the relaxed wait times -- use only if leads come "
                          "back 0 because dots aren't loading in time on a slow link")
+    ap.add_argument("--backfill-gold", action="store_true",
+                    help="one-time: pull every ORANGE (gold/upgrade) address "
+                         "already in 'Precise Fiber' into the 'Gold Dots' tab")
     ap.add_argument("--clean-sheet", action="store_true",
                     help="free space in the production sheet: delete junk tabs, trim "
                          "the status log, shrink tabs to their data. Keeps all leads/"
@@ -4061,6 +4211,10 @@ def main():
 
     if args.clean_sheet:
         clean_sheet()
+        return
+
+    if args.backfill_gold:
+        backfill_gold_dots()
         return
 
     if args.allow_click:
