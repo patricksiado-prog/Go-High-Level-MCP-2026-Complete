@@ -2913,6 +2913,31 @@ def self_update():
 # ----------------------------------------------------------------------------
 # phone + business enrichment, running alongside the hunt (in-process)
 # ----------------------------------------------------------------------------
+def _start_summary():
+    """Refresh the small 'OPTIMUS DATA SUMMARY' sheet Claude reads (best-effort,
+    one-shot, detached). The production sheet is too big for Claude to export, so
+    optimus_summary.py distills it. Runs in its own process so it never delays or
+    touches the hunt; ONE-SHOT (no loop) so nothing leaks. Silent on any failure."""
+    try:
+        import subprocess as _sp
+        here = os.path.dirname(os.path.abspath(__file__))
+        summ = os.path.join(here, "optimus_summary.py")
+        if not os.path.exists(summ):
+            return
+        _env = dict(os.environ, OPTIMUS_NO_UPDATE="1")
+        _kw = {"cwd": here, "env": _env, "stdin": _sp.DEVNULL,
+               "stdout": _sp.DEVNULL, "stderr": _sp.DEVNULL}
+        if os.name == "nt":
+            _kw["creationflags"] = 0x00000008 | 0x08000000   # detached, no window
+        else:
+            _kw["start_new_session"] = True
+        _sp.Popen([sys.executable, summ], **_kw)   # run once, then it exits
+        print("  (refreshing the OPTIMUS DATA SUMMARY sheet for Claude in the "
+              "background)")
+    except Exception:
+        pass
+
+
 def _start_enrichment(allow_paid=False):
     """Launch phone/business enrichment in a background daemon thread so leads
     get a name + phone while the scan keeps running. FREE OpenStreetMap first;
@@ -4148,6 +4173,12 @@ def main():
             except Exception as e:
                 print("  (write worker spawn failed: %s -- writing in-process)"
                       % str(e)[:80])
+
+        # ANALYSIS FOR CLAUDE: refresh the small "OPTIMUS DATA SUMMARY" sheet once
+        # at startup (a detached ONE-SHOT so it can't leak looping processes and
+        # never touches the pan loop). The giant sheet can't be read by Claude
+        # (too big to export) -- this distills it into a sheet Claude reads fully.
+        _start_summary()
 
         if args.net_debug:
             # RESEARCH short-circuit: load the map, trigger a few data loads by

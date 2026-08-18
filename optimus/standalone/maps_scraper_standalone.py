@@ -950,8 +950,34 @@ def self_update():
             pass
 
 
+def _start_summary():
+    """Refresh the 'OPTIMUS DATA SUMMARY' sheet Claude reads (best-effort, one-shot,
+    detached). Uses the hunter's optimus_summary.py if the hunter is installed on
+    this PC (usual case -- the installer sets up both). Silent if not found."""
+    try:
+        import subprocess as _sp, sys
+        cands = [os.path.join(os.path.expanduser("~"), "optimus_hunter"),
+                 os.path.join(os.path.expanduser("~"), "optimus", "repo", "optimus")]
+        for d in cands:
+            summ = os.path.join(d, "optimus_summary.py")
+            if os.path.exists(summ):
+                _env = dict(os.environ, OPTIMUS_NO_UPDATE="1", SCRAPER_NO_UPDATE="1")
+                _kw = {"cwd": d, "env": _env, "stdin": _sp.DEVNULL,
+                       "stdout": _sp.DEVNULL, "stderr": _sp.DEVNULL}
+                if os.name == "nt":
+                    _kw["creationflags"] = 0x00000008 | 0x08000000
+                else:
+                    _kw["start_new_session"] = True
+                _sp.Popen([sys.executable, summ], **_kw)
+                print("  (refreshing the OPTIMUS DATA SUMMARY sheet for Claude...)")
+                return
+    except Exception:
+        pass
+
+
 def main():
     self_update()
+    _start_summary()
     print("=" * 56)
     print("  GOOGLE MAPS BUSINESS SCRAPER   v%s" % VERSION)
     print("=" * 56)
