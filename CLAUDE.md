@@ -2009,3 +2009,8 @@ TAB line, it's stale → relaunch via the RUN_HUNTER desktop icon (curls the lat
 still old does that one PC need the installer (old icon). Source-side proof (any machine, no PC needed): curl the
 raw `precise_fiber_hunter.py` on the deploy branch and grep for `BUILD_DATE = "2026-08-18"`, `def write_gold_dots`,
 `GOLD_TAB = `, and `GOLD DOTS TAB ON` — all four confirmed present/served 2026-08-18.
+ONE-CLICK for Patrick: `optimus/install/RUN_GOLD.bat` (updates → `--backfill-gold` → summary once). Dropped in
+his Drive installers folder as **"GET GOLD DOTS - run once (OPTIMUS).bat"** (id `1TFK_NKqUK-6r3vS0fKRowI_EotiuUDAc`,
+folder `0AHafe86gsae2Uk9PVA`). After he runs it once: the Gold Dots tab holds the upgrade call list, and Claude
+reads the "OPTIMUS DATA SUMMARY" sheet (Gold Hotspots) via Drive to report where the new fiber is. `optimus_summary.
+collect_gold_addresses` now reads the Gold Dots tab first (fallback: scan Precise Fiber ORANGE) + accepts `--no-update`.
