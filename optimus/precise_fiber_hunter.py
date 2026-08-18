@@ -4281,6 +4281,15 @@ def main():
                 input("  Map on the right spot? Press Enter to START scanning... ")
             except EOFError:
                 pass
+            # 5-second grace period so you can MINIMIZE this window before the
+            # hunter takes over the mouse (real-mouse motion). Countdown so you
+            # know how long you've got.
+            print("\n  Starting in 5 seconds -- MINIMIZE this window now if you want")
+            print("  it out of the way (the map keeps scanning either way):")
+            for _n in range(5, 0, -1):
+                print("     ...%d" % _n)
+                time.sleep(1)
+            print("  Go.\n")
 
         # Manual mode keeps watching by default: you pan the map by hand and it
         # collects the backend dots from each view, every few seconds, until you
