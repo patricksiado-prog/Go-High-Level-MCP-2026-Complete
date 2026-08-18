@@ -1887,3 +1887,60 @@ prompt (name the tab + what to return), poll get_agent, report. This SUPERSEDES 
 as the primary read path -- the converter still works as a no-connector fallback, but the MCP reads the LIVE
 sheet directly. Autosheet is a COMMUNITY connector (routes through their server + the "GPT for Sheets and Docs"
 Google app) -- fine for the fiber leads (not sensitive), noted for the record.
+
+### 11h-fix30 (2026-08-18) — ★ GOAL: AUTOMATE THE HUNTER END-TO-END (scan the country, no manual reset). Full manual sequence + code audit + roadmap.
+Patrick showed the FULL manual run (screenshots) + asked to automate it. FCC data is DEAD for this (biannual;
+fresh green ages to grey in ~3 weeks) -- the ONLY current source is AT&T's own live map/backend. So automation
+must drive AT&T directly. LIVE TOTALS captured this run (2026-08-18): Precise Fiber **446,398** dots; Maps
+Businesses **31,003**; callable unique-phone **3,604**; Fiber Green Biz **5,909** rows; Upgrade Orange Biz **9**
+matches.
+
+**THE FULL MANUAL SEQUENCE (finally documented from Patrick's screenshots -- the "steps you don't see"):**
+1. Double-click "Optimus Fiber Hunter" -> auto-update prints `UPDATED to latest -- BUILD_DATE` -> Chromium opens.
+2. AT&T login: "Choose your method of access" -> click **AT&T Employee**.
+3. Global Logon (oidc.idp.elogin.att.com): **UserID = zg431x** + AT&T Password -> **Log on**. ("Remember me"
+   checked; NO visible 2FA in the shots.)
+4. Lands on you Refer home (youachieve.att.com/yourefer) -> click the **AT&T Fiber** tile.
+5. Fiber page ("Now delivering speeds up to 5 Gigs!") -> click **Fiber Availability Map**.
+6. Grey map loads -> type ZIP in the search box (e.g. "Houston, Texas 77070") -> pick the suggestion -> dots.
+7. Back to the console -> press **Enter** -> it sweeps ("Search this area" each pan).
+
+**WHAT'S ALREADY AUTOMATED IN CODE (audited precise_fiber_hunter.py):** auto-update; `open_map_view()` (clicks
+"Fiber Availability Map" IF already past login); `search_zip()` (types ZIP + picks the geocoder suggestion --
+works for any market); the capture/sweep; and `pan_map_js()` uses `window.__optimusMaps[0].panBy` -> **the
+Mapbox object IS partially recovered already** (the mapbox-extraction canvas/React-fiber hook landed).
+**WHAT'S NOT AUTOMATED = the reset pain:** steps 2-5 (AT&T Employee button, UserID/password, AT&T Fiber tile,
+Fiber Availability Map). There is NO credential auto-fill in the code. `att_profile/` persists the session so
+login USUALLY sticks -- but when it expires, a HUMAN must redo steps 2-5 every time. THAT is "the map needs to
+be reset." Positioning (step 6) is code-able via search_zip but is currently done by hand.
+
+**AUTOMATION ROADMAP (3 phases, increasing power):**
+- **PHASE 1 -- AUTO-LOGIN + AUTO-NAV (biggest single unlock; kills "reset every time").** Store AT&T creds
+  locally (e.g. `att_login.json` {userid:"zg431x", password:"..."} next to google_creds, gitignored). On launch,
+  detect logged-out (URL has elogin / "Global Logon" text) and DRIVE the form: click "AT&T Employee" ->
+  fill UserID -> fill Password -> click "Log on" -> wait -> click "AT&T Fiber" -> click "Fiber Availability Map"
+  -> hand off to open_map_view/search_zip. Add auto-REAUTH: if a sweep ever lands back on the login page,
+  re-run auto-login (self-heal, no human). WATCH-OUT: if AT&T adds MFA/OTP, Phase 1 needs a one-time code path
+  (prompt once / TOTP) -- the shots show none today. This one change makes the hunter self-login + self-recover.
+- **PHASE 2 -- ZIP-QUEUE DRIVER (unattended national scanning + the "API to the hunter").** The hunter reads a
+  target queue (a "Target Queue" sheet tab OR a GitHub `_live/target_queue.txt`) and loops: search_zip(zip) ->
+  sweep -> mark done -> next zip. **Claude writes the queue** (fresh-first ZIPs) via the Autosheet MCP or a
+  GitHub push; the hunter consumes it. That IS the remote-control API -- Claude can't touch the PC program, but
+  it CAN feed it work through a shared queue it already has write access to. Combined with Phase 1 = runs ZIP
+  after ZIP across the country with zero human, self-relogins, never needs a reset.
+- **PHASE 3 -- DIRECT BACKEND HTTP READER (ultimate; no browser at all).** Once Phase-1 login captures the
+  session cookie + csrfToken + attuid, hit AT&T's dot endpoint directly:
+  `youachieve.att.com/yourefer/api/fiberMap.cfc?method=getMapData&lon=&lat=&attuid=zg431x&csrfToken=` + cookie
+  (documented in backend_exchange.txt). Loop lat/lon across the nation over pure HTTP -> real-time green/gold,
+  NO map/render/pan/reset. Re-auth only when the cookie expires. This is the fully-scalable end state.
+
+**MAPBOX note (research, mapbox-extraction skill):** the map object is already reachable (`__optimusMaps[0]`),
+so `querySourceFeatures(src,{sourceLayer})` could read ALL dots in a loaded viewport in ONE call (vs pan+search
+per cell) and classify each by its own `map.project()` pixel -- a speed/reliability win. But network capture
+(the serviceability JSON) stays the floor and is what yields ADDRESSES; the object-read is a secondary
+optimizer. The real scale unlock is Phase 1->3 (auth + backend HTTP), not the map object.
+
+**RECOMMENDED ORDER:** build **Phase 1 (auto-login)** first -- it removes the human reset immediately and is the
+prerequisite for everything else. Then Phase 2 (queue) for hands-off national runs. Phase 3 (HTTP reader) last,
+for max speed. All three keep the canonical two-path self-update. SECURITY: att_login.json holds Patrick's AT&T
+creds -> gitignore it, never commit (same rule as serviceability_request_FULL.json).
