@@ -411,6 +411,75 @@ GOLD_CLUSTER_ALERT = 8
 NEW_FIBER_ALERT = 15
 NEW_FIBER_TAB = "New Fiber Alerts"
 
+# ---- BACKEND COMM TAB (Patrick 2026-08-20: "add a tab, tell the program to put
+#      that info in, we run it, you observe the backend comm") -----------------
+# Every network reply the sniffer considers DATA gets one row here, including the
+# non-200s that used to be printed to the console and thrown away. That console
+# print is how "serviceability reply 301" stayed invisible: it scrolls past, it is
+# never persisted, and nobody can see it remotely. A 301 means AT&T bounced the
+# data call to login and NOTHING lands -- green or gold -- so it is the single
+# most important thing to be able to read after the fact.
+BACKEND_TAB = "Backend Comm"
+BACKEND_HEADER = ["Time", "Host", "Area", "Kind", "Status", "Bytes", "ms",
+                  "Leads", "Green", "Gold", "Grey", "URL", "Content-Type", "Note"]
+_BACKEND_LOG = []          # rows buffered between flushes
+_BACKEND_WS = [None]       # cached worksheet handle
+_BACKEND_MAX = 5000        # hard cap per run so a long sweep cannot flood the sheet
+_BACKEND_WRITTEN = [0]
+_CUR_AREA = [""]        # set per cell so every backend row says WHERE
+_SEEN_ENDPOINTS = set()  # base URLs already logged once (endpoint discovery)
+
+
+def log_backend(kind, url="", status="", ct="", nbytes="", ms="", leads="",
+                green="", gold="", grey="", note="", area=""):
+    """Buffer one backend-communication row. Never raises, never blocks.
+
+    Called from the response handler on EVERY data-ish reply, success or not.
+    Rows are written by flush_backend() in the same batch cadence as the leads,
+    so this costs one extra append per viewport, not one per request.
+    """
+    try:
+        if _BACKEND_WRITTEN[0] >= _BACKEND_MAX:
+            return
+        host = ""
+        try:
+            host = url.split("//", 1)[-1].split("/", 1)[0][:40]
+        except Exception:
+            pass
+        _BACKEND_LOG.append([
+            time.strftime("%Y-%m-%d %H:%M:%S"), host, str(area)[:40], kind,
+            str(status), str(nbytes), str(ms), str(leads), str(green),
+            str(gold), str(grey), url.split("?")[0][:180], str(ct)[:40],
+            str(note)[:180]])
+    except Exception:
+        pass
+
+
+def flush_backend(ws):
+    """Write buffered backend rows to the Backend Comm tab. Best-effort."""
+    global _BACKEND_LOG
+    if not _BACKEND_LOG or ws is None:
+        return 0
+    rows, _BACKEND_LOG = _BACKEND_LOG, []
+    try:
+        bw = _BACKEND_WS[0]
+        if bw is None:
+            sh = ws.spreadsheet
+            try:
+                bw = sh.worksheet(BACKEND_TAB)
+            except Exception:
+                bw = sh.add_worksheet(title=BACKEND_TAB, rows="6000",
+                                      cols=str(len(BACKEND_HEADER)))
+                bw.append_row(BACKEND_HEADER, value_input_option="RAW")
+            _BACKEND_WS[0] = bw
+        for i in range(0, len(rows), 500):
+            bw.append_rows(rows[i:i + 500], value_input_option="RAW")
+        _BACKEND_WRITTEN[0] += len(rows)
+        return len(rows)
+    except Exception as e:
+        print("  (Backend Comm tab write failed: %s)" % str(e)[:70])
+        return 0
+
 # SLAM-TO-STOP: hold the mouse in the very top-left screen corner ~1s to stop the
 # hunt cleanly. The hunter pans from the CENTER of the screen and never parks the
 # cursor in the corner itself, so this can only be triggered by you.
@@ -1155,6 +1224,33 @@ class NetCapture:
                 row = self.seen_urls.setdefault(base, [ct, 0, 0])
                 row[1] += 1
                 row[2] = max(row[2], sz)
+            # ENDPOINT DISCOVERY: one row the FIRST time each distinct base URL is
+            # seen, then never again. Tiles arrive in the hundreds, so logging every
+            # one would flood the tab and teach us nothing; logging each endpoint
+            # once shows exactly which hosts the map talks to and in what shape.
+            # This is what tells us whether the dots ride in Mapbox vector tiles
+            # (queryable in-page via querySourceFeatures, no panning needed) or only
+            # in the serviceability JSON we currently pan for.
+            try:
+                _b = url.split("?")[0]
+                if _b not in _SEEN_ENDPOINTS:
+                    _SEEN_ENDPOINTS.add(_b)
+                    _st = 0
+                    try:
+                        _st = response.status
+                    except Exception:
+                        pass
+                    _n = ""
+                    try:
+                        _n = (response.headers or {}).get("content-length") or ""
+                    except Exception:
+                        pass
+                    _kind = "tile" if (".pbf" in url or ".mvt" in url or "/tiles/" in url) else (
+                        "mapbox" if "mapbox" in url.lower() else "endpoint")
+                    log_backend(_kind, url, _st, ct, _n, note="first sight of this endpoint",
+                                area=_CUR_AREA[0])
+            except Exception:
+                pass
             if self.substr and self.substr not in url:
                 return
             ctl = ct.lower()
@@ -1183,6 +1279,16 @@ class NetCapture:
                 except Exception:
                     st = 0
                 if st != 200:
+                    # 301 = AT&T bounced the data call to login; 429/503 = rate
+                    # limited or down. All three mean NOTHING lands this viewport.
+                    hint = {301: "REDIRECTED TO LOGIN -- not logged in, nothing lands",
+                            302: "redirected -- session likely expired",
+                            401: "unauthorized -- session expired",
+                            403: "forbidden -- blocked or logged out",
+                            429: "RATE LIMITED -- slow the sweep down",
+                            503: "AT&T unavailable -- transient"}.get(st, "non-200, body not read")
+                    log_backend("serviceability", url, st, ct, note=hint,
+                                area=_CUR_AREA[0])
                     print("  (serviceability reply %s -- skipping, map keeps moving)" % st)
                     return
                 try:
@@ -1193,6 +1299,7 @@ class NetCapture:
                 except Exception:
                     return
                 self.svc_seen += 1
+                _t0 = time.time()
                 leads = extract_leads_from_json(data)
                 # ALSO run the proven extractor (catches the AT&T 'serviceability'
                 # endpoint shape that the working pipeline tools rely on)
@@ -1211,6 +1318,28 @@ class NetCapture:
                 # gate left it stuck on the first area forever, useless for
                 # diagnosing a gold-heavy view captured later. Drive log stays
                 # once-only (that's the expensive push).
+                # One Backend Comm row per successful data reply: how big it was,
+                # how long decoding took, how many leads came out, and the colour
+                # split. A reply that is 200 but yields 0 leads means AT&T changed
+                # the payload shape -- that is invisible without this row.
+                try:
+                    _g = _o = _y = 0
+                    for _ld in leads:
+                        _c = dot_color(classify_lead(_ld))
+                        if _c == "GREEN":
+                            _g += 1
+                        elif _c == "ORANGE":
+                            _o += 1
+                        elif _c == "GREY":
+                            _y += 1
+                    log_backend("serviceability", url, 200, ct, len(body),
+                                int((time.time() - _t0) * 1000), len(leads),
+                                _g, _o, _y,
+                                "" if leads else "200 but 0 leads -- payload shape may have changed: %s"
+                                % (list(data)[:6] if isinstance(data, dict) else type(data).__name__),
+                                _CUR_AREA[0])
+                except Exception:
+                    pass
                 if leads:
                     try:
                         here = os.path.dirname(os.path.abspath(__file__))
@@ -1366,6 +1495,9 @@ class NetCapture:
                 print("  (couldn't write %s: %s)" % (path, e))
 
     def flush(self, ws, seen, area_label, dry):
+        _CUR_AREA[0] = str(area_label or "")[:40]
+        if not dry:
+            flush_backend(ws)
         """Write the new captured addresses. BATCHED -- one append_rows call for
         all of them, not one append_row per address (which blew the Google Sheets
         'write requests per minute' quota -> 429 errors)."""
