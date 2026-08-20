@@ -118,7 +118,8 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
           "https://www.googleapis.com/auth/drive"]
 
 # Self-update: which branch to pull on each start (matches the launcher).
-REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
+REPO_BRANCH = (os.environ.get("OPTIMUS_REPO_BRANCH")
+               or "claude/optimus-map-tools-setup-6dcl6o")
 
 # ---- GitHub write: real-time count channel (Patrick 2026-07-16 "how many leads
 #      are getting pulled in real time"). Same proven best-effort push the scout
@@ -282,6 +283,69 @@ def _bld_code(raw):
     return ""
 
 
+try:
+    from optimus_api_capture import compose_address as _compose_address
+except Exception:                                  # keep the hunter standalone
+    def _compose_address(street, city="", state="", zipc=""):
+        street = (street or "").strip()
+        tail = " ".join(x for x in ((state or "").strip(), (zipc or "").strip()) if x)
+        parts = [p for p in (street, (city or "").strip(), tail) if p]
+        return ", ".join(parts[:2]) + ((" " + tail) if tail and len(parts) > 2 else "")
+
+
+# ---- classification telemetry -------------------------------------------------
+# Every customer dot lands in exactly one of these buckets. Printed at the end of
+# a run by wire_classification_report() so a bad gold/grey split is visible on the
+# console instead of being discovered weeks later on the phone.
+_WIRE_COUNTS = {"green": 0, "fiber": 0, "copper": 0, "unknown": 0, "no_code": 0}
+_UNKNOWN_CODES = {}
+
+# What to call a CUSTOMER whose build code we cannot decode.
+#   "grey" (default) -- treat as an existing fiber customer and skip. A false
+#                       grey costs nothing, because grey is skipped anyway.
+#   "gold"           -- the old behaviour: assume copper and put them on the
+#                       call list. Only use this if gold collapses to zero and
+#                       the report below shows the codes really are copper.
+# Override with:  set OPTIMUS_UNKNOWN_CUSTOMER=gold
+_UNKNOWN_CUSTOMER = (os.environ.get("OPTIMUS_UNKNOWN_CUSTOMER") or "grey").strip().lower()
+
+
+def _unknown_customer_status():
+    return "copper_upgrade" if _UNKNOWN_CUSTOMER == "gold" else "customer"
+
+
+def wire_classification_report():
+    """One block at the end of a run saying how every customer dot was decided.
+
+    Read it like this: `copper` is real gold. `unknown` and `no code` are dots we
+    guessed on -- if either is large, the gold count is not trustworthy and the
+    codes listed underneath need confirming on the dealer map."""
+    c = _WIRE_COUNTS
+    cust = c["fiber"] + c["copper"] + c["unknown"] + c["no_code"]
+    if not (cust or c["green"]):
+        return
+    print("\n" + "-" * 62)
+    print("DOT CLASSIFICATION THIS RUN")
+    print("  GREEN  non-customers            %7d" % c["green"])
+    print("  GREY   confirmed fiber customer %7d" % c["fiber"])
+    print("  GOLD   confirmed copper         %7d   <- real upgrade leads" % c["copper"])
+    if c["unknown"]:
+        print("  ?      customer, code unknown   %7d   -> %s" % (
+            c["unknown"], _unknown_customer_status().upper()))
+    if c["no_code"]:
+        print("  ?      customer, NO build code  %7d   -> %s" % (
+            c["no_code"], _unknown_customer_status().upper()))
+    if cust:
+        guessed = 100.0 * (c["unknown"] + c["no_code"]) / cust
+        print("  %.1f%% of customer dots were a guess, not a decode." % guessed)
+    if _UNKNOWN_CODES:
+        print("  undecoded build codes seen:")
+        for code, n in sorted(_UNKNOWN_CODES.items(), key=lambda kv: -kv[1])[:10]:
+            print("     %-20s %6d" % (code, n))
+        print("  Confirm one on the map, then add it to build_codes.json.")
+    print("-" * 62)
+
+
 def classify_wire(status, ban, raw):
     """classify_status + build-code tiebreak, for wire-captured dots.
 
@@ -297,9 +361,27 @@ def classify_wire(status, ban, raw):
     why a gold-dot-heavy view still wrote zero ORANGE."""
     if ban:
         code = _bld_code(raw)
-        if code and any(c in code for c in _BLD_CODES["fiber"]):
+        if not code:
+            # No build code on the record at all. We cannot tell fiber from
+            # copper, so we are guessing either way. Counted, because if this
+            # number is large the real problem is upstream (raw not reaching
+            # us) and NO classification rule can fix it.
+            _WIRE_COUNTS["no_code"] += 1
+            return _unknown_customer_status()
+        if any(c in code for c in _BLD_CODES["fiber"]):
+            _WIRE_COUNTS["fiber"] += 1
             return "customer"            # GREY -> confirmed fiber customer, skip
-        return "copper_upgrade"          # GOLD dot -> ORANGE row -> upgrade lead
+        if any(c in code for c in _BLD_CODES["copper"]):
+            _WIRE_COUNTS["copper"] += 1
+            return "copper_upgrade"      # GOLD dot -> ORANGE row -> upgrade lead
+        # Customer on a code in neither list. Previously this fell through to
+        # GOLD, which is why existing FIBER customers turned up on the call
+        # list -- Patrick clicked a "gold" dot on the map and it came back an
+        # existing fiber customer. A new AT&T fiber designation lands here.
+        _WIRE_COUNTS["unknown"] += 1
+        _UNKNOWN_CODES[code] = _UNKNOWN_CODES.get(code, 0) + 1
+        return _unknown_customer_status()
+    _WIRE_COUNTS["green"] += 1
     return classify_status(text=status, ban=ban)   # no ban -> GREEN (eligible)
 
 
@@ -887,7 +969,18 @@ def lead_from_dict(d):
     # subscriber_ban + curr_ntwrk_bld_type_cd off ld["raw"] to score GREEN/GOLD/
     # GREY per cell; without this the backend path never fires and every cell
     # silently falls back to pixel detection.
-    return {"address": " ".join(addr.split())[:160], "lat": lat, "lng": lng,
+    # City / state / ZIP ride in the same backend record as the street. Dropping
+    # them produced street-only addresses that cannot be skip-traced and cannot
+    # be told apart from the same street name in another metro.
+    _b = base if isinstance(base, dict) else {}
+    _city = str(_b.get("city") or "").strip()
+    _state = str(_b.get("state") or "").strip()
+    _zip = str(_b.get("zip") or _b.get("zipcode") or "").strip()
+    _street = " ".join(addr.split())
+    return {"address": _compose_address(_street, _city, _state, _zip)[:160],
+            "street": _street[:160],
+            "city": _city, "state": _state, "zip": _zip,
+            "lat": lat, "lng": lng,
             "status": status if isinstance(status, str) else None,
             "ban": _pick(low, NET_BAN_KEYS),
             "raw": base if isinstance(base, dict) else None}
@@ -3079,11 +3172,23 @@ def self_update():
         before = open(here, "rb").read()
         # fetch + hard reset to origin so a local edit / conflict / divergence
         # can NEVER leave us stuck on old code (a plain pull silently fails then).
-        subprocess.run([git, "-C", repo_root, "fetch", "origin", REPO_BRANCH],
-                       env=env, timeout=90, capture_output=True, text=True)
-        subprocess.run([git, "-C", repo_root, "reset", "--hard",
-                        "origin/" + REPO_BRANCH],
-                       env=env, timeout=60, capture_output=True, text=True)
+        f = subprocess.run([git, "-C", repo_root, "fetch", "origin", REPO_BRANCH],
+                           env=env, timeout=90, capture_output=True, text=True)
+        r = subprocess.run([git, "-C", repo_root, "reset", "--hard",
+                            "origin/" + REPO_BRANCH],
+                           env=env, timeout=60, capture_output=True, text=True)
+        # A silent failure here is how the hunter ends up running MONTHS-old code
+        # while looking perfectly healthy. Both commands used to have their
+        # output captured and their exit codes ignored, so a wrong branch name or
+        # an expired credential produced no message at all. Say it loudly.
+        if f.returncode or r.returncode:
+            bad = (f if f.returncode else r)
+            print("!" * 68)
+            print("  SELF-UPDATE FAILED -- THIS RUN IS USING THE CODE ON DISK,")
+            print("  WHICH MAY BE OLD. Branch: %s" % REPO_BRANCH)
+            print("  git said: %s" % (bad.stderr or bad.stdout or "").strip()[:200])
+            print("  Fix the branch/credentials, or run: git pull")
+            print("!" * 68)
         after = open(here, "rb").read()
         changed = (after != before)
     except Exception as e:
@@ -4598,4 +4703,8 @@ def main():
 
 
 if __name__ == "__main__":
+    # atexit, not a call at the end of main(): the sweep is normally stopped with
+    # Ctrl-C, and the gold/grey split is exactly what we need to see when it is.
+    import atexit
+    atexit.register(wire_classification_report)
     main()

@@ -30,6 +30,13 @@ import re
 # key names seen across map backends; lowercase, punctuation stripped
 ADDRESS_KEYS = ("address", "formattedaddress", "fulladdress", "addressline1",
                 "streetaddress", "siteaddress", "serviceaddress", "addr")
+# City / state / ZIP ride in the SAME backend record as the street address
+# ("address":"558 TRESVANT DR","city":"WEBSTER","state":"TX","zip":"77598").
+# They were dropped on the floor, so every lead came out street-only: not
+# skip-traceable, and impossible to tell one metro's street from another's.
+CITY_KEYS  = ("city", "cityname", "municipality", "town")
+STATE_KEYS = ("state", "statecode", "stateabbr", "st", "province")
+ZIP_KEYS   = ("zip", "zipcode", "postalcode", "postal_code", "postcode")
 LAT_KEYS = ("lat", "latitude")
 LNG_KEYS = ("lng", "lon", "long", "longitude")
 BAN_KEYS = ("ban", "subscriberban", "billingaccountnumber", "billingaccount",
@@ -68,6 +75,19 @@ def _looks_like_address(v):
     return isinstance(v, str) and bool(_ADDRESS_SHAPE.search(v))
 
 
+def compose_address(street, city="", state="", zipc=""):
+    """Street + city + state + ZIP as one mailable string, degrading gracefully.
+
+    A street-only address cannot be skip-traced and cannot be told apart from the
+    same street name in another metro -- that is how a Dallas sweep nearly got
+    worked as Houston.
+    """
+    street = (street or "").strip()
+    tail = " ".join(x for x in ((state or "").strip(), (zipc or "").strip()) if x)
+    parts = [p for p in (street, (city or "").strip(), tail) if p]
+    return ", ".join(parts[:2]) + ((" " + tail) if tail and len(parts) > 2 else "")
+
+
 def extract_features(obj, out=None):
     """Walk any JSON structure; return a list of
     {"address": str, "lat": float|None, "lng": float|None, "ban": str|None}."""
@@ -85,6 +105,9 @@ def extract_features(obj, out=None):
     lng = _as_float(_get_first(obj, LNG_KEYS))
     ban = _get_first(obj, BAN_KEYS)
     status = _get_first(obj, STATUS_KEYS)
+    city = _get_first(obj, CITY_KEYS)
+    state = _get_first(obj, STATE_KEYS)
+    zipc = _get_first(obj, ZIP_KEYS)
 
     # GeoJSON: coordinates are [lng, lat]; attributes live in "properties"
     props = obj.get("properties")
@@ -92,6 +115,9 @@ def extract_features(obj, out=None):
         addr = addr or _get_first(props, ADDRESS_KEYS)
         ban = ban or _get_first(props, BAN_KEYS)
         status = status or _get_first(props, STATUS_KEYS)
+        city = city or _get_first(props, CITY_KEYS)
+        state = state or _get_first(props, STATE_KEYS)
+        zipc = zipc or _get_first(props, ZIP_KEYS)
         if lat is None or lng is None:
             plat = _as_float(_get_first(props, LAT_KEYS))
             plng = _as_float(_get_first(props, LNG_KEYS))
@@ -110,11 +136,18 @@ def extract_features(obj, out=None):
     if lng is not None and not (-180 <= lng <= 180):
         lng = None
     if _looks_like_address(addr):
+        _street = re.sub(r"\s+", " ", addr).strip()
+        _city = str(city).strip() if city not in (None, "") else ""
+        _state = str(state).strip() if state not in (None, "") else ""
+        _zip = str(zipc).strip() if zipc not in (None, "") else ""
         out.append({
-            "address": re.sub(r"\s+", " ", addr).strip(),
+            "address": compose_address(_street, _city, _state, _zip),
+            "street": _street,
+            "city": _city, "state": _state, "zip": _zip,
             "lat": lat, "lng": lng,
             "ban": str(ban).strip() if ban not in (None, "") else None,
             "status": str(status).strip() if status not in (None, "") else None,
+            "raw": obj,
         })
     else:
         # keep walking nested containers for the real feature objects
