@@ -3108,9 +3108,15 @@ def _find_git():
 
 
 # Core files a fresh launch must have current -- the SAME set RUN_HUNTER.bat curls.
+# THIS TUPLE IS THE ENTIRE DEPLOY MANIFEST on a machine without git (the hunter
+# PC has none -- self_update's git path throws WinError 2 and _raw_refresh takes
+# over). A file absent from this list NEVER reaches that machine by auto-update,
+# so pushing it to the branch changes nothing there. Add new tools here or they
+# do not ship.
 _CORE_FILES = ("precise_fiber_hunter.py", "optimus_dot_detect.py",
                "optimus_api_capture.py", "hunter_fixes.py",
-               "backend_classifier.py", "build_codes.json")
+               "backend_classifier.py", "build_codes.json",
+               "verify_gold_capture.py", "deploy_check.py")
 
 
 def _raw_refresh(here):
