@@ -427,7 +427,34 @@ _BACKEND_WS = [None]       # cached worksheet handle
 _BACKEND_MAX = 5000        # hard cap per run so a long sweep cannot flood the sheet
 _BACKEND_WRITTEN = [0]
 _CUR_AREA = [""]        # set per cell so every backend row says WHERE
-_SEEN_ENDPOINTS = set()  # base URLs already logged once (endpoint discovery)
+_SEEN_ENDPOINTS = set()  # normalised endpoints already logged once
+_SEEN_ENDPOINTS_MAX = 300   # bound it; a runaway pattern can never eat memory
+
+
+def _endpoint_key(url):
+    """Collapse a URL to the ENDPOINT it represents, not the individual request.
+
+    Map tiles are addressed /z/x/y, so every single tile is a distinct path and
+    naive de-duplication logs all of them -- hundreds of rows per sweep, the exact
+    flood the once-per-endpoint rule exists to prevent. Replacing the numeric
+    z/x/y segments with placeholders collapses a whole tile layer to one row:
+
+        /v4/att.dots/12/954/1710.vector.pbf  ->  /v4/att.dots/{z}/{x}/{y}.vector.pbf
+    """
+    try:
+        base = url.split("?")[0]
+        parts = base.split("/")
+        out, n = [], 0
+        for seg in parts:
+            head = seg.split(".")[0]
+            if head.isdigit() and n < 3:
+                out.append(("{z}", "{x}", "{y}")[n] + seg[len(head):])
+                n += 1
+            else:
+                out.append(seg)
+        return "/".join(out)[:180]
+    except Exception:
+        return url.split("?")[0][:180]
 
 
 def log_backend(kind, url="", status="", ct="", nbytes="", ms="", leads="",
@@ -439,8 +466,8 @@ def log_backend(kind, url="", status="", ct="", nbytes="", ms="", leads="",
     so this costs one extra append per viewport, not one per request.
     """
     try:
-        if _BACKEND_WRITTEN[0] >= _BACKEND_MAX:
-            return
+        if _BACKEND_WRITTEN[0] >= _BACKEND_MAX or len(_BACKEND_LOG) >= 2000:
+            return          # capped: telemetry must never grow without bound
         host = ""
         try:
             host = url.split("//", 1)[-1].split("/", 1)[0][:40]
@@ -1232,8 +1259,8 @@ class NetCapture:
             # (queryable in-page via querySourceFeatures, no panning needed) or only
             # in the serviceability JSON we currently pan for.
             try:
-                _b = url.split("?")[0]
-                if _b not in _SEEN_ENDPOINTS:
+                _b = _endpoint_key(url)
+                if _b not in _SEEN_ENDPOINTS and len(_SEEN_ENDPOINTS) < _SEEN_ENDPOINTS_MAX:
                     _SEEN_ENDPOINTS.add(_b)
                     _st = 0
                     try:
@@ -1247,7 +1274,7 @@ class NetCapture:
                         pass
                     _kind = "tile" if (".pbf" in url or ".mvt" in url or "/tiles/" in url) else (
                         "mapbox" if "mapbox" in url.lower() else "endpoint")
-                    log_backend(_kind, url, _st, ct, _n, note="first sight of this endpoint",
+                    log_backend(_kind, _b, _st, ct, _n, note="first sight of this endpoint",
                                 area=_CUR_AREA[0])
             except Exception:
                 pass
@@ -1323,6 +1350,13 @@ class NetCapture:
                 # split. A reply that is 200 but yields 0 leads means AT&T changed
                 # the payload shape -- that is invisible without this row.
                 try:
+                    # Snapshot and restore _WIRE_COUNTS around this pass. Counting
+                    # colours for the log calls the same classifier the writer
+                    # calls, so without this every dot is tallied TWICE and the
+                    # exit report -- the thing we actually use to judge the gold
+                    # split -- comes out doubled. Observability must never alter
+                    # what it observes.
+                    _snap = dict(_WIRE_COUNTS)
                     _g = _o = _y = 0
                     for _ld in leads:
                         _c = dot_color(classify_lead(_ld))
@@ -1332,6 +1366,8 @@ class NetCapture:
                             _o += 1
                         elif _c == "GREY":
                             _y += 1
+                    _WIRE_COUNTS.clear()
+                    _WIRE_COUNTS.update(_snap)
                     log_backend("serviceability", url, 200, ct, len(body),
                                 int((time.time() - _t0) * 1000), len(leads),
                                 _g, _o, _y,
