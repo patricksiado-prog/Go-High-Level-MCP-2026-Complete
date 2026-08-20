@@ -421,7 +421,18 @@ NEW_FIBER_TAB = "New Fiber Alerts"
 # most important thing to be able to read after the fact.
 BACKEND_TAB = "Backend Comm"
 BACKEND_HEADER = ["Time", "Host", "Area", "Kind", "Status", "Bytes", "ms",
-                  "Leads", "Green", "Gold", "Grey", "URL", "Content-Type", "Note"]
+                  "Leads", "Green", "Gold", "Grey", "Radius mi", "URL",
+                  "Content-Type", "Note"]
+
+# AT&T returns AT MOST ~3000 leads per "Search this area" (documented in
+# backend_classifier.py, and four tabs in the sheet sit at exactly 3,000 rows --
+# the fingerprint of a truncated response). This is the REAL limit on how far out
+# we can usefully zoom: past the point where a viewport holds ~3000 addresses the
+# reply silently truncates and the rest of that ground is never captured. Nothing
+# reports an error -- the sweep just quietly misses houses. Any row at or above
+# NEAR_CAP is a viewport that probably lost addresses.
+BACKEND_LEAD_CAP = 3000
+NEAR_CAP = 2900
 _BACKEND_LOG = []          # rows buffered between flushes
 _BACKEND_WS = [None]       # cached worksheet handle
 _BACKEND_MAX = 5000        # hard cap per run so a long sweep cannot flood the sheet
@@ -458,7 +469,7 @@ def _endpoint_key(url):
 
 
 def log_backend(kind, url="", status="", ct="", nbytes="", ms="", leads="",
-                green="", gold="", grey="", note="", area=""):
+                green="", gold="", grey="", note="", area="", radius=""):
     """Buffer one backend-communication row. Never raises, never blocks.
 
     Called from the response handler on EVERY data-ish reply, success or not.
@@ -476,8 +487,8 @@ def log_backend(kind, url="", status="", ct="", nbytes="", ms="", leads="",
         _BACKEND_LOG.append([
             time.strftime("%Y-%m-%d %H:%M:%S"), host, str(area)[:40], kind,
             str(status), str(nbytes), str(ms), str(leads), str(green),
-            str(gold), str(grey), url.split("?")[0][:180], str(ct)[:40],
-            str(note)[:180]])
+            str(gold), str(grey), str(radius), url.split("?")[0][:180],
+            str(ct)[:40], str(note)[:180]])
     except Exception:
         pass
 
@@ -1368,12 +1379,30 @@ class NetCapture:
                             _y += 1
                     _WIRE_COUNTS.clear()
                     _WIRE_COUNTS.update(_snap)
+                    # miles_from_claim rides on every lead and is the distance
+                    # from the search centre. Its MAX is therefore the actual
+                    # radius this one search covered -- a direct measurement of
+                    # how much ground a viewport buys, instead of guessing from
+                    # zoom presses.
+                    _rad = ""
+                    try:
+                        _m = [float(l.get("raw", {}).get("miles_from_claim") or 0)
+                              for l in leads if isinstance(l.get("raw"), dict)]
+                        if _m:
+                            _rad = round(max(_m), 2)
+                    except Exception:
+                        pass
+                    if not leads:
+                        _note = ("200 but 0 leads -- payload shape may have changed: %s"
+                                 % (list(data)[:6] if isinstance(data, dict) else type(data).__name__))
+                    elif len(leads) >= NEAR_CAP:
+                        _note = ("NEAR THE %d CAP -- this viewport probably LOST "
+                                 "addresses. Zoom IN here." % BACKEND_LEAD_CAP)
+                    else:
+                        _note = ""
                     log_backend("serviceability", url, 200, ct, len(body),
                                 int((time.time() - _t0) * 1000), len(leads),
-                                _g, _o, _y,
-                                "" if leads else "200 but 0 leads -- payload shape may have changed: %s"
-                                % (list(data)[:6] if isinstance(data, dict) else type(data).__name__),
-                                _CUR_AREA[0])
+                                _g, _o, _y, _note, _CUR_AREA[0], _rad)
                 except Exception:
                     pass
                 if leads:
