@@ -259,6 +259,31 @@ try:
 except Exception:
     pass
 BUILD_DATE = "2026-08-20"   # bump on every push so the console proves the version
+
+# ---- DERIVED VERSION STAMP -------------------------------------------------
+# RULE (Patrick 2026-08-20, after BUILD_DATE reported 08-18 while running 08-20
+# code): a version marker that is typed by hand WILL eventually disagree with the
+# code, and a marker that disagrees is worse than none because it gets trusted.
+# So the console also prints values DERIVED from the file itself -- the mtime the
+# updater actually wrote, and a fingerprint of the bytes. Neither can go stale,
+# because neither is maintained by anyone.
+def _file_stamp():
+    """(written-at, 8-char fingerprint) of THIS file. Cannot lie about its age."""
+    import hashlib
+    try:
+        f = os.path.abspath(__file__)
+        b = open(f, "rb").read()
+        return (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(os.path.getmtime(f))),
+                hashlib.sha256(b).hexdigest()[:8])
+    except Exception:
+        return ("unknown", "unknown")
+
+
+# One id per launch, stamped on every lead this run writes. BRAIN section 44 has
+# asked for run_id on every lead since April: without it nobody can say which
+# capture produced which row, so "does the software make money" stays unanswerable.
+RUN_ID = time.strftime("%Y%m%d-%H%M%S")
+_WRITTEN_AT, _FINGERPRINT = _file_stamp()
 if _BLD_CODES["copper"]:
     # visible proof-of-version: if this line prints, the gold fix is running.
     print("CODE UPDATED %s -- GOLD CAPTURE ON: copper customers write as ORANGE "
@@ -269,6 +294,11 @@ if _BLD_CODES["copper"]:
 else:
     print("CODE UPDATED %s -- (gold capture LIMITED: build_codes.json missing -- "
           "copper customers will be skipped as GREY)" % BUILD_DATE)
+# Derived, so it cannot disagree with the code the way BUILD_DATE did. Printed
+# outside the if/else because it is true either way.
+print("  THIS FILE : written %s   fingerprint %s   (derived -- cannot go stale)"
+      % (_WRITTEN_AT, _FINGERPRINT))
+print("  RUN ID    : %s   (stamped on every lead this run writes)" % RUN_ID)
 # every gold dot also lands in its own 'Gold Dots' tab for analysis + upgrade calls
 print("GOLD DOTS TAB ON: every gold (upgrade) dot address -> 'Gold Dots' tab")
 
@@ -1657,7 +1687,8 @@ class NetCapture:
             _bidx = _BIZ.get("index") or {}
             _b = _bidx.get(_norm_addr(addr)) if _bidx else None
             new_rows.append([addr, dot_color(dot_status), ts,
-                             (_b or {}).get("name", ""), (_b or {}).get("phone", "")])
+                             (_b or {}).get("name", ""), (_b or {}).get("phone", ""),
+                             RUN_ID])
             new_records.append({"address": addr, "dot_status": dot_status,
                                 "zone_label": "WORKING", "popup_status": ld.get("status"),
                                 "ban": ld.get("ban"), "area": area_label, "ts": ts,
@@ -3962,7 +3993,12 @@ def _email_alert(subject, body):
 MAPS_TAB = "Maps Businesses"
 GREEN_BIZ_TAB = "Fiber Green Biz"
 ORANGE_BIZ_TAB = "Upgrade Orange Biz"
-BIZ_HEADER = ["Business Name", "Phone", "Address", "Website", "Category"]
+# Captured At + Run ID appended 2026-08-20. These rows carried no timestamp of any
+# kind, so a business lead could not be aged, diffed against a later sweep, or
+# traced to the run that produced it. Appended at the END so existing rows stay
+# valid -- they simply have the last two columns blank.
+BIZ_HEADER = ["Business Name", "Phone", "Address", "Website", "Category",
+              "Captured At", "Run ID"]
 # local-CSV fallback when the Google Sheet is full (10M-cell cap) and can't take
 # the two result tabs -- matches still get saved, never lost.
 GREEN_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fiber_green_biz.csv")
@@ -4209,8 +4245,12 @@ def match_leads_to_biz(new_records):
         addr = ld.get("address") or ""
         au = addr.strip().upper()
         ph = _biz_ph10(b.get("phone"))          # dialer key: last-10-digit phone
+        # Captured At carries the DOT's timestamp, not "now" -- these rows are
+        # a business matched to a captured dot, so the dot's capture time is the
+        # date that matters for ageing and for diffing against a later sweep.
         row = [b.get("name") or "", b.get("phone") or "", addr,
-               b.get("website") or "", b.get("category") or ""]
+               b.get("website") or "", b.get("category") or "",
+               ld.get("ts") or time.strftime("%Y-%m-%d %H:%M:%S"), RUN_ID]
         if (ld.get("dot_status") or "").lower() == "copper_upgrade":
             # Dedup by PHONE when the business has one (one business = one row, no
             # matter how many address/unit/spelling variants matched the dot) --
