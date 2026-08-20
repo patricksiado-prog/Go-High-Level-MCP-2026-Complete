@@ -421,7 +421,7 @@ NEW_FIBER_TAB = "New Fiber Alerts"
 # most important thing to be able to read after the fact.
 BACKEND_TAB = "Backend Comm"
 BACKEND_HEADER = ["Time", "Host", "Area", "Kind", "Status", "Bytes", "ms",
-                  "Leads", "Green", "Gold", "Grey", "Radius mi", "URL",
+                  "Leads", "Green", "Gold", "Grey", "Zoom", "Radius mi", "URL",
                   "Content-Type", "Note"]
 
 # AT&T returns AT MOST ~3000 leads per "Search this area" (documented in
@@ -438,6 +438,8 @@ _BACKEND_WS = [None]       # cached worksheet handle
 _BACKEND_MAX = 5000        # hard cap per run so a long sweep cannot flood the sheet
 _BACKEND_WRITTEN = [0]
 _CUR_AREA = [""]        # set per cell so every backend row says WHERE
+_CUR_ZOOM = [""]         # live map zoom, stamped on every backend row
+_DOT_LAYERS = [None]     # dot-layer minzoom/maxzoom, printed once
 _SEEN_ENDPOINTS = set()  # normalised endpoints already logged once
 _SEEN_ENDPOINTS_MAX = 300   # bound it; a runaway pattern can never eat memory
 
@@ -487,8 +489,8 @@ def log_backend(kind, url="", status="", ct="", nbytes="", ms="", leads="",
         _BACKEND_LOG.append([
             time.strftime("%Y-%m-%d %H:%M:%S"), host, str(area)[:40], kind,
             str(status), str(nbytes), str(ms), str(leads), str(green),
-            str(gold), str(grey), str(radius), url.split("?")[0][:180],
-            str(ct)[:40], str(note)[:180]])
+            str(gold), str(grey), str(_CUR_ZOOM[0]), str(radius),
+            url.split("?")[0][:180], str(ct)[:40], str(note)[:180]])
     except Exception:
         pass
 
@@ -729,6 +731,39 @@ MAPBOX_QUERY_JS = """
 }
 """
 
+MAPBOX_VIEW_JS = """
+() => {
+  const m = (window.__optimusMaps || [])[0];
+  if (!m || !m.getZoom) return null;
+  const out = {zoom: null, bounds: null, layers: []};
+  try { out.zoom = Math.round(m.getZoom() * 100) / 100; } catch (e) {}
+  try {
+    const b = m.getBounds();
+    out.bounds = {w: b.getWest(), s: b.getSouth(), e: b.getEast(), n: b.getNorth()};
+  } catch (e) {}
+  // Patrick 2026-08-20: "the dots are created at a certain zoom level". A Mapbox
+  // layer DECLARES that threshold as minzoom, so read it instead of guessing --
+  // below it the layer renders nothing no matter how the sweep is configured.
+  try {
+    const style = m.getStyle();
+    for (const L of (style.layers || [])) {
+      const id = (L.id || '').toLowerCase();
+      if (L.type !== 'circle' && L.type !== 'symbol') continue;
+      if (!(id.includes('dot') || id.includes('fiber') || id.includes('elig') ||
+            id.includes('serv') || id.includes('addr') || id.includes('point'))) continue;
+      let n = 0;
+      try { n = m.queryRenderedFeatures({layers: [L.id]}).length; } catch (e) {}
+      out.layers.push({id: L.id, type: L.type,
+                       minzoom: (L.minzoom === undefined ? null : L.minzoom),
+                       maxzoom: (L.maxzoom === undefined ? null : L.maxzoom),
+                       rendered: n});
+    }
+  } catch (e) {}
+  return out;
+}
+"""
+
+
 MAPBOX_PROBE_JS = """
 () => {
   let maps = (window.__optimusMaps || []).slice();
@@ -879,6 +914,36 @@ FEATURE_STATUS_KEYS = ["status", "customer_status", "customertype",
                        "customer_type", "eligibility", "eligible", "fiber_status",
                        "fiberstatus", "service_status", "servicestatus",
                        "dot_status", "category", "segment", "color", "type"]
+
+
+def read_map_view(page):
+    """Read the live map's zoom, bounds and dot-layer zoom thresholds.
+
+    Cheap (one evaluate) and called once per cell so every Backend Comm row can
+    say WHICH ZOOM produced it. The dot layer's declared minzoom is the hard
+    floor on zooming out: below it the layer draws nothing and the sweep captures
+    nothing, regardless of how wide the viewport is. Never raises.
+    """
+    try:
+        v = page.evaluate(MAPBOX_VIEW_JS)
+    except Exception:
+        return None
+    if not isinstance(v, dict):
+        return None
+    try:
+        if v.get("zoom") is not None:
+            _CUR_ZOOM[0] = v["zoom"]
+        if v.get("layers") and not _DOT_LAYERS[0]:
+            _DOT_LAYERS[0] = v["layers"]
+            print("\n  DOT LAYERS (the zoom range where dots exist):")
+            for L in v["layers"]:
+                print("    %-30s min=%-5s max=%-5s rendered now=%d"
+                      % (str(L.get("id"))[:30], L.get("minzoom"),
+                         L.get("maxzoom"), L.get("rendered") or 0))
+            print("    -> zooming out below the highest 'min' shows NO dots at all.\n")
+    except Exception:
+        pass
+    return v
 
 
 def query_map_features(page):
@@ -2513,7 +2578,12 @@ SEARCH_LABELS = ["Search this area", "Search area", "Search this map",
 def search_this_area(page):
     """After a pan the new view's dots only load when the map's 'search this
     area' control is clicked. The exact label varies, so try several; if none
-    match, dump the visible controls ONCE so we can pin the right one."""
+    match, dump the visible controls ONCE so we can pin the right one.
+
+    Also stamps the live map zoom (read_map_view) so every Backend Comm row
+    produced by this search records WHICH ZOOM produced it. Done here rather than
+    at each of the seven call sites so no sweep mode can miss it."""
+    read_map_view(page)
     for label in SEARCH_LABELS:
         try:
             btn = page.get_by_text(label, exact=False)
