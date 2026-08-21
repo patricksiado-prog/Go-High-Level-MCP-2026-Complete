@@ -282,6 +282,22 @@ def _file_stamp():
 # One id per launch, stamped on every lead this run writes. BRAIN section 44 has
 # asked for run_id on every lead since April: without it nobody can say which
 # capture produced which row, so "does the software make money" stays unanswerable.
+try:
+    import optimus_operator as _OP
+except Exception:                     # never let identity break a sweep
+    _OP = None
+
+
+def OPERATOR():
+    """Who is running this scan. Stamped on every row we write so 'who found
+    this lead' has an answer in the data. Falls back to the hostname; never
+    returns blank, and never raises into the sweep."""
+    try:
+        return _OP.current() if _OP else ("PC:" + os.environ.get("COMPUTERNAME", "unknown"))
+    except Exception:
+        return "unknown"
+
+
 RUN_ID = time.strftime("%Y%m%d-%H%M%S")
 _WRITTEN_AT, _FINGERPRINT = _file_stamp()
 if _BLD_CODES["copper"]:
@@ -449,10 +465,58 @@ NEW_FIBER_TAB = "New Fiber Alerts"
 # never persisted, and nobody can see it remotely. A 301 means AT&T bounced the
 # data call to login and NOTHING lands -- green or gold -- so it is the single
 # most important thing to be able to read after the fact.
+# Precise Fiber's real shape. The header on the live sheet was 5 wide while
+# flush() appended 6 values -- Run ID has been landing in an UNLABELLED column F
+# since 2026-08-20, and the uploader path wrote only 5, so rows were ragged
+# depending on which code path saved them. Both are normalised to this list.
+OUT_HEADER = ["Address", "Dot Color", "Captured At", "Business", "Phone",
+              "Run ID", "Operator"]
+
+
+def _ensure_header(ws, header):
+    """Make row 1 of `ws` carry `header`, WITHOUT disturbing any data.
+
+    Adding a column to a tab that already holds hundreds of thousands of rows is
+    the kind of edit that eats a dataset if it goes wrong, so this is deliberately
+    timid:
+      - empty tab            -> write the header
+      - header already wide  -> do nothing at all
+      - header too short     -> write ONLY the missing cells at the end of row 1
+    It never rewrites a label that is already there (someone may have renamed a
+    column on purpose) and never touches row 2 or below. Best-effort: a failure
+    here must not stop leads from saving."""
+    try:
+        first = ws.row_values(1)
+    except Exception:
+        return
+    try:
+        if not first:
+            ws.append_row(header, value_input_option="RAW")
+            return
+        if len(first) >= len(header):
+            return
+        # widen the tab if the grid is too narrow to hold the new columns
+        try:
+            if getattr(ws, "col_count", 0) and ws.col_count < len(header):
+                ws.add_cols(len(header) - ws.col_count)
+        except Exception:
+            pass
+        missing = header[len(first):]
+        start = len(first) + 1
+        cells = ws.range(1, start, 1, len(header))
+        for c, val in zip(cells, missing):
+            c.value = val
+        ws.update_cells(cells, value_input_option="RAW")
+        print("   labelled %d new column(s) in '%s': %s"
+              % (len(missing), ws.title, ", ".join(missing)))
+    except Exception as e:
+        print("   (header check skipped on '%s': %s)" % (ws.title, str(e)[:60]))
+
+
 BACKEND_TAB = "Backend Comm"
 BACKEND_HEADER = ["Time", "Host", "Area", "Kind", "Status", "Bytes", "ms",
                   "Leads", "Green", "Gold", "Grey", "Zoom", "Radius mi", "URL",
-                  "Content-Type", "Note"]
+                  "Content-Type", "Note", "Operator"]
 
 # AT&T returns AT MOST ~3000 leads per "Search this area" (documented in
 # backend_classifier.py, and four tabs in the sheet sit at exactly 3,000 rows --
@@ -541,6 +605,7 @@ def flush_backend(ws):
                 bw = sh.add_worksheet(title=BACKEND_TAB, rows="6000",
                                       cols=str(len(BACKEND_HEADER)))
                 bw.append_row(BACKEND_HEADER, value_input_option="RAW")
+            _ensure_header(bw, BACKEND_HEADER)
             _BACKEND_WS[0] = bw
         for i in range(0, len(rows), 500):
             bw.append_rows(rows[i:i + 500], value_input_option="RAW")
@@ -1688,8 +1753,9 @@ class NetCapture:
             _b = _bidx.get(_norm_addr(addr)) if _bidx else None
             new_rows.append([addr, dot_color(dot_status), ts,
                              (_b or {}).get("name", ""), (_b or {}).get("phone", ""),
-                             RUN_ID])
+                             RUN_ID, OPERATOR()])
             new_records.append({"address": addr, "dot_status": dot_status,
+                                "run_id": RUN_ID, "operator": OPERATOR(),
                                 "zone_label": "WORKING", "popup_status": ld.get("status"),
                                 "ban": ld.get("ban"), "area": area_label, "ts": ts,
                                 "via": "network", "lat": ld.get("lat"), "lng": ld.get("lng"),
@@ -1952,7 +2018,8 @@ def _sheet_is_full(sh):
 GOLD_SHEET_TITLE = "OPTIMUS GOLD DOTS"
 GOLD_OWNER_EMAIL = "patricksiado@gmail.com"
 _GOLD = {"ws": None, "seen": None}
-_GOLD_HEADER = ["Address", "Captured At", "Lat", "Lng", "Business", "Phone"]
+_GOLD_HEADER = ["Address", "Captured At", "Lat", "Lng", "Business", "Phone",
+                "Run ID", "Operator"]
 
 
 def _ensure_gold_tab(sh):
@@ -1982,6 +2049,8 @@ def _ensure_gold_tab(sh):
         print("   created '%s' tab in the main sheet" % GOLD_TAB)
     if not gw.get_all_values():
         gw.append_row(_GOLD_HEADER)
+    else:
+        _ensure_header(gw, _GOLD_HEADER)
     try:
         col = gw.col_values(1)[1:]      # skip the header row
         _GOLD["seen"] = set(a.strip().upper() for a in col if a and a.strip())
@@ -2023,7 +2092,9 @@ def write_gold_dots(sh, records):
         rows.append([addr, r.get("ts") or "",
                      r.get("lat") if r.get("lat") is not None else "",
                      r.get("lng") if r.get("lng") is not None else "",
-                     r.get("biz_name") or "", r.get("biz_phone") or ""])
+                     r.get("biz_name") or "", r.get("biz_phone") or "",
+                     r.get("run_id") or RUN_ID,
+                     r.get("operator") or OPERATOR()])
     if not rows:
         return 0
     try:
@@ -2051,6 +2122,8 @@ def _backfill_gold_from(sh, log=print):
     ts_col = pf.col_values(3)     # column C = Captured At
     biz_col = pf.col_values(4)    # column D = Business
     ph_col = pf.col_values(5)     # column E = Phone
+    run_col = pf.col_values(6)    # column F = Run ID
+    op_col = pf.col_values(7)     # column G = Operator (blank on old rows)
     gw = _ensure_gold_tab(sh)     # the 'Gold Dots' tab in this same sheet
     seen = _GOLD["seen"]
     rows = []
@@ -2063,11 +2136,15 @@ def _backfill_gold_from(sh, log=print):
         if not addr or addr.upper() in seen:
             continue
         seen.add(addr.upper())
+        # Backfilled from history: we genuinely do not know who scanned these,
+        # and inventing an operator would be worse than leaving it honest.
         rows.append([addr,
                      ts_col[i] if i < len(ts_col) else "",
                      "", "",     # lat/lng not stored in Precise Fiber
                      biz_col[i] if i < len(biz_col) else "",
-                     ph_col[i] if i < len(ph_col) else ""])
+                     ph_col[i] if i < len(ph_col) else "",
+                     run_col[i] if i < len(run_col) else "",
+                     op_col[i] if i < len(op_col) else "(before operator tracking)"])
     if not rows:
         log("No ORANGE/gold rows found in Precise Fiber to backfill.")
         return 0
@@ -2143,7 +2220,7 @@ def open_sheet():
         except Exception:
             ws = sh.add_worksheet(title=OUT_TAB, rows="5000", cols="8")
         if not ws.get_all_values():
-            ws.append_row(["Address", "Dot Color", "Captured At", "Business", "Phone"])
+            _ensure_header(ws, OUT_HEADER)
         return ws
     except Exception as e:
         print("WARNING: couldn't open the Google Sheet (%s)." % str(e)[:100])
@@ -3411,7 +3488,8 @@ def _find_git():
 # over). A file absent from this list NEVER reaches that machine by auto-update,
 # so pushing it to the branch changes nothing there. Add new tools here or they
 # do not ship.
-_CORE_FILES = ("precise_fiber_hunter.py", "optimus_dot_detect.py",
+_CORE_FILES = ("precise_fiber_hunter.py", "optimus_operator.py",
+               "optimus_dot_detect.py",
                "optimus_api_capture.py", "hunter_fixes.py",
                "backend_classifier.py", "build_codes.json",
                "verify_gold_capture.py", "deploy_check.py")
@@ -3778,9 +3856,14 @@ def uploader_main():
                     # Captured At | Business | Phone (biz merged like the flush)
                     _bidx = _BIZ.get("index") or {}
                     _b = _bidx.get(_norm_addr(addr)) if _bidx else None
+                    # was 5 columns here vs 6 in flush() -- the same tab was
+                    # getting two different row shapes depending on which path
+                    # saved it. Both write OUT_HEADER's 7 columns now.
                     queued_rows.append([addr, dot_color(ds), d.get("ts") or "",
                                         (_b or {}).get("name", ""),
-                                        (_b or {}).get("phone", "")])
+                                        (_b or {}).get("phone", ""),
+                                        d.get("run_id") or RUN_ID,
+                                        d.get("operator") or OPERATOR()])
                     d["biz_name"] = (_b or {}).get("name", "")
                     d["biz_phone"] = (_b or {}).get("phone", "")
                     new_records.append(d)
@@ -4674,6 +4757,12 @@ def main():
                          "OSM misses (needs GOOGLE_PLACES_API_KEY). Default is FREE.")
     ap.add_argument("--uploader", action="store_true",
                     help=argparse.SUPPRESS)   # internal: the write worker
+    ap.add_argument("--operator", default=None, metavar="NAME",
+                    help="who is running this scan (stamped on every row). "
+                         "Normally you are asked once and it is remembered; "
+                         "use this to override, or on scheduled runs.")
+    ap.add_argument("--whoami", action="store_true",
+                    help="show/change who this PC scans as, then carry on")
     ap.add_argument("--no-split", action="store_true",
                     help="write to the sheet in-process (June's original way) "
                          "instead of the separate write worker")
@@ -4683,6 +4772,19 @@ def main():
     # in MANUAL mode: you pan/search the AT&T map to the spot you want by hand,
     # then press Enter here to scan THAT view. You control where it scans, so it
     # can never wander to the wrong area.
+
+    # WHO IS SCANNING -- settled before a single row can be written, so no
+    # capture in this process can ever be saved anonymously. Asks once on a real
+    # terminal, then remembers; silently falls back to the hostname on scheduled
+    # and worker runs, which have nobody at the keyboard to answer.
+    if _OP:
+        try:
+            _OP.resolve(cli_value=args.operator,
+                        auto=bool(args.auto or args.uploader),
+                        force_ask=bool(args.whoami))
+            print(_OP.banner())
+        except Exception as e:
+            print("  (operator check skipped: %s)" % str(e)[:60])
 
     if args.uploader:
         uploader_main()          # write worker: no browser, no Playwright
