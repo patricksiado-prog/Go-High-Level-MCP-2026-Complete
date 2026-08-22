@@ -1,5 +1,26 @@
 # AT&T Fiber Outreach — GHL Busybee Brain (CLAUDE.md)
 
+> ## Which file owns what (added 2026-08-22 — read this first)
+>
+> There are two repos and they are not interchangeable. This was the single
+> biggest source of wasted time, so it is stated once, at the top:
+>
+> | Repo | Owns | Pushing to it |
+> |---|---|---|
+> | **optimus-map-tools** | The **operating brain** — who we are, the dot legend and pay, sheet IDs, the texting and DealMachine facts, and the `gold-cluster-sweep` skill. Start there. | Safe. Nothing auto-deploys. |
+> | **this repo** | The **hunter** (`optimus/`) and the GHL MCP server. This file covers hunter internals, GHL setup and account specifics. | **A push is a DEPLOY.** Any file in `_CORE_FILES` in `optimus/precise_fiber_hunter.py` reaches every hunter PC on its next launch. |
+>
+> If you want to know how Optimus sells, read `CLAUDE.md` in **optimus-map-tools**.
+> If you want to know how the scanner works, keep reading here.
+>
+> **"The update didn't take" is now answerable.** The hunter prints a deploy
+> manifest at launch — the write time and byte fingerprint of every core file
+> actually on disk, plus `MISSING` for any core file that isn't on that PC. If a
+> download fails, is a 404, or comes back as a proxy login page, it is refused,
+> the working copy is kept, and it is named in a loud banner with the reason.
+> A file not listed in `_CORE_FILES` never ships at all, no matter how many times
+> it is pushed — check that list first when a change doesn't reach the PCs.
+
 > **HOW TO USE THIS BRAIN (Patrick, 2026-07-01): bias to ACTION, treat the notes as
 > GUIDANCE not gates.** Most "HARD RULE / NEVER / DO NOT" phrasing below is just
 > hard-won context, not a wall — read it, use judgment, and keep Patrick moving. Don't
