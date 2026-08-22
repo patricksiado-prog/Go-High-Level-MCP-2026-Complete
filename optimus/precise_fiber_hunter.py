@@ -4782,6 +4782,25 @@ GOLD_TAB_NAME = "Gold Dots"       # no header row: A=Address B=Captured At C=Lat
                                  # New Green | Instance
 INTEL_ROWS = 5
 
+# Why a given intel source produced nothing. The whole point of this block is
+# that "none open" reads as "we checked and there were none" when the truth was
+# "that tab does not exist" -- a failure returning 0 instead of saying so, which
+# is the exact bug pattern that has cost this project weeks before. Filled by
+# the readers below, printed by intel_banner().
+_INTEL_WHY = {}
+
+
+def _intel_tab(sh, name):
+    """Open a tab. Returns (rows, None) or (None, reason). Never raises."""
+    try:
+        return sh.worksheet(name).get_all_values(), None
+    except Exception as e:
+        blob = (e.__class__.__name__ + " " + str(e)).lower()
+        if "worksheetnotfound" in blob or "not found" in blob:
+            return None, "there is no '%s' tab in the sheet" % name
+        return None, "could not read '%s' (%s)" % (name, str(e)[:40] or
+                                                   e.__class__.__name__)
+
 
 def _intel_int(v):
     """Sheet cells arrive as text and may carry a '%'. Never raise on junk."""
@@ -4793,10 +4812,12 @@ def _intel_int(v):
 
 def _intel_recent_outages(sh, limit=INTEL_ROWS):
     """Newest outage signals that nobody has worked yet."""
-    try:
-        rows = sh.worksheet(OUTAGE_TAB).get_all_values()
-    except Exception:
+    rows, why = _intel_tab(sh, OUTAGE_TAB)
+    if rows is None:
+        _INTEL_WHY["outages"] = why
         return []
+    if len(rows) < 2:
+        _INTEL_WHY["outages"] = "'%s' is empty -- nothing logs into it yet" % OUTAGE_TAB
     out = []
     for r in reversed(rows[1:]):              # newest appended last
         logged, zipc, signal, status = [str(x).strip() for x in (r + [""] * 4)[:4]]
@@ -4823,10 +4844,12 @@ def _intel_gold_pockets(sh, limit=INTEL_ROWS):
     Grids the coordinates to ~1km cells and returns the thickest pockets. Read
     only, best-effort, and silent on any failure.
     """
-    try:
-        rows = sh.worksheet(GOLD_TAB_NAME).get_all_values()
-    except Exception:
+    rows, why = _intel_tab(sh, GOLD_TAB_NAME)
+    if rows is None:
+        _INTEL_WHY["gold"] = why
         return []
+    n_rows = len(rows)
+    n_coord = 0
     cells = {}
     for r in rows:                      # Gold Dots has NO header row
         if len(r) < 4:
@@ -4838,6 +4861,7 @@ def _intel_gold_pockets(sh, limit=INTEL_ROWS):
             continue
         if lat == 0 or lng == 0:
             continue
+        n_coord += 1
         key = (round(lat, 2), round(lng, 2))     # ~1.1km latitude cells
         c = cells.setdefault(key, {"n": 0, "streets": {}})
         c["n"] += 1
@@ -4856,15 +4880,28 @@ def _intel_gold_pockets(sh, limit=INTEL_ROWS):
                     "streets": ", ".join(s for s, _ in top)})
         if len(out) >= limit:
             break
+    if not out:
+        # Say which step lost the data. Each of these is a different bug.
+        if not n_rows:
+            _INTEL_WHY["gold"] = "'%s' read back 0 rows" % GOLD_TAB_NAME
+        elif not n_coord:
+            _INTEL_WHY["gold"] = ("read %d rows from '%s' but none had a usable "
+                                  "lat/lng in columns C and D"
+                                  % (n_rows, GOLD_TAB_NAME))
+        else:
+            _INTEL_WHY["gold"] = ("%d gold dots over %d cells, none with %d+ in "
+                                  "one cell" % (n_coord, len(cells), 4))
     return out
 
 
 def _intel_suggested_zips(sh, limit=INTEL_ROWS):
     """Newest scan per ZIP, ranked by how much NEW green it turned up."""
-    try:
-        rows = sh.worksheet(ZONES_TAB_NAME).get_all_values()
-    except Exception:
+    rows, why = _intel_tab(sh, ZONES_TAB_NAME)
+    if rows is None:
+        _INTEL_WHY["zips"] = why
         return []
+    if len(rows) < 2:
+        _INTEL_WHY["zips"] = "'%s' is empty -- nobody has run fiber_zone_scanner.py" % ZONES_TAB_NAME
     latest = {}
     for r in rows[1:]:
         r = (r + [""] * 11)[:11]
@@ -4905,7 +4942,8 @@ def intel_banner():
             print("     %-6s %-28s %-9s %s"
                   % (zipc, signal[:28], status, logged))
     else:
-        print("  PRECISE FIBER CABLE OUTAGES: none open")
+        print("  PRECISE FIBER CABLE OUTAGES: %s"
+              % (_INTEL_WHY.get("outages") or "none open"))
 
     if zips:
         print("  SUGGESTED NEW BUILD ZIPS (most new green first):")
@@ -4927,8 +4965,12 @@ def intel_banner():
             print("     (gold = AT&T customers still on copper. A thick pocket means")
             print("      fiber was lit there recently and nobody has worked it.)")
         else:
-            print("  SUGGESTED NEW BUILD ZIPS: no zone scans and no gold dots yet -- "
-                  "run fiber_zone_scanner.py or capture some gold")
+            print("  SUGGESTED NEW BUILD ZIPS: nothing to suggest --")
+            for k, label in (("zips", "zones"), ("gold", "gold ")):
+                if _INTEL_WHY.get(k):
+                    print("     %s: %s" % (label, _INTEL_WHY[k]))
+            if not (_INTEL_WHY.get("zips") or _INTEL_WHY.get("gold")):
+                print("     no zone scans and no gold dots yet")
     print("  ------------------------------------------------------------")
 
 
