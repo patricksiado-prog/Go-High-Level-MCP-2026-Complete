@@ -52,10 +52,78 @@ TERRITORY = (
 # Texas ZIPs only: 75000-79999. Houston 770xx-775xx, Beaumont 776xx-777xx.
 ZIP_RE = re.compile(r"\b(7[5-9]\d{3})\b")
 
+# OUTAGES stay local. An outage is a selling event where we already have reps
+# standing; a cut in Ohio is not our problem.
 OUTAGE_Q = ('"AT&T" (outage OR "fiber cut" OR "service interruption" OR '
             '"internet down") (Houston OR Beaumont OR Texas)')
-BUILD_Q = ('"AT&T Fiber" (expansion OR "now available" OR "new market" OR '
-           '"lights up" OR launches) (Texas OR Houston OR Beaumont)')
+
+# NEW BUILDS go NATIONWIDE across the AT&T footprint. This is the one that
+# answers "where do we point the scanner next", and the answer is not confined
+# to where we happen to have already scanned. Patrick, 2026-08-22.
+BUILD_Q = ('"AT&T Fiber" ("now available" OR expansion OR "new market" OR '
+           '"lights up" OR launches OR "brings fiber" OR "expands to")')
+
+# The AT&T fiber footprint. A headline naming a state outside it is somebody
+# else's build.
+STATES = {
+    "alabama": "AL", "arkansas": "AR", "california": "CA", "florida": "FL",
+    "georgia": "GA", "illinois": "IL", "indiana": "IN", "kansas": "KS",
+    "kentucky": "KY", "louisiana": "LA", "michigan": "MI", "mississippi": "MS",
+    "missouri": "MO", "nevada": "NV", "north carolina": "NC", "ohio": "OH",
+    "oklahoma": "OK", "south carolina": "SC", "tennessee": "TN", "texas": "TX",
+    "wisconsin": "WI",
+}
+ABBR = set(STATES.values())
+
+_CITY_ST = re.compile(r"\b([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){0,2}),\s*"
+                      r"(" + "|".join(sorted(ABBR)) + r")\b")
+_IN_CITY = re.compile(r"\b(?:in|to|across|throughout)\s+"
+                      r"([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){0,2})\b")
+# Words that look like a place to a regex but are not one.
+_NOT_A_PLACE = {"at&t", "att", "fiber", "internet", "gig", "gigs", "more",
+                "new", "the", "its", "their", "america", "us", "u.s.",
+                "united states", "customers", "homes", "businesses", "week",
+                "monday", "tuesday", "wednesday", "thursday", "friday"}
+
+
+def extract_places(title):
+    """Pull (city, state) out of a headline. Returns [] when it cannot tell.
+
+    Deliberately conservative: a wrong city sends somebody to the wrong state
+    for a day, so an unparseable headline yields nothing and simply prints
+    without a target rather than guessing one.
+    """
+    out, seen = [], set()
+    for city, st in _CITY_ST.findall(title):
+        k = (city.lower(), st)
+        if city.lower() in _NOT_A_PLACE or k in seen:
+            continue
+        seen.add(k)
+        out.append((city.strip(), st))
+    if out:
+        return out
+    low = title.lower()
+    st = ""
+    for name, ab in STATES.items():
+        if name in low:
+            st = ab
+            break
+    if not st:
+        for ab in ABBR:
+            if re.search(r"\b%s\b" % ab, title):
+                st = ab
+                break
+    if not st:
+        return []
+    for city in _IN_CITY.findall(title):
+        k = (city.lower(), st)
+        if city.lower() in _NOT_A_PLACE or k in seen:
+            continue
+        if city.lower() in STATES:          # "in Texas" -> statewide, not a city
+            continue
+        seen.add(k)
+        out.append((city.strip(), st))
+    return out or [("", st)]
 
 
 def _news_rss(q):
@@ -170,16 +238,33 @@ def classify(title):
     return None
 
 
-def _relevant(item):
-    """Keep only what touches Optimus territory, and pull any Texas ZIP out."""
-    blob = (item.get("title", "") + " " + item.get("url", "")).lower()
-    zips = sorted(set(ZIP_RE.findall(item.get("title", ""))))
+def _relevant(item, kind):
+    """Outages are kept only for our own territory. New builds are kept for the
+    whole AT&T footprint -- that is the point of them: they say where to send
+    the scanner next, which is by definition somewhere we have not been."""
+    title = item.get("title", "")
+    blob = (title + " " + item.get("url", "")).lower()
+    zips = sorted(set(ZIP_RE.findall(title)))
+    item = dict(item)
+    item["zips"] = zips
+
+    if kind == "build":
+        places = extract_places(title)
+        if not places:
+            return None
+        city, st = places[0]
+        item["places"] = places
+        item["state"] = st
+        item["city"] = city
+        item["where"] = ("%s, %s" % (city, st)) if city else st
+        return item
+
     hit = [t for t in TERRITORY if t in blob]
     if not hit and not zips:
         return None
-    item = dict(item)
-    item["zips"] = zips
     item["where"] = hit[0].title() if hit else (zips[0] if zips else "")
+    item["state"] = "TX"
+    item["city"] = hit[0].title() if hit else ""
     return item
 
 
@@ -230,11 +315,11 @@ def gather(budget_s=6.0, per_source_s=3.0, cache_path=None, ttl_s=21600,
             continue
         kept, misfiled = [], 0
         for i in items:
-            r = _relevant(i)
-            if not r:
-                continue
-            actual = classify(r["title"])
+            actual = classify(i.get("title", ""))
             if actual is None:
+                continue
+            r = _relevant(i, actual)
+            if not r:
                 continue
             if actual != kind:
                 misfiled += 1

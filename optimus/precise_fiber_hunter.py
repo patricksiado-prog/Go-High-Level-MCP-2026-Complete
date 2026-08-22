@@ -3488,7 +3488,8 @@ def _find_git():
 # over). A file absent from this list NEVER reaches that machine by auto-update,
 # so pushing it to the branch changes nothing there. Add new tools here or they
 # do not ship.
-_CORE_FILES = ("precise_fiber_hunter.py", "optimus_web_intel.py", "optimus_operator.py",
+_CORE_FILES = ("precise_fiber_hunter.py", "optimus_web_intel.py",
+               "optimus_territory.py", "optimus_operator.py",
                "optimus_dot_detect.py",
                "optimus_api_capture.py", "hunter_fixes.py",
                "backend_classifier.py", "build_codes.json",
@@ -4790,6 +4791,11 @@ try:
 except Exception:
     _WEB = None
 
+try:
+    import optimus_territory as _TERR
+except Exception:                     # a missing ledger must not stop a sweep
+    _TERR = None
+
 def _web_cache_path():
     """Where to cache web intel. Module-level `__file__` is NOT safe here: a
     frozen or exec-wrapped launcher leaves it undefined, and a NameError at
@@ -4952,6 +4958,57 @@ def _intel_suggested_zips(sh, limit=INTEL_ROWS):
     return [z for z in ranked if z["new_green"] or z["green"] or z["gold"]][:limit]
 
 
+def _print_dispatch(sh, web):
+    """WHERE TO GO NEXT -- a dispatch, not a report.
+
+    Areas come from NATIONWIDE AT&T announcements, never from what we have
+    already captured. An area another operator holds is shown as taken, with
+    who and since when, so nobody wonders why a market they saw in the news is
+    missing. Captured counts appear only as context on a claim.
+    """
+    me = OPERATOR()
+    cands = (web or {}).get("build") or []
+
+    if _TERR is None:
+        print("  WHERE TO SCAN NEXT: optimus_territory.py not on this PC")
+        return
+    claims, why = _TERR.load(sh)
+    if why:
+        print("  WHERE TO SCAN NEXT: %s" % why)
+        return
+
+    go, taken, mine = _TERR.dispatch(cands, claims, me)
+
+    print("  WHERE TO SCAN NEXT -- %s, these are yours to take:" % me)
+    if go:
+        for c in go:
+            z = (", ".join(c.get("zips") or []))[:24]
+            print("     %-26s %-4s %-24s %s"
+                  % (str(c.get("where"))[:26], c.get("state") or "",
+                     z or "-", str(c.get("title"))[:44]))
+        print("     claim one:  --claim \"%s\"" % (go[0].get("where") or ""))
+    elif cands:
+        print("     nothing free -- every announced area is already claimed")
+    else:
+        print("     no new-build announcements came back this launch")
+        for n in ((web or {}).get("notes") or [])[:3]:
+            if " build" in n:
+                print("       " + n)
+
+    if taken:
+        print("  ALREADY SOMEBODY ELSE'S -- do not go:")
+        for c in taken:
+            print("     %-26s held by %-12s since %s"
+                  % (str(c.get("where"))[:26], c.get("holder"), c.get("since")))
+
+    if mine:
+        print("  YOURS RIGHT NOW (%s):" % me)
+        for c in mine:
+            print("     %-26s claimed %s%s"
+                  % (str(c.get("Area"))[:26], c.get("Claimed At"),
+                     ("  ZIP " + c["ZIP"]) if c.get("ZIP") else ""))
+
+
 def _print_web(web, kind, heading):
     """Print web items, or -- when there are none -- WHY there are none.
 
@@ -5025,7 +5082,7 @@ def intel_banner():
         except Exception:
             pockets = []
         if pockets:
-            print("  WHERE THE GOLD IS THICKEST (from our own captured dots):")
+            print("  ALREADY WORKED BY US -- captured gold, NOT a suggestion:")
             for p in pockets:
                 print("     %6.2f,%-8.2f  %3d gold   %s"
                       % (p["lat"], p["lng"], p["gold"], p["streets"]))
@@ -5038,11 +5095,47 @@ def intel_banner():
                     print("     %s: %s" % (label, _INTEL_WHY[k]))
             if not (_INTEL_WHY.get("zips") or _INTEL_WHY.get("gold")):
                 print("     no zone scans and no gold dots yet")
-    _print_web(web, "build", "NEW FIBER ANNOUNCEMENTS ON THE WEB")
-    if web and web.get("zips"):
-        print("  ZIPS NAMED IN THOSE STORIES -- scan these: %s"
-              % ", ".join(web["zips"][:12]))
+    _print_dispatch(sh, web)
     print("  ------------------------------------------------------------")
+
+
+def _territory_cli(args):
+    """--claim / --release / --territory. Never raises into the launcher."""
+    me = OPERATOR()
+    try:
+        machine = _OP.machine_name() if _OP else ""
+    except Exception:
+        machine = ""
+    if _TERR is None:
+        print("  territory: optimus_territory.py is not on this PC")
+        return
+    try:
+        sh = open_sheet()
+    except Exception as e:
+        print("  territory: sheet unreachable (%s)" % str(e)[:60])
+        return
+
+    if args.claim:
+        area, st = _split_area(args.claim)
+        ok, msg = _TERR.claim(sh, area, st, operator=me, machine=machine,
+                              source="manual")
+        print("  %s %s" % ("CLAIMED:" if ok else "REFUSED:", msg))
+    if args.release:
+        area, st = _split_area(args.release)
+        ok, msg = _TERR.release(sh, area, st, operator=me)
+        print("  %s %s" % ("RELEASED:" if ok else "REFUSED:", msg))
+
+    print("  ---- TERRITORY BOARD ---------------------------------------")
+    _print_dispatch(sh, _web_intel())
+    print("  ------------------------------------------------------------")
+
+
+def _split_area(text):
+    """'Beaumont, TX' -> ('Beaumont', 'TX'). 'Beaumont' -> ('Beaumont', '')."""
+    parts = [p.strip() for p in str(text).split(",")]
+    if len(parts) >= 2 and len(parts[-1]) == 2 and parts[-1].isalpha():
+        return ", ".join(parts[:-1]), parts[-1].upper()
+    return str(text).strip(), ""
 
 
 def main():
@@ -5130,6 +5223,13 @@ def main():
                     help="who is running this scan (stamped on every row). "
                          "Normally you are asked once and it is remembered; "
                          "use this to override, or on scheduled runs.")
+    ap.add_argument("--claim", metavar="AREA", default="",
+                    help="claim an area so nobody else is sent there, e.g. "
+                         "--claim \"Beaumont, TX\"")
+    ap.add_argument("--release", metavar="AREA", default="",
+                    help="give a claimed area back so others can take it")
+    ap.add_argument("--territory", action="store_true",
+                    help="print the dispatch board and quit")
     ap.add_argument("--whoami", action="store_true",
                     help="show/change who this PC scans as, then carry on")
     ap.add_argument("--no-split", action="store_true",
@@ -5157,6 +5257,13 @@ def main():
 
     if args.uploader:
         uploader_main()          # write worker: no browser, no Playwright
+        return
+
+    # Territory: claiming an area is a bookkeeping action, not a scan. It runs
+    # before the browser opens and quits, so a rep can take or hand back a
+    # market without burning a launch.
+    if args.claim or args.release or args.territory:
+        _territory_cli(args)
         return
 
     # Intel prints for a person opening the hunter, so it sits after the
