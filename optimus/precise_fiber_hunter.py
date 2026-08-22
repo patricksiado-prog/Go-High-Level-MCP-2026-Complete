@@ -4776,7 +4776,8 @@ def _disable_quickedit():
 # rule the operator check follows.
 # ---------------------------------------------------------------------------
 OUTAGE_TAB = "Outage Signals"    # Logged At | ZIP | Signal | Status
-ZONES_TAB_NAME = "Fiber Zones"   # Scanned At | ZIP | Zone Label | Priority |
+ZONES_TAB_NAME = "Fiber Zones"
+GOLD_TAB_NAME = "Gold Dots"       # no header row: A=Address B=Captured At C=Lat D=Lng   # Scanned At | ZIP | Zone Label | Priority |
                                  # Action | Green | Gold | Grey | Gray Share |
                                  # New Green | Instance
 INTEL_ROWS = 5
@@ -4804,6 +4805,55 @@ def _intel_recent_outages(sh, limit=INTEL_ROWS):
         if status.upper() in ("DONE", "WORKED", "CLOSED"):
             continue
         out.append((logged, zipc, signal, status or "RECEIVED"))
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _intel_gold_pockets(sh, limit=INTEL_ROWS):
+    """Fallback: derive where to go next from the gold dots we already captured.
+
+    `Fiber Zones` only has rows once somebody runs fiber_zone_scanner.py, and
+    until then the banner had nothing to say. But the answer is already in the
+    sheet: `Gold Dots` carries lat/lng for every gold dot ever captured, and gold
+    means an AT&T customer still on copper -- a dense pocket of them is fiber that
+    was lit recently and that nobody has converted. That IS the freshness signal,
+    so no web lookup and no outside update is needed to produce it.
+
+    Grids the coordinates to ~1km cells and returns the thickest pockets. Read
+    only, best-effort, and silent on any failure.
+    """
+    try:
+        rows = sh.worksheet(GOLD_TAB_NAME).get_all_values()
+    except Exception:
+        return []
+    cells = {}
+    for r in rows:                      # Gold Dots has NO header row
+        if len(r) < 4:
+            continue
+        try:
+            lat = float(str(r[2]).strip())
+            lng = float(str(r[3]).strip())
+        except (ValueError, TypeError):
+            continue
+        if lat == 0 or lng == 0:
+            continue
+        key = (round(lat, 2), round(lng, 2))     # ~1.1km latitude cells
+        c = cells.setdefault(key, {"n": 0, "streets": {}})
+        c["n"] += 1
+        addr = str(r[0] or "").strip().upper()
+        # keep the street, drop the house number, so a pocket names a street
+        parts = addr.split()
+        if len(parts) > 1:
+            st = " ".join(parts[1:])[:26]
+            c["streets"][st] = c["streets"].get(st, 0) + 1
+    out = []
+    for (lat, lng), c in sorted(cells.items(), key=lambda kv: kv[1]["n"], reverse=True):
+        if c["n"] < 4:                  # a pocket, not a stray dot
+            continue
+        top = sorted(c["streets"].items(), key=lambda kv: kv[1], reverse=True)[:2]
+        out.append({"lat": lat, "lng": lng, "gold": c["n"],
+                    "streets": ", ".join(s for s, _ in top)})
         if len(out) >= limit:
             break
     return out
@@ -4865,8 +4915,20 @@ def intel_banner():
                      z["grey_share"] or "-",
                      (z["action"] or z["label"] or "")[:24]))
     else:
-        print("  SUGGESTED NEW BUILD ZIPS: no zone scans yet -- "
-              "run fiber_zone_scanner.py to populate")
+        try:
+            pockets = _intel_gold_pockets(sh)
+        except Exception:
+            pockets = []
+        if pockets:
+            print("  WHERE THE GOLD IS THICKEST (from our own captured dots):")
+            for p in pockets:
+                print("     %6.2f,%-8.2f  %3d gold   %s"
+                      % (p["lat"], p["lng"], p["gold"], p["streets"]))
+            print("     (gold = AT&T customers still on copper. A thick pocket means")
+            print("      fiber was lit there recently and nobody has worked it.)")
+        else:
+            print("  SUGGESTED NEW BUILD ZIPS: no zone scans and no gold dots yet -- "
+                  "run fiber_zone_scanner.py or capture some gold")
     print("  ------------------------------------------------------------")
 
 
