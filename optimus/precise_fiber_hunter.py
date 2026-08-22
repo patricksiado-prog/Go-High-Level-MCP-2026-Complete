@@ -4874,7 +4874,12 @@ def main():
     self_update()
     # Straight after the update, so the console always answers "did the update
     # actually take, and what am I running?" before anything else happens.
-    _deploy_manifest()
+    # Wrapped: a manifest is diagnostics, and diagnostics must never be the
+    # reason a sweep does not run.
+    try:
+        _deploy_manifest()
+    except Exception as e:
+        print("  (deploy manifest unavailable: %s)" % str(e)[:70])
     _disable_quickedit()
     ap = argparse.ArgumentParser()
     ap.add_argument("--login", action="store_true", help="open browser to log in once, then quit")
