@@ -3488,7 +3488,7 @@ def _find_git():
 # over). A file absent from this list NEVER reaches that machine by auto-update,
 # so pushing it to the branch changes nothing there. Add new tools here or they
 # do not ship.
-_CORE_FILES = ("precise_fiber_hunter.py", "optimus_operator.py",
+_CORE_FILES = ("precise_fiber_hunter.py", "optimus_web_intel.py", "optimus_operator.py",
                "optimus_dot_detect.py",
                "optimus_api_capture.py", "hunter_fixes.py",
                "backend_classifier.py", "build_codes.json",
@@ -4782,6 +4782,39 @@ GOLD_TAB_NAME = "Gold Dots"       # no header row: A=Address B=Captured At C=Lat
                                  # New Green | Instance
 INTEL_ROWS = 5
 
+# Web intel. Imported defensively: optimus_web_intel.py is in _CORE_FILES, but a
+# PC whose download of it failed must still scan. No import, no web lines, sweep
+# unaffected.
+try:
+    import optimus_web_intel as _WEB
+except Exception:
+    _WEB = None
+
+def _web_cache_path():
+    """Where to cache web intel. Module-level `__file__` is NOT safe here: a
+    frozen or exec-wrapped launcher leaves it undefined, and a NameError at
+    import time kills the hunter outright instead of costing it one banner."""
+    try:
+        base = os.path.dirname(os.path.abspath(__file__))
+    except Exception:
+        base = os.getcwd()
+    return os.path.join(base, "optimus_web_intel_cache.json")
+
+
+def _web_intel():
+    """Outage + new-build chatter off the open web. Never raises, never blocks
+    longer than its own budget. Returns None if the module is not present."""
+    if _WEB is None:
+        return None
+    try:
+        return _WEB.gather(budget_s=6.0, per_source_s=3.0,
+                           cache_path=_web_cache_path(), ttl_s=21600)
+    except Exception as e:
+        return {"outage": [], "build": [], "zips": [],
+                "notes": ["web intel failed: %s" % str(e)[:60]],
+                "cached": False, "age_s": 0}
+
+
 # Why a given intel source produced nothing. The whole point of this block is
 # that "none open" reads as "we checked and there were none" when the truth was
 # "that tab does not exist" -- a failure returning 0 instead of saying so, which
@@ -4919,6 +4952,37 @@ def _intel_suggested_zips(sh, limit=INTEL_ROWS):
     return [z for z in ranked if z["new_green"] or z["green"] or z["gold"]][:limit]
 
 
+def _print_web(web, kind, heading):
+    """Print web items, or -- when there are none -- WHY there are none.
+
+    Same rule as the sheet readers: an empty line that does not say why is how
+    the old banner spent weeks reporting "none open" about a tab that did not
+    exist.
+    """
+    if web is None:
+        print("  %s: optimus_web_intel.py not on this PC" % heading)
+        return
+    items = web.get(kind) or []
+    if items:
+        mins = web.get("age_s", 0) // 60
+        if web.get("stale"):
+            age = "STALE, %dh old -- the net was unreachable" % (mins // 60)
+        elif web.get("cached"):
+            age = "cached %dm ago" % mins
+        else:
+            age = "fresh"
+        print("  %s (%s):" % (heading, age))
+        for it in items[:5]:
+            print("     [%-12s] %-64s %s"
+                  % (str(it.get("where"))[:12], str(it.get("title"))[:64],
+                     str(it.get("when"))[:16]))
+        return
+    print("  %s: nothing --" % heading)
+    for n in (web.get("notes") or [])[:6]:
+        if (" " + kind) in n or "failed" in n:
+            print("     " + n)
+
+
 def intel_banner():
     """Outages + suggested new build ZIPs, printed at every opening."""
     try:
@@ -4935,6 +4999,8 @@ def intel_banner():
     except Exception:
         zips = []
 
+    web = _web_intel()
+
     print("  ---- OPENING INTEL -----------------------------------------")
     if outages:
         print("  PRECISE FIBER CABLE OUTAGES (open):")
@@ -4942,8 +5008,9 @@ def intel_banner():
             print("     %-6s %-28s %-9s %s"
                   % (zipc, signal[:28], status, logged))
     else:
-        print("  PRECISE FIBER CABLE OUTAGES: %s"
-              % (_INTEL_WHY.get("outages") or "none open"))
+        print("  PRECISE FIBER CABLE OUTAGES (sheet): %s"
+              % (_INTEL_WHY.get("outages") or "none logged"))
+    _print_web(web, "outage", "OUTAGE CHATTER ON THE WEB (our territory only)")
 
     if zips:
         print("  SUGGESTED NEW BUILD ZIPS (most new green first):")
@@ -4971,6 +5038,10 @@ def intel_banner():
                     print("     %s: %s" % (label, _INTEL_WHY[k]))
             if not (_INTEL_WHY.get("zips") or _INTEL_WHY.get("gold")):
                 print("     no zone scans and no gold dots yet")
+    _print_web(web, "build", "NEW FIBER ANNOUNCEMENTS ON THE WEB")
+    if web and web.get("zips"):
+        print("  ZIPS NAMED IN THOSE STORIES -- scan these: %s"
+              % ", ".join(web["zips"][:12]))
     print("  ------------------------------------------------------------")
 
 
