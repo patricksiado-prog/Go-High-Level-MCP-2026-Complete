@@ -4684,6 +4684,116 @@ def _disable_quickedit():
         pass
 
 
+# ---------------------------------------------------------------------------
+# OPENING INTEL BANNER (Patrick, 2026-08-22)
+# The startup banner already answers "who is scanning". It should also answer
+# "what changed since last time" -- the two things that decide where today's
+# sweep should point:
+#   1. precise fiber cable outages -- a live buying window. The pipeline and
+#      portal already log these to the 'Outage Signals' tab; nothing read them
+#      back, so a logged outage sat unseen until somebody opened the sheet.
+#   2. suggested new build ZIPs    -- fiber_zone_scanner already scores every
+#      ZIP it sweeps into 'Fiber Zones'. The ZIPs turning up the most NEW green
+#      are where fiber was just lit.
+# Read-only, and wrapped end to end: intel is never worth breaking a sweep for,
+# so every failure degrades to one quiet line and the hunter carries on. Same
+# rule the operator check follows.
+# ---------------------------------------------------------------------------
+OUTAGE_TAB = "Outage Signals"    # Logged At | ZIP | Signal | Status
+ZONES_TAB_NAME = "Fiber Zones"   # Scanned At | ZIP | Zone Label | Priority |
+                                 # Action | Green | Gold | Grey | Gray Share |
+                                 # New Green | Instance
+INTEL_ROWS = 5
+
+
+def _intel_int(v):
+    """Sheet cells arrive as text and may carry a '%'. Never raise on junk."""
+    try:
+        return int(float(str(v).replace("%", "").strip() or 0))
+    except Exception:
+        return 0
+
+
+def _intel_recent_outages(sh, limit=INTEL_ROWS):
+    """Newest outage signals that nobody has worked yet."""
+    try:
+        rows = sh.worksheet(OUTAGE_TAB).get_all_values()
+    except Exception:
+        return []
+    out = []
+    for r in reversed(rows[1:]):              # newest appended last
+        logged, zipc, signal, status = [str(x).strip() for x in (r + [""] * 4)[:4]]
+        if not zipc and not signal:
+            continue
+        if status.upper() in ("DONE", "WORKED", "CLOSED"):
+            continue
+        out.append((logged, zipc, signal, status or "RECEIVED"))
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _intel_suggested_zips(sh, limit=INTEL_ROWS):
+    """Newest scan per ZIP, ranked by how much NEW green it turned up."""
+    try:
+        rows = sh.worksheet(ZONES_TAB_NAME).get_all_values()
+    except Exception:
+        return []
+    latest = {}
+    for r in rows[1:]:
+        r = (r + [""] * 11)[:11]
+        zipc = str(r[1]).strip()
+        if not zipc:
+            continue
+        latest[zipc] = {          # later row wins -> newest scan per ZIP
+            "zip": zipc, "label": str(r[2]).strip(), "action": str(r[4]).strip(),
+            "green": _intel_int(r[5]), "gold": _intel_int(r[6]),
+            "grey_share": str(r[8]).strip(), "new_green": _intel_int(r[9]),
+        }
+    ranked = sorted(latest.values(),
+                    key=lambda z: (z["new_green"], z["green"] + z["gold"]),
+                    reverse=True)
+    return [z for z in ranked if z["new_green"] or z["green"] or z["gold"]][:limit]
+
+
+def intel_banner():
+    """Outages + suggested new build ZIPs, printed at every opening."""
+    try:
+        sh = open_sheet()
+    except Exception as e:
+        print("  INTEL: sheet unreachable (%s) -- scanning anyway" % str(e)[:50])
+        return
+    try:
+        outages = _intel_recent_outages(sh)
+    except Exception:
+        outages = []
+    try:
+        zips = _intel_suggested_zips(sh)
+    except Exception:
+        zips = []
+
+    print("  ---- OPENING INTEL -----------------------------------------")
+    if outages:
+        print("  PRECISE FIBER CABLE OUTAGES (open):")
+        for logged, zipc, signal, status in outages:
+            print("     %-6s %-28s %-9s %s"
+                  % (zipc, signal[:28], status, logged))
+    else:
+        print("  PRECISE FIBER CABLE OUTAGES: none open")
+
+    if zips:
+        print("  SUGGESTED NEW BUILD ZIPS (most new green first):")
+        for z in zips:
+            print("     %-6s new-green %-5d green %-5d gold %-4d grey %-5s %s"
+                  % (z["zip"], z["new_green"], z["green"], z["gold"],
+                     z["grey_share"] or "-",
+                     (z["action"] or z["label"] or "")[:24]))
+    else:
+        print("  SUGGESTED NEW BUILD ZIPS: no zone scans yet -- "
+              "run fiber_zone_scanner.py to populate")
+    print("  ------------------------------------------------------------")
+
+
 def main():
     self_update()
     _disable_quickedit()
@@ -4789,6 +4899,10 @@ def main():
     if args.uploader:
         uploader_main()          # write worker: no browser, no Playwright
         return
+
+    # Intel prints for a person opening the hunter, so it sits after the
+    # uploader return -- a headless write worker has nobody to read it.
+    intel_banner()
 
     # THE ORIGINAL MOTION -- raw Windows input, nothing to install, no fallback.
     if _real_mouse_ready():
