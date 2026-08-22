@@ -3501,35 +3501,111 @@ def _raw_refresh(here):
     urllib -- no git, no launcher needed, so the PROGRAM self-heals to the latest
     code every launch on ANY machine. Returns True if THIS file's bytes changed
     (caller then re-execs once). Best-effort; every failure is swallowed."""
-    import urllib.request, time
+    import urllib.request, time, hashlib, json as _json
     base = ("https://raw.githubusercontent.com/%s/%s/optimus"
             % (GH_REPO, GH_BRANCH))
     cb = str(int(time.time()))        # cache-bust so a CDN copy can't pin us stale
     d = os.path.dirname(here)
     changed = False
-    got_main = False
+    updated, same, failed = [], [], []
+
     for name in _CORE_FILES:
         url = "%s/%s?cb=%s" % (base, name, cb)
         dest = os.path.join(d, name)
         try:
             req = urllib.request.Request(url, headers={"Cache-Control": "no-cache"})
-            new = urllib.request.urlopen(req, timeout=30).read()
+            resp = urllib.request.urlopen(req, timeout=30)
+            new = resp.read()
             if not new:
+                failed.append((name, "empty response"))
                 continue
+
+            # A captive portal, a proxy login page or a truncated transfer can all
+            # come back HTTP 200 with a body that is not the file. Writing that
+            # over a working core file bricks the hunter with no clue why, so
+            # every download is parsed BEFORE it is allowed to land.
+            if name.endswith(".py"):
+                try:
+                    compile(new, name, "exec")
+                except SyntaxError as e:
+                    failed.append((name, "downloaded bytes are not valid Python "
+                                         "(line %s) -- kept the working copy" % e.lineno))
+                    continue
+            elif name.endswith(".json"):
+                try:
+                    _json.loads(new.decode("utf-8"))
+                except Exception:
+                    failed.append((name, "downloaded bytes are not valid JSON "
+                                         "-- kept the working copy"))
+                    continue
+
             old = b""
             if os.path.exists(dest):
                 old = open(dest, "rb").read()
-            if new != old:
-                open(dest, "wb").write(new)
-                if os.path.abspath(dest) == os.path.abspath(here):
-                    changed = True
-            if name == "precise_fiber_hunter.py":
-                got_main = True
-        except Exception:
-            continue      # offline / 404 / one file failed -- keep the rest
-    if got_main:
-        print("(auto-update: refreshed core files over HTTPS -- no git needed)")
+            if new == old:
+                same.append(name)
+                continue
+
+            # Write to a temp file then replace, so a crash or a full disk mid-write
+            # cannot leave a half-written core file behind. os.replace is atomic.
+            tmp = dest + ".new"
+            with open(tmp, "wb") as fh:
+                fh.write(new)
+            os.replace(tmp, dest)
+            updated.append((name, hashlib.sha256(new).hexdigest()[:8]))
+            if os.path.abspath(dest) == os.path.abspath(here):
+                changed = True
+        except Exception as e:
+            # Report it. Swallowing this is how a hunter runs month-old code while
+            # printing a success line -- the exact failure this whole block exists
+            # to make visible.
+            failed.append((name, "%s: %s" % (type(e).__name__, str(e)[:70])))
+
+    print("  UPDATE (HTTPS, no git needed): %d updated, %d already current, "
+          "%d FAILED" % (len(updated), len(same), len(failed)))
+    for name, fp in updated:
+        print("     updated  %-28s -> %s" % (name, fp))
+    if failed:
+        print("!" * 68)
+        print("  %d OF %d CORE FILES DID NOT UPDATE. This run is using the copy"
+              % (len(failed), len(_CORE_FILES)))
+        print("  already on disk for those files, which may be old.")
+        for name, why in failed:
+            print("     FAILED   %-28s %s" % (name, why))
+        print("  Branch: %s/%s" % (GH_REPO, GH_BRANCH))
+        print("  A 404 here usually means the file was renamed or the branch")
+        print("  moved. Check the branch above still exists on GitHub.")
+        print("!" * 68)
     return changed
+
+
+def _deploy_manifest():
+    """Print what is ACTUALLY on disk for every core file: when it was written and
+    a fingerprint of its bytes.
+
+    A hand-typed version marker eventually disagrees with the code, and one that
+    disagrees is worse than none because it gets believed -- BUILD_DATE already
+    did exactly that, reporting 08-18 while 08-20 code was running. Nothing here
+    is maintained by anyone, so nothing here can go stale: it is read off the
+    files themselves at launch. When somebody says 'the update didn't take',
+    this is the block that answers it."""
+    import hashlib
+    d = os.path.dirname(os.path.abspath(__file__))
+    print("  DEPLOYED FILES (read from disk -- cannot go stale):")
+    for name in _CORE_FILES:
+        p = os.path.join(d, name)
+        if not os.path.exists(p):
+            print("     MISSING  %-28s <- not on this PC; it will never "
+                  "auto-update" % name)
+            continue
+        try:
+            b = open(p, "rb").read()
+            print("     %-28s %s  %s"
+                  % (name,
+                     time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(p))),
+                     hashlib.sha256(b).hexdigest()[:8]))
+        except Exception as e:
+            print("     %-28s unreadable: %s" % (name, str(e)[:40]))
 
 
 def self_update():
@@ -4796,6 +4872,9 @@ def intel_banner():
 
 def main():
     self_update()
+    # Straight after the update, so the console always answers "did the update
+    # actually take, and what am I running?" before anything else happens.
+    _deploy_manifest()
     _disable_quickedit()
     ap = argparse.ArgumentParser()
     ap.add_argument("--login", action="store_true", help="open browser to log in once, then quit")
