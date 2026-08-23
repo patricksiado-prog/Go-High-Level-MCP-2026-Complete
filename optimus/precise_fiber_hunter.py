@@ -5492,6 +5492,61 @@ def _split_area(text):
     return str(text).strip(), ""
 
 
+# Seconds to wait at the "press Enter" prompt before starting anyway. The
+# prompt is a convenience, not a gate: an unattended hunter that waits forever
+# is indistinguishable from a broken one.
+START_WAIT_SECS = int(os.environ.get("OPTIMUS_START_WAIT") or 45)
+
+
+def _wait_for_start(secs):
+    """Wait up to `secs` for Enter, then start regardless. Never blocks forever.
+
+    Counts down out loud so it is obvious the tool is alive and what it will do.
+    """
+    print("  Map on the right spot? Press Enter to START scanning "
+          "(auto-starts in %ds)... " % secs)
+    end = time.time() + max(1, secs)
+    try:
+        if not sys.stdin.isatty():
+            # Launched with no console input (a .bat double-click, a scheduler).
+            # There is nobody to press anything, so waiting is pure dead time.
+            print("  (no interactive console -- starting immediately)")
+            return False
+    except Exception:
+        pass
+    try:
+        import msvcrt                       # Windows
+        while time.time() < end:
+            if msvcrt.kbhit():
+                msvcrt.getch()
+                print("  starting now.")
+                return True
+            left = int(end - time.time())
+            if left and left % 10 == 0:
+                print("     auto-start in %ds..." % left)
+                time.sleep(1.05)
+            time.sleep(0.15)
+    except ImportError:
+        try:
+            import select                   # POSIX
+            while time.time() < end:
+                r, _, _ = select.select([sys.stdin], [], [], 0.5)
+                if r:
+                    sys.stdin.readline()
+                    print("  starting now.")
+                    return True
+        except Exception:
+            # NEVER fall back to a bare input() here. That is the exact call
+            # this function exists to remove: it blocks forever and the sweep
+            # silently never starts. Sleeping out the timer is strictly better.
+            while time.time() < end:
+                time.sleep(0.2)
+    except Exception:
+        pass
+    print("  no keypress -- STARTING ANYWAY so the sweep is never stuck here.")
+    return False
+
+
 def main():
     self_update()
     # Straight after the update, so the console always answers "did the update
@@ -5882,10 +5937,12 @@ def main():
             print("  STEP 2  ->  When the map is sitting on the right spot, come")
             print("              back to THIS window and press Enter to scan it.")
             print("  " + "=" * 60)
-            try:
-                input("  Map on the right spot? Press Enter to START scanning... ")
-            except EOFError:
-                pass
+            # A bare input() blocks FOREVER. If this window does not have
+            # keyboard focus -- easy to miss when the map window is the one you
+            # were just using -- the sweep never starts, every feed report comes
+            # back empty, and nothing anywhere says "I am waiting for a keypress".
+            # That cost most of 2026-08-23. It now starts on its own.
+            _wait_for_start(START_WAIT_SECS)
             # 5-second grace period so you can MINIMIZE this window before the
             # hunter takes over the mouse (real-mouse motion). Countdown so you
             # know how long you've got.
