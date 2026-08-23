@@ -6717,6 +6717,17 @@ def main():
                 # alarm in the one tool whose job is to stop false alarms.
                 if passno == 1:
                     _phase("pass_done")
+                # Publish on the FIRST completed pass, whatever it found.
+                # Otherwise a pass that captured fewer than FLUSH_EVERY dots
+                # reports nothing at all until the run exits -- and a pass that
+                # captured ZERO looks identical to one that captured 40. That
+                # ambiguity is the exact thing this feed exists to remove, and
+                # it survived right up to the first pass that ever completed.
+                try:
+                    if _FEED:
+                        _publish_feed()
+                except Exception:
+                    pass
             except Exception as e:
                 msg = str(e)
                 report_status(ws, args.zip or "manual", "error", note=msg[:120])
