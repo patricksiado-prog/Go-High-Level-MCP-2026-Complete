@@ -162,6 +162,25 @@ def note_stages(d):
         pass
 
 
+_CRASH = {}
+
+
+def note_crash(summary, tb=""):
+    """Record why a run died. Published, so nobody has to photograph a console.
+
+    A run that exits before its first milestone reports all-nulls and looks
+    exactly like a run that swept an empty street. The phase breadcrumb narrowed
+    that to a window; this closes it by naming the exception itself.
+    """
+    try:
+        _CRASH.clear()
+        _CRASH.update({"summary": str(summary)[:300],
+                       "traceback": str(tb or "")[-4000:],
+                       "at": time.strftime("%Y-%m-%d %H:%M:%S")})
+    except Exception:
+        pass
+
+
 _DIAG = {}
 
 
@@ -426,6 +445,7 @@ def build_report(counts=None, undecoded=None, undecoded_samples=None,
         "phases": [list(p) for p in _PHASES],
         "last_phase": last_phase(),
         "stage_counters": dict(_STAGE_COUNTS),
+        "crash": dict(_CRASH),
         "capture_truth": dict(_TRUTH),
         "first_failure": first_failure()[0],
         "capture_diagnostic": dict(_DIAG),

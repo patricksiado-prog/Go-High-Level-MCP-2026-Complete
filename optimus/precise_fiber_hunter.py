@@ -342,10 +342,12 @@ def _git_commit():
     than a fault to hide.
     """
     try:
+        import shutil
         import subprocess
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        r = subprocess.run([_find_git(), "-C", root, "rev-parse", "--short",
-                            "HEAD"], capture_output=True, text=True, timeout=15)
+        git = shutil.which("git") or "git"
+        r = subprocess.run([git, "-C", root, "rev-parse", "--short", "HEAD"],
+                           capture_output=True, text=True, timeout=15)
         out = (r.stdout or "").strip()
         return out or "unknown (%s)" % (r.stderr or "").strip()[:50]
     except Exception as e:
@@ -6348,7 +6350,19 @@ def main():
     os.makedirs(PROFILE_DIR, exist_ok=True)
 
     with sync_playwright() as pw:
+        _phase("playwright_up")
         _kill_stale_browser()   # a frozen run's leftover Chromium would block
+        try:
+            _lock = os.path.join(PROFILE_DIR, "SingletonLock")
+            _busy = os.path.exists(_lock)
+        except Exception:
+            _busy = False
+        if _busy:
+            print("")
+            print("  NOTE: a Chromium profile lock is present. If another")
+            print("  Optimus Fiber Hunter window is already open, CLOSE THIS ONE")
+            print("  -- two hunters cannot share one browser profile, and the")
+            print("  second to start will die immediately.")
         ctx = pw.chromium.launch_persistent_context(
             PROFILE_DIR, headless=False,
             viewport=VIEWPORT,
@@ -6368,6 +6382,7 @@ def main():
         ctx.add_init_script(GEO_HIDE_JS)      # hide the giant geolocation blob
         ctx.add_init_script(GL_WATCH_JS)      # detect WebGL context loss (freeze)
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        _phase("chromium_up")
 
         # ALWAYS capture network responses now -- the map object is hidden on
         # this site, so the dots have to be read off the wire. debug=True records
@@ -6719,4 +6734,31 @@ if __name__ == "__main__":
         atexit.register(lambda: (_DEDUPE_REPORT.duplicates
                                  or _DEDUPE_REPORT.failed_writes)
                         and _DEDUPE_REPORT.report())
-    main()
+    try:
+        main()
+    except SystemExit as e:
+        # A non-zero exit is a failure even though nothing was raised. The
+        # dependency check does exactly this -- one printed line, then gone.
+        if getattr(e, "code", 0) and _FEED is not None:
+            try:
+                _FEED.note_crash("SystemExit(%s) -- something called sys.exit"
+                                 % e.code)
+                _FEED.phase("EXIT_%s" % e.code)
+            except Exception:
+                pass
+        raise
+    except BaseException as e:
+        import traceback as _tb
+        _msg = "%s: %s" % (type(e).__name__, str(e)[:200])
+        print("")
+        print("!" * 68)
+        print("  THE RUN DIED: %s" % _msg)
+        print("!" * 68)
+        _tb.print_exc()
+        if _FEED is not None:
+            try:
+                _FEED.note_crash(_msg, _tb.format_exc())
+                _FEED.phase("CRASHED")
+            except Exception:
+                pass
+        raise
