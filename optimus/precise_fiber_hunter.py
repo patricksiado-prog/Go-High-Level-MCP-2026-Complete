@@ -414,13 +414,20 @@ def classify_wire(status, ban, raw):
     The map legend has only three states, keyed off two fields:
       * subscriber_ban EMPTY            -> GREEN (fiber-eligible non-customer)
       * ban present + confirmed FIBER   -> GREY  (fttp-gpon/ftth = already on fiber)
-      * ban present + NOT on fiber      -> GOLD  (copper/DSL/other customer = the
+      * ban present + confirmed COPPER  -> GOLD  (copper/DSL customer = the
                                                   upgrade lead)
-    So a customer is GREY only when we can CONFIRM fiber; every other customer is
-    a copper-upgrade GOLD. This catches copper dots whose build code is a value we
-    never enumerated (e.g. 'unavailable', a DSL variant) -- the earlier version
-    required an explicit copper code and silently dropped those as GREY, which is
-    why a gold-dot-heavy view still wrote zero ORANGE."""
+      * ban present + code we cannot decode -> GREY (see below -- NOT gold)
+    A customer is GOLD only when we can CONFIRM copper. An unrecognised build
+    code is GREY, not gold.
+
+    DO NOT "fix" this back to gold-by-default. That was the old rule, and it put
+    existing FIBER customers on the call list -- Patrick clicked a gold dot and
+    got somebody already on fiber. It is also why the 'Gold Dots' tab still holds
+    roughly 4.7x more rows than this rule produces (audit 2026-08-23, BRAIN.md
+    22.14): those rows were written under the old rule and cannot be told apart,
+    because nothing stamps which rule wrote a row. If a code is genuinely copper,
+    confirm it on the map and add it to build_codes.json -- do not widen the
+    default."""
     if ban:
         code = _bld_code(raw)
         if not code:
@@ -539,8 +546,17 @@ BACKEND_HEADER = ["Time", "Host", "Area", "Kind", "Status", "Bytes", "ms",
 # reply silently truncates and the rest of that ground is never captured. Nothing
 # reports an error -- the sweep just quietly misses houses. Any row at or above
 # NEAR_CAP is a viewport that probably lost addresses.
-BACKEND_LEAD_CAP = 3000
-NEAR_CAP = 2900
+# MEASURED, not assumed: backend_capture.txt (2026-07-16) shows two replies of
+# EXACTLY 500 and an inspect header reading "total leads: 500". Patrick's team
+# email says the same. This constant previously read 3000 -- a number taken from
+# four sheet tabs sitting at 3,000 rows, which is a different artifact entirely.
+# At 3000 the warning below could NEVER fire, so every truncated viewport was
+# logged as a clean scan. That is worse than no guard at all.
+BACKEND_LEAD_CAP = 500
+NEAR_CAP = 475
+# Landing EXACTLY on a round number is the truncation fingerprint. Flag those
+# outright, so a future cap we have not measured still gets caught.
+BACKEND_CAP_VALUES = (500, 1000, 1500, 2000, 2500, 3000)
 _BACKEND_LOG = []          # rows buffered between flushes
 _BACKEND_WS = [None]       # cached worksheet handle
 _BACKEND_MAX = 5000        # hard cap per run so a long sweep cannot flood the sheet
@@ -1569,9 +1585,12 @@ class NetCapture:
                     if not leads:
                         _note = ("200 but 0 leads -- payload shape may have changed: %s"
                                  % (list(data)[:6] if isinstance(data, dict) else type(data).__name__))
-                    elif len(leads) >= NEAR_CAP:
-                        _note = ("NEAR THE %d CAP -- this viewport probably LOST "
-                                 "addresses. Zoom IN here." % BACKEND_LEAD_CAP)
+                    elif (len(leads) in BACKEND_CAP_VALUES
+                          or len(leads) >= NEAR_CAP):
+                        _note = ("TRUNCATED? %d leads, at/near AT&T's %d cap -- "
+                                 "this viewport probably LOST addresses. Zoom IN "
+                                 "and sweep it again."
+                                 % (len(leads), BACKEND_LEAD_CAP))
                     else:
                         _note = ""
                     log_backend("serviceability", url, 200, ct, len(body),
@@ -2066,7 +2085,13 @@ def _ensure_gold_tab(sh):
     else:
         _ensure_header(gw, _GOLD_HEADER)
     try:
-        col = gw.col_values(1)[1:]      # skip the header row
+        col = gw.col_values(1)
+        # Only drop row 1 when it REALLY is the header. The live tab has no
+        # header row (verified 2026-08-22), so blindly slicing [1:] left a real
+        # address out of `seen` -- and that address was re-appended on every
+        # single run that captured it again.
+        if col and col[0].strip().lower() == _GOLD_HEADER[0].strip().lower():
+            col = col[1:]
         _GOLD["seen"] = set(a.strip().upper() for a in col if a and a.strip())
     except Exception:
         _GOLD["seen"] = set()

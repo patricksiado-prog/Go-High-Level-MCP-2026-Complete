@@ -49,12 +49,48 @@ WHAT WE DON'T KNOW YET (a CUSTOMER-area capture answers it)
 import json
 
 
-# ── CONFIG: fill these in from a CUSTOMER-area inspect() run ────────────────
-# Once a customer-area capture reveals them, list the codes that mean an
-# existing FIBER subscriber (=> GREY) vs a COPPER/DSL account (=> GOLD).
-# Until then they stay empty and customers are reported as "CUSTOMER".
-FIBER_BUILD_CODES  = set()   # e.g. {"fiber", "ftth", "available_fiber"}
-COPPER_BUILD_CODES = set()   # e.g. {"copper", "ipbb", "dsl"}
+# ── BUILD CODES: loaded from build_codes.json, the ONE source of truth ──────
+# These were hard-coded as empty sets and nothing ever filled them in, so every
+# customer fell through to "CUSTOMER" and this module could NEVER return GOLD --
+# while build_codes.json sat right next to it holding the decoded codes. Anything
+# importing this file (fiber_scout.py, zip_reader.py, verify_gold_capture.py)
+# therefore reported zero gold, always. Found 2026-08-23; see BRAIN.md 22.14.
+#
+# Keep loading from the JSON. Do not re-inline these lists: the hunter reads the
+# same file, and two copies of the rule is what caused the original mess.
+import os
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_CODES_PATH = os.path.join(_HERE, "build_codes.json")
+
+
+def _load_build_codes(path=_CODES_PATH):
+    """Return (fiber, copper) code sets from build_codes.json.
+
+    Returns empty sets if the file is missing or unreadable -- the caller then
+    reports customers as CUSTOMER rather than guessing a color, which is the
+    safe direction: an unclassified dot costs us a lead, a wrongly-gold dot
+    costs a rep a wasted call on somebody already on fiber.
+    """
+    try:
+        with open(path) as f:
+            raw = json.load(f)
+    except Exception:
+        return set(), set()
+    def _norm_set(key):
+        return set(str(c).strip().lower()
+                   for c in (raw.get(key) or []) if str(c).strip())
+    return _norm_set("fiber"), _norm_set("copper")
+
+
+FIBER_BUILD_CODES, COPPER_BUILD_CODES = _load_build_codes()
+
+# Loud, once, at import: a silent empty table is exactly how this went unnoticed.
+if not FIBER_BUILD_CODES or not COPPER_BUILD_CODES:
+    import sys
+    print("backend_classifier: build_codes.json missing or empty (%s) -- gold "
+          "vs grey CANNOT be decided, every customer will report as CUSTOMER."
+          % _CODES_PATH, file=sys.stderr)
 
 
 # ── CORE CLASSIFIER ────────────────────────────────────────────────────────
