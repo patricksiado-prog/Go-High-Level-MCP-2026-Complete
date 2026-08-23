@@ -99,13 +99,59 @@ def has_account(rec):
     return False
 
 
+def push_net_log(token):
+    """Send the endpoint log. This is what says whether AT&T was ever ASKED.
+
+    A sweep that pans 150 cells and decodes 0 leads has two very different
+    causes: the request is never made, or it is made and the reply cannot be
+    read. The endpoint list separates them in one look, and it is the one file
+    that never leaves the field PC.
+    """
+    log = None
+    for d in _dirs():
+        q = os.path.join(d, "net_responses.log")
+        if os.path.exists(q):
+            log = q
+            break
+    if not log:
+        print("(no net_responses.log found)")
+        return
+    body = open(log, encoding="utf-8", errors="replace").read()
+    lines = [l for l in body.split("\n") if l.strip()]
+    api = [l for l in lines if "fibermap" in l.lower() or ".cfc" in l.lower()
+           or "/api/" in l.lower()]
+    print("\nENDPOINT LOG: %d lines, %d look like an API call" % (len(lines), len(api)))
+    if api:
+        print("  API-ish endpoints seen:")
+        for l in api[:15]:
+            print("   ", l.strip()[:140])
+    else:
+        print("  *** NO API/fiberMap.cfc CALL IN THE WHOLE LOG ***")
+        print("  AT&T was never asked for dot data, so a zero is guaranteed")
+        print("  no matter how many cells are swept.")
+    tail = "\n".join(lines[-400:])
+    if token:
+        gh_put(token, "optimus/_feed/net_endpoints.txt",
+               "lines=%d api_like=%d\n\nAPI-LIKE:\n%s\n\nTAIL:\n%s"
+               % (len(lines), len(api), "\n".join(api[:60]), tail))
+        print("  pushed -> optimus/_feed/net_endpoints.txt")
+
+
+def _dirs():
+    home = os.path.expanduser("~")
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))
+    except NameError:
+        here = os.getcwd()
+    return [here, os.path.join(home, "optimus_hunter"), home, "."]
+
+
 def main():
     path = find_file()
+    push_net_log(gh_token())
     if not path:
-        print("No saved AT&T response found. Run the hunter once (it saves")
-        print("serviceability_raw.json), then run this from that same folder.")
         return 1
-    print("reading: %s  (%d bytes)" % (path, os.path.getsize(path)))
+    print("\nreading: %s  (%d bytes)" % (path, os.path.getsize(path)))
     raw = open(path, encoding="utf-8", errors="replace").read()
     try:
         data = json.loads(raw)
