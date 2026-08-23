@@ -1778,6 +1778,11 @@ class NetCapture:
             dot_status = classify_lead(ld)
             if dot_color(dot_status) == "GREY":
                 grey_ct += 1
+                # A dot we ALREADY recorded as gold that now reads grey is the
+                # single most valuable observation a re-sweep produces: it is an
+                # existing fiber customer sitting on the upgrade call list. Record
+                # it as evidence. The old row is left untouched.
+                _note_verification(ld, addr, "GOLD", "GREY")
                 continue   # GREY = existing fiber customer -> leave out
             ts = time.strftime("%Y-%m-%d %H:%M:%S")
             # clean columns + the business merged inline when the address matches a
@@ -1864,6 +1869,9 @@ class NetCapture:
                 ng = write_gold_dots(ws.spreadsheet, new_records)
                 if ng:
                     print("   + %d gold (upgrade) dots -> '%s' tab" % (ng, GOLD_TAB))
+                # Evidence from this batch: dots we had already called gold that
+                # now read grey. Appended, never overwriting the original rows.
+                _flush_verification(ws.spreadsheet)
             except Exception as e:
                 print("   (gold dots skipped: %s)" % str(e)[:80])
         # COMBO: match these just-captured leads against the scraped businesses and
@@ -2071,7 +2079,9 @@ _GOLD_HEADER = ["Address", "Captured At", "Lat", "Lng", "Business", "Phone",
 
 
 def _coord_key(lat, lng):
-    """Identity from coordinates, ~1 m. Present on 100% of the live gold rows."""
+    """Positional identity, ~1 m. Delegates to optimus_dedupe when present."""
+    if _DEDUPE:
+        return _DEDUPE.coord_key(lat, lng)
     try:
         return "@%.5f,%.5f" % (float(lat), float(lng))
     except (TypeError, ValueError):
@@ -2079,20 +2089,14 @@ def _coord_key(lat, lng):
 
 
 def _gold_keys(addr, lat=None, lng=None):
-    """Every key one gold row should dedupe on.
+    """Keys a gold row is claimed under: normalised FULL address + coordinates.
 
-    The hunter used to write a STREET-ONLY address; it now writes the full
-    "STREET, CITY STATE ZIP" that AT&T's own payload carries. Those two strings
-    never match, so without help the 3,328 legacy rows would each be written a
-    SECOND time the next time that property was captured -- the compose fix
-    quietly became a duplicate generator.
-
-    Coordinates are the bridge. Every legacy row has lat/lng, so a fresh capture
-    of the same property matches on position no matter which address form was
-    stored. Street-only is deliberately NOT used as a key: '5309 WENDA ST'
-    exists in both Houston and Beaumont, and collapsing those would silently
-    drop a real $140 lead.
+    Street-only text is never a key on its own -- '5309 WENDA ST' exists in both
+    Houston and Beaumont and collapsing those drops a real $140 lead. See
+    optimus_dedupe for the full reasoning.
     """
+    if _DEDUPE:
+        return _DEDUPE.keys_for(addr, lat, lng)
     keys = set()
     a = (addr or "").strip().upper()
     if a:
@@ -2101,6 +2105,41 @@ def _gold_keys(addr, lat=None, lng=None):
     if ck:
         keys.add(ck)
     return keys
+
+
+def _note_verification(ld, addr, prev_class, new_class):
+    """Record one re-observation of a dot we have seen before. Never raises.
+
+    Only fires when the address is already claimed in the gold set, so a first
+    sighting is not mistaken for a change of mind.
+    """
+    if not _DEDUPE or _GOLD.get("seen") is None:
+        return
+    try:
+        lat, lng = ld.get("lat"), ld.get("lng")
+        if not (_gold_keys(addr, lat, lng) & _GOLD["seen"]):
+            return                     # never seen before: not a verification
+        _DEDUPE_REPORT.duplicates += 1
+        _DEDUPE_REPORT.note_change(addr, prev_class, new_class)
+        raw = ld.get("raw") if isinstance(ld.get("raw"), dict) else {}
+        _VERIFY_ROWS.append(_DEDUPE.history_row(
+            addr, lat, lng, prev_class, new_class,
+            _bld_code(raw) or "", bool(ld.get("ban")), "",
+            RUN_ID, OPERATOR()))
+    except Exception:
+        pass
+
+
+def _flush_verification(sh):
+    """Append the run's observations to the history tab. Best-effort."""
+    if not (_DEDUPE and sh is not None and _VERIFY_ROWS):
+        return
+    try:
+        ws = _DEDUPE.ensure_history_tab(sh)
+        _DEDUPE.write_history(ws, _VERIFY_ROWS, _DEDUPE_REPORT)
+        del _VERIFY_ROWS[:]
+    except Exception as e:
+        print("   (verification flush skipped: %s)" % str(e)[:70])
 
 
 def _ensure_gold_tab(sh):
@@ -2197,12 +2236,22 @@ def write_gold_dots(sh, records):
                      r.get("zip") or ""])
     if not rows:
         return 0
-    try:
-        for i in range(0, len(rows), 500):
-            gw.append_rows(rows[i:i + 500], value_input_option="RAW")
-    except Exception:
-        return 0
-    return len(rows)
+    written = 0
+    for i in range(0, len(rows), 500):
+        batch = rows[i:i + 500]
+        try:
+            gw.append_rows(batch, value_input_option="RAW")
+            written += len(batch)
+        except Exception as e:
+            # Never silent. A swallowed gold write is how an operator ends up
+            # believing rows were saved that were not.
+            print("   (GOLD WRITE FAILED for %d rows: %s)"
+                  % (len(batch), str(e)[:90]))
+            if _DEDUPE_REPORT:
+                _DEDUPE_REPORT.failed_writes += len(batch)
+    if _DEDUPE_REPORT:
+        _DEDUPE_REPORT.written += written
+    return written
 
 
 def _backfill_gold_from(sh, log=print):
@@ -3588,7 +3637,8 @@ def _find_git():
 # over). A file absent from this list NEVER reaches that machine by auto-update,
 # so pushing it to the branch changes nothing there. Add new tools here or they
 # do not ship.
-_CORE_FILES = ("precise_fiber_hunter.py", "optimus_web_intel.py",
+_CORE_FILES = ("precise_fiber_hunter.py", "optimus_dedupe.py",
+               "optimus_web_intel.py",
                "optimus_territory.py", "optimus_operator.py",
                "optimus_dot_detect.py",
                "optimus_api_capture.py", "hunter_fixes.py",
@@ -4061,6 +4111,7 @@ def uploader_main():
                     ng = write_gold_dots(ws.spreadsheet, new_records)
                     if ng:
                         _ulog("shipped %d gold (upgrade) dots to '%s'" % (ng, GOLD_TAB))
+                    _flush_verification(ws.spreadsheet)
                 except Exception as e:
                     _ulog("gold dots error: %s" % str(e)[:60])
                 try:
@@ -4896,6 +4947,15 @@ try:
 except Exception:                     # a missing ledger must not stop a sweep
     _TERR = None
 
+try:
+    import optimus_dedupe as _DEDUPE
+except Exception:                     # dedupe is safety, not a hard dependency
+    _DEDUPE = None
+
+# One report per run, filled by the flush paths and printed at the end.
+_DEDUPE_REPORT = _DEDUPE.DedupeReport() if _DEDUPE else None
+_VERIFY_ROWS = []                     # verification observations, appended only
+
 def _web_cache_path():
     """Where to cache web intel. Module-level `__file__` is NOT safe here: a
     frozen or exec-wrapped launcher leaves it undefined, and a NameError at
@@ -5704,4 +5764,10 @@ if __name__ == "__main__":
     # Ctrl-C, and the gold/grey split is exactly what we need to see when it is.
     import atexit
     atexit.register(wire_classification_report)
+    # Same reasoning as above: a sweep is normally ended with Ctrl-C, and the
+    # duplicate / GOLD->GREY split is exactly what we need to see when it is.
+    if _DEDUPE_REPORT is not None:
+        atexit.register(lambda: (_DEDUPE_REPORT.duplicates
+                                 or _DEDUPE_REPORT.failed_writes)
+                        and _DEDUPE_REPORT.report())
     main()
