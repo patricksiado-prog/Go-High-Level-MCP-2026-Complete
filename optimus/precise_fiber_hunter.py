@@ -362,6 +362,9 @@ except Exception:                                  # keep the hunter standalone
 # console instead of being discovered weeks later on the phone.
 _WIRE_COUNTS = {"green": 0, "fiber": 0, "copper": 0, "unknown": 0, "no_code": 0}
 _UNKNOWN_CODES = {}
+# One real address per undecoded code, so the operator can click THAT dot on
+# the map and read its popup. A code with no example is unconfirmable.
+_UNKNOWN_CODE_SAMPLE = {}
 
 # What to call a CUSTOMER whose build code we cannot decode.
 #   "grey" (default) -- treat as an existing fiber customer and skip. A false
@@ -402,10 +405,14 @@ def wire_classification_report():
         guessed = 100.0 * (c["unknown"] + c["no_code"]) / cust
         print("  %.1f%% of customer dots were a guess, not a decode." % guessed)
     if _UNKNOWN_CODES:
-        print("  undecoded build codes seen:")
+        print("  UNDECODED BUILD CODES  (each one may be real gold we are")
+        print("  currently discarding as grey):")
         for code, n in sorted(_UNKNOWN_CODES.items(), key=lambda kv: -kv[1])[:10]:
-            print("     %-20s %6d" % (code, n))
-        print("  Confirm one on the map, then add it to build_codes.json.")
+            print("     %-16s %6d   e.g. %s"
+                  % (code, n, _UNKNOWN_CODE_SAMPLE.get(code, "(no sample)")))
+        print("  CLICK one of those addresses on the dealer map. If its popup")
+        print("  says 'Status: Existing Copper Customer', that code is COPPER --")
+        print("  add it to build_codes.json and the gold comes back.")
     print("-" * 62)
 
 
@@ -463,6 +470,12 @@ def classify_wire(status, ban, raw):
         # existing fiber customer. A new AT&T fiber designation lands here.
         _WIRE_COUNTS["unknown"] += 1
         _UNKNOWN_CODES[code] = _UNKNOWN_CODES.get(code, 0) + 1
+        if code not in _UNKNOWN_CODE_SAMPLE:
+            try:
+                _UNKNOWN_CODE_SAMPLE[code] = str(
+                    (raw or {}).get("address") or "")[:44]
+            except Exception:
+                pass
         return _unknown_customer_status()
     _WIRE_COUNTS["green"] += 1
     return classify_status(text=status, ban=ban)   # no ban -> GREEN (eligible)
