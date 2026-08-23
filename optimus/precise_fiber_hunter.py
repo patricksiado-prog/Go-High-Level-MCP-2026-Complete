@@ -332,6 +332,26 @@ else:
     print("CODE UPDATED %s -- (gold capture LIMITED: build_codes.json missing -- "
           "copper customers will be skipped as GREY)" % BUILD_DATE)
 
+def _git_commit():
+    """Short commit of the checkout this file sits in, or a reason it is absent.
+
+    The fingerprint already proves WHICH BYTES are running, which is the fact
+    that matters. The commit adds provenance -- it says which push those bytes
+    came from -- but it is genuinely unavailable on a PC that installed by raw
+    download rather than git clone, and saying "unknown" there is honest rather
+    than a fault to hide.
+    """
+    try:
+        import subprocess
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        r = subprocess.run([_find_git(), "-C", root, "rev-parse", "--short",
+                            "HEAD"], capture_output=True, text=True, timeout=15)
+        out = (r.stdout or "").strip()
+        return out or "unknown (%s)" % (r.stderr or "").strip()[:50]
+    except Exception as e:
+        return "unavailable (no git checkout: %s)" % str(e)[:40]
+
+
 def print_identity():
     """Prove WHICH file, from WHICH repo, is running -- before anything else.
 
@@ -350,6 +370,8 @@ def print_identity():
     print("-" * 68)
     print("  RUNNING FILE : %s" % me)
     print("  BUILD_DATE   : %s   fingerprint: %s" % (BUILD_DATE, _FINGERPRINT))
+    print("  COMMIT       : %s" % _git_commit())
+    print("  PYTHON       : %s" % sys.executable)
     print("  SOURCE REPO  : %s" % GH_REPO)
     print("  BRANCH       : %s" % REPO_BRANCH)
     print("  SELF-UPDATE  : https://raw.githubusercontent.com/%s/%s/optimus/"
@@ -4421,7 +4443,8 @@ _CORE_FILES = ("precise_fiber_hunter.py", "optimus_dedupe.py",
                "optimus_dot_detect.py",
                "optimus_api_capture.py", "hunter_fixes.py",
                "backend_classifier.py", "build_codes.json",
-               "verify_gold_capture.py", "deploy_check.py")
+               "verify_gold_capture.py", "deploy_check.py",
+               "test_durability.py")
 
 
 def _raw_refresh(here):
