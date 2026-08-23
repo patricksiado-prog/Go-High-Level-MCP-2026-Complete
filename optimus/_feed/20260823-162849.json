@@ -1,0 +1,45 @@
+{
+ "generated_at": "2026-08-23 16:28:49",
+ "run_id": "20260823-162849",
+ "operator": "Patrick",
+ "machine": "LAPTOP-FJEEPATI",
+ "area": "",
+ "build_fingerprint": "5c5a8cf6",
+ "counts": {
+  "green": 0,
+  "fiber": 0,
+  "copper": 0,
+  "unknown": 0,
+  "no_code": 0
+ },
+ "undecoded_codes": {},
+ "dedupe": {
+  "seen": 0,
+  "written": 0,
+  "duplicates": 0,
+  "unchanged": 0,
+  "gold_to_grey": 0,
+  "grey_to_gold": 0,
+  "unknown": 0,
+  "failed_writes": 0,
+  "history_rows": 0,
+  "history_failed": 0
+ },
+ "capture_truth": {
+  "delivery": null,
+  "raw_features": null,
+  "rendered": null,
+  "classified": 0,
+  "written": 0,
+  "auth_ok": null,
+  "map_ok": null,
+  "zoom_ok": null,
+  "notes": []
+ },
+ "first_failure": "classified",
+ "capture_diagnostic": {},
+ "zero_lead_responses": [],
+ "sample_count": 0,
+ "samples": [],
+ "note": ""
+}
