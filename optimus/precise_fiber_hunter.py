@@ -1430,7 +1430,27 @@ def capture_diagnostic(page):
     }
     diag["preconditions"] = _pre
     _failed = [k for k, ok in _pre.items() if not ok]
-    if _failed:
+    # WHICH PATH ARE WE JUDGING? Dots are read off the WIRE, not out of Mapbox
+    # -- the Mapbox hook is a cross-check. So a Mapbox precondition failure is
+    # only a verdict on capture when the wire produced nothing either. Without
+    # this, a perfectly healthy backend sweep prints INVALID_ZERO in red every
+    # time the map object is slow to appear, and the next person spends an hour
+    # on a renderer that was never in the path.
+    _wire_ok = False
+    try:
+        if _FEED:
+            _t = getattr(_FEED, "_TRUTH", {}) or {}
+            _wire_ok = (_t.get("delivery") in ("DATA_OK", "OK")
+                        and (_t.get("raw_features") or 0) > 0)
+    except Exception:
+        pass
+    if _failed and _wire_ok:
+        diag["zero_verdict"] = "MAPBOX_UNAVAILABLE_WIRE_OK"
+        diag["zero_reason"] = ("the Mapbox cross-check is unavailable (%s) but "
+                               "AT&T delivered records on the wire, which is "
+                               "the path capture actually uses -- not a capture "
+                               "failure" % ", ".join(_failed))
+    elif _failed:
         diag["zero_verdict"] = "INVALID_ZERO"
         diag["zero_reason"] = ("a zero from this view proves nothing -- "
                                "failed: %s" % ", ".join(_failed))
