@@ -6260,6 +6260,12 @@ def main():
             passno += 1
             try:
                 n = one_pass()
+                # Stamped only on the FIRST completed pass. PHASES lists
+                # pass_done, so without this every phase report would end with
+                # "NEVER REACHED: pass_done" even on a healthy run -- a false
+                # alarm in the one tool whose job is to stop false alarms.
+                if passno == 1:
+                    _phase("pass_done")
             except Exception as e:
                 msg = str(e)
                 report_status(ws, args.zip or "manual", "error", note=msg[:120])
