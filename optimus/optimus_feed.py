@@ -99,6 +99,18 @@ def note_empty(url, content_type, body):
         pass
 
 
+_DIAG = {}
+
+
+def note_diagnostic(d):
+    """Store the capture-state diagnostic for this run (last one wins)."""
+    try:
+        _DIAG.clear()
+        _DIAG.update(d or {})
+    except Exception:
+        pass
+
+
 _AUTH_HINTS = ("sign in", "log in", "login", "session has expired",
                "session expired", "not authorized", "unauthorized",
                "access denied", "csrf", "please authenticate",
@@ -188,6 +200,7 @@ def build_report(counts=None, undecoded=None, undecoded_samples=None,
         "counts": dict(counts or {}),
         "undecoded_codes": codes,
         "dedupe": dict(dedupe or {}),
+        "capture_diagnostic": dict(_DIAG),
         "zero_lead_responses": list(_EMPTY),
         "sample_count": len(_SAMPLES),
         "samples": list(_SAMPLES),

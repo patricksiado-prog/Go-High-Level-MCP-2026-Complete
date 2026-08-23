@@ -960,6 +960,78 @@ MAPBOX_VIEW_JS = """
 """
 
 
+# Full capture-state diagnostic. Answers, in one call: is the hook alive, did we
+# get the real map, is the style loaded, what zoom are we at, which layers can
+# carry dots, what is each layer's zoom band, and how many features does each
+# actually return RIGHT NOW. Without the zoom band a zero is unreadable -- a
+# layer above its maxzoom is hidden and returns nothing, which is not the same
+# fact as "no fiber here".
+MAPBOX_DIAG_JS = """
+() => {
+  const out = {hook_installed: !!(window.__optimusMaps),
+               maps_hooked: (window.__optimusMaps || []).length,
+               has_mapboxgl: !!(window.mapboxgl),
+               canvases: document.querySelectorAll('.mapboxgl-canvas').length,
+               map_captured: false, map_loaded: null, style_loaded: null,
+               zoom: null, center: null, layers_total: null, sources_total: null,
+               candidate_layers: [], rendered_total: null, error: null};
+  let maps = (window.__optimusMaps || []).slice();
+  if (!maps.length) {
+    try {
+      for (const k in window) {
+        let v; try { v = window[k]; } catch (e) { continue; }
+        if (v && typeof v.queryRenderedFeatures === 'function' &&
+            typeof v.getStyle === 'function') { maps.push(v); break; }
+      }
+    } catch (e) {}
+  }
+  const m = maps[0];
+  if (!m) { out.error = 'no map object found'; return out; }
+  out.map_captured = true;
+  try { out.map_loaded = !!m.loaded(); } catch (e) {}
+  try { out.style_loaded = !!m.isStyleLoaded(); } catch (e) {}
+  try { out.zoom = m.getZoom(); } catch (e) {}
+  try { const c = m.getCenter(); out.center = [c.lng, c.lat]; } catch (e) {}
+  let style = null;
+  try { style = m.getStyle(); } catch (e) { out.error = 'getStyle: ' + e; }
+  if (!style) return out;
+  out.layers_total = (style.layers || []).length;
+  out.sources_total = Object.keys(style.sources || {}).length;
+  let all = [];
+  try { all = m.queryRenderedFeatures(); } catch (e) { out.error = 'qRF: ' + e; }
+  out.rendered_total = all.length;
+  for (const L of (style.layers || [])) {
+    // circle/symbol layers on a non-basemap source are what a dot can be
+    const t = L.type || '';
+    if (t !== 'circle' && t !== 'symbol') continue;
+    const srcId = String(L.source || '');
+    if (/mapbox|composite|terrain|satellite/i.test(srcId) && !/att|fiber|dot|lead/i.test(srcId)) continue;
+    let n = 0, sample = null;
+    try {
+      const f = m.queryRenderedFeatures({layers: [L.id]});
+      n = f.length;
+      if (n) sample = {geom: (f[0].geometry || {}).type,
+                       props: f[0].properties || {},
+                       source_layer: f[0].sourceLayer || null};
+    } catch (e) {}
+    let color = null;
+    try { color = JSON.stringify(m.getPaintProperty(L.id, 'circle-color')); } catch (e) {}
+    let vis = null;
+    try { vis = m.getLayoutProperty(L.id, 'visibility'); } catch (e) {}
+    out.candidate_layers.push({
+      id: L.id, type: t, source: srcId,
+      source_layer: L['source-layer'] || null,
+      minzoom: (L.minzoom === undefined ? null : L.minzoom),
+      maxzoom: (L.maxzoom === undefined ? null : L.maxzoom),
+      visibility: vis, circle_color: color,
+      rendered: n, sample: sample
+    });
+  }
+  return out;
+}
+"""
+
+
 MAPBOX_PROBE_JS = """
 () => {
   let maps = (window.__optimusMaps || []).slice();
@@ -1174,6 +1246,79 @@ def eval_best_frame(page, js):
             if n > best_n:
                 best, best_n, idx = d, n, i
     return best, idx
+
+
+def capture_diagnostic(page):
+    """Run the full capture-state diagnostic and hand it to the feed.
+
+    Patrick, 2026-08-23: "create backend feedback u need to diagnose the issue
+    not me." So the tool reports its own health instead of asking the operator
+    to read a console.
+    """
+    diag = {"mapbox": {}, "verdict": "", "advice": ""}
+    try:
+        frames = list(page.frames)
+    except Exception:
+        frames = [page]
+    best = None
+    for fr in frames:
+        try:
+            d = fr.evaluate(MAPBOX_DIAG_JS)
+        except Exception as e:
+            d = {"error": str(e)[:120]}
+        if d and d.get("map_captured"):
+            best = d
+            break
+        if best is None:
+            best = d
+    diag["mapbox"] = best or {}
+
+    mb = diag["mapbox"]
+    zoom = mb.get("zoom")
+    cands = mb.get("candidate_layers") or []
+    # A layer is only usable when the CURRENT zoom sits inside its own band.
+    # Outside it the layer is hidden and returns nothing -- a zero that means
+    # "you cannot see this from here", not "there is nothing here".
+    in_band, out_band = [], []
+    for L in cands:
+        lo = L.get("minzoom")
+        hi = L.get("maxzoom")
+        lo = 0.0 if lo is None else float(lo)
+        hi = 24.0 if hi is None else float(hi)
+        L["in_band"] = (zoom is not None and lo <= float(zoom) < hi)
+        (in_band if L["in_band"] else out_band).append(L)
+    diag["layers_in_band"] = len(in_band)
+    diag["layers_out_of_band"] = len(out_band)
+    if in_band:
+        diag["safe_zoom"] = round(
+            (max(float(L.get("minzoom") or 0) for L in in_band)
+             + min(float(L.get("maxzoom") or 24) for L in in_band)) / 2.0, 2)
+
+    if not mb.get("hook_installed") and not mb.get("map_captured"):
+        diag["verdict"] = "HOOK_MISSING"
+        diag["advice"] = ("the mapboxgl hook never captured a map object -- "
+                          "capture cannot use the Mapbox path at all")
+    elif not mb.get("style_loaded"):
+        diag["verdict"] = "MAP_NOT_READY"
+        diag["advice"] = "style not loaded yet; query too early"
+    elif cands and not in_band:
+        diag["verdict"] = "ZOOM_OUT_OF_BAND"
+        diag["advice"] = ("every dot layer is outside its zoom band at z=%s -- "
+                          "a zero here is INVALID, not empty ground" % zoom)
+    elif not cands:
+        diag["verdict"] = "NO_DOT_LAYERS"
+        diag["advice"] = "no circle/symbol layer looks like a dot layer"
+    elif not mb.get("rendered_total"):
+        diag["verdict"] = "ZERO_RENDERED"
+        diag["advice"] = "layers are in band but nothing is drawn in this view"
+    else:
+        diag["verdict"] = "MAPBOX_OK"
+    if _FEED:
+        try:
+            _FEED.note_diagnostic(diag)
+        except Exception:
+            pass
+    return diag
 
 
 def run_frame_probe(page):
@@ -5943,6 +6088,19 @@ def main():
             # back empty, and nothing anywhere says "I am waiting for a keypress".
             # That cost most of 2026-08-23. It now starts on its own.
             _wait_for_start(START_WAIT_SECS)
+            # Report our own health before a single cell is swept, so a bad
+            # capture state is known up front instead of inferred from zeros.
+            try:
+                _d = capture_diagnostic(page)
+                print("\n  [HUNTER DIAG] mapbox=%s  zoom=%s  layers_in_band=%s"
+                      % (_d.get("verdict"), (_d.get("mapbox") or {}).get("zoom"),
+                         _d.get("layers_in_band")))
+                if _d.get("advice"):
+                    print("                %s" % _d["advice"])
+                if _d.get("safe_zoom"):
+                    print("                safe capture zoom ~ %s" % _d["safe_zoom"])
+            except Exception as _e:
+                print("  (diagnostic skipped: %s)" % str(_e)[:70])
             # 5-second grace period so you can MINIMIZE this window before the
             # hunter takes over the mouse (real-mouse motion). Countdown so you
             # know how long you've got.
