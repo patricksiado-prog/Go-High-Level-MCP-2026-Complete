@@ -22,6 +22,7 @@ number itself is never uploaded.
 import base64
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -146,9 +147,77 @@ def _dirs():
     return [here, os.path.join(home, "optimus_hunter"), home, "."]
 
 
+COLOR_HINTS = ("fttp", "fttn", "gpon", "ftth", "ip-rt", "iprt", "adsl", "vdsl",
+               "unavailable", "curr_ntwrk_bld_type_cd", "subscriber_ban",
+               "orange", "#f", "gold", "grey", "gray", "copper")
+
+
+def find_color_rule(token):
+    """Read AT&T's OWN dot-colouring rule out of their map JavaScript.
+
+    This is the one source that cannot be wrong. Their map paints gold and grey
+    correctly from the same payload we receive, so the rule that separates them
+    is in their code -- already downloaded into the browser. Everything else we
+    have is reverse-engineering; this is the original.
+
+    Looks for the bundle in the browser cache the hunter's profile keeps, then
+    pulls out every line mentioning the build-code field or a known code.
+    """
+    import glob
+    roots = []
+    home = os.path.expanduser("~")
+    for d in (os.path.join(home, "optimus_hunter", "optimus_profile"),
+              os.path.join(home, "optimus_hunter"), os.getcwd()):
+        if os.path.isdir(d):
+            roots.append(d)
+    hits, scanned = [], 0
+    for root in roots:
+        for path in glob.glob(os.path.join(root, "**", "*"), recursive=True):
+            if not os.path.isfile(path):
+                continue
+            if os.path.getsize(path) > 12 * 1024 * 1024:
+                continue
+            low = path.lower()
+            if not (low.endswith(".js") or "cache" in low):
+                continue
+            scanned += 1
+            try:
+                blob = open(path, "rb").read().decode("utf-8", "ignore")
+            except Exception:
+                continue
+            if "curr_ntwrk_bld_type_cd" not in blob and "fttp" not in blob.lower():
+                continue
+            for m in re.finditer(r".{220}(?:curr_ntwrk_bld_type_cd|fttp|fttn).{220}",
+                                 blob, re.I | re.S):
+                frag = " ".join(m.group(0).split())
+                if frag not in hits:
+                    hits.append(frag)
+                if len(hits) >= 25:
+                    break
+            if len(hits) >= 25:
+                break
+    print("\n=== AT&T's OWN COLOUR RULE ===")
+    print("scanned %d cached files" % scanned)
+    if not hits:
+        print("No colouring code found in the browser cache.")
+        print("Open the Fiber Map once with dots visible, then run this again --")
+        print("the bundle has to be cached before it can be read.")
+        return
+    print("%d fragment(s) mentioning the build-code field:" % len(hits))
+    for h in hits[:6]:
+        print("   ...%s..." % h[:260])
+    if token:
+        gh_put(token, "optimus/_feed/att_color_rule.txt",
+               "AT&T map colouring fragments (%d)\n\n%s"
+               % (len(hits), "\n\n---\n\n".join(hits)))
+        print("  pushed -> optimus/_feed/att_color_rule.txt")
+
+
 def main():
     path = find_file()
-    push_net_log(gh_token())
+    _tok = gh_token()
+    push_net_log(_tok)
+    find_color_rule(_tok)
     if not path:
         return 1
     print("\nreading: %s  (%d bytes)" % (path, os.path.getsize(path)))
