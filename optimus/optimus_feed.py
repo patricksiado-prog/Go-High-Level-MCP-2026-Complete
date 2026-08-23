@@ -71,6 +71,34 @@ def note(address, lat, lng, ban, build_code, classification, color):
         pass
 
 
+_EMPTY = []
+EMPTY_CAP = 3             # specimens kept
+EMPTY_BYTES = 4000        # per specimen
+
+
+def note_empty(url, content_type, body):
+    """Keep a specimen of a 200 response that decoded to ZERO leads.
+
+    This is the failure that has cost the most time: AT&T answers, the bytes
+    arrive, and nothing comes out. Without the body there is no way to tell an
+    auth redirect from a changed payload shape from an empty viewport.
+    """
+    try:
+        if len(_EMPTY) >= EMPTY_CAP:
+            return
+        if isinstance(body, bytes):
+            body = body.decode("utf-8", "replace")
+        body = str(body or "")
+        _EMPTY.append({
+            "url": str(url or "")[:300],
+            "content_type": str(content_type or "")[:80],
+            "total_bytes": len(body),
+            "body_head": body[:EMPTY_BYTES],
+        })
+    except Exception:
+        pass
+
+
 def build_report(counts=None, undecoded=None, undecoded_samples=None,
                  dedupe=None, note_text=""):
     codes = {}
@@ -87,6 +115,7 @@ def build_report(counts=None, undecoded=None, undecoded_samples=None,
         "counts": dict(counts or {}),
         "undecoded_codes": codes,
         "dedupe": dict(dedupe or {}),
+        "zero_lead_responses": list(_EMPTY),
         "sample_count": len(_SAMPLES),
         "samples": list(_SAMPLES),
         "note": note_text,

@@ -1629,6 +1629,16 @@ class NetCapture:
                     if not leads:
                         _note = ("200 but 0 leads -- payload shape may have changed: %s"
                                  % (list(data)[:6] if isinstance(data, dict) else type(data).__name__))
+                        # A 200 that decodes to nothing is the single most
+                        # opaque failure this tool has. Keep the actual body so
+                        # it can be read later instead of guessed at from a
+                        # console photo. First occurrence only -- one specimen
+                        # is enough and a sweep must never balloon the feed.
+                        if _FEED:
+                            try:
+                                _FEED.note_empty(url, ct, body)
+                            except Exception:
+                                pass
                     elif (len(leads) in BACKEND_CAP_VALUES
                           or len(leads) >= NEAR_CAP):
                         _note = ("TRUNCATED? %d leads, at/near AT&T's %d cap -- "
