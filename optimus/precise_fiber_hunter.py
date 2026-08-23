@@ -1899,6 +1899,8 @@ class NetCapture:
                                   "browser,")
                             print("!!      log back in, then start the hunter again.")
                         print("!" * 64 + "\n")
+                    if st in (301, 302, 401, 403):
+                        _AUTH_FAIL[0] += 1
                     if _FEED:
                         try:
                             _FEED.truth(delivery=("AUTH_EXPIRED"
@@ -1925,6 +1927,8 @@ class NetCapture:
                     if _FEED:
                         try:
                             _m, _k = _FEED.diagnose(body, ct)
+                            if _k in ("auth", "notjson"):
+                                _AUTH_FAIL[0] += 1
                             _FEED.truth(delivery=("AUTH_EXPIRED" if _k == "auth"
                                                   else "PARSE_ERROR"),
                                         note=_m[:150])
@@ -1947,6 +1951,7 @@ class NetCapture:
                 self.svc_seen += 1
                 if _FEED:
                     try:
+                        _AUTH_FAIL[0] = 0        # a real reply clears the streak
                         _FEED.truth(delivery="DATA_OK")
                     except Exception:
                         pass
@@ -4036,6 +4041,11 @@ def sweep_grid(page, ws, seen, area_label, dry, capture):
         n = capture.flush(ws, seen, area_label, dry)
         tally["total"] += n
         tally["cells"] += 1
+        # Stop the moment the session dies. Grinding on is how 150 cells were
+        # spent capturing login pages.
+        if _AUTH_FAIL[0] >= AUTH_FAIL_LIMIT:
+            if not recover_session(page):
+                _STOP[0] = True
         print("  [cell %d @ %d,%d] +%d  (total %d)"
               % (tally["cells"], pos[0], pos[1], n, tally["total"]))
         if tally["cells"] % 15 == 0:
@@ -4118,6 +4128,67 @@ def _handle_frozen_map(ws, area_label):
     except Exception:
         pass
     _STOP[0] = True          # end the sweep + shut down cleanly (no auto-restart)
+
+
+# ---------------------------------------------------------------------------
+# SESSION RECOVERY. AT&T's cookie can authenticate the page shell while the API
+# rejects it: the map still shows the dots it fetched earlier, so the screen
+# looks perfectly healthy while every new request is bounced to a login page.
+# On 2026-08-23 that cost a 150-cell sweep -- every cell pressed Search, every
+# reply was a 301 or an HTML login page, every cell scored +0, and the operator
+# was told to log out by hand afterwards.
+#
+# A stale cookie is a fixable condition, not a reason to grind. Three failures
+# in a row now stop the sweep, clear the cookies so AT&T is forced to present a
+# real login, and wait for the sign-in -- then carry on where it left off.
+# ---------------------------------------------------------------------------
+_AUTH_FAIL = [0]
+AUTH_FAIL_LIMIT = int(os.environ.get("OPTIMUS_AUTH_FAIL_LIMIT") or 3)
+_RECOVERED = [0]
+
+
+def recover_session(page, log=print):
+    """Clear the dead session and wait for a fresh sign-in. True if recovered."""
+    _RECOVERED[0] += 1
+    log("")
+    log("!" * 68)
+    log("  SESSION DEAD -- %d replies in a row were a redirect or a login page."
+        % _AUTH_FAIL[0])
+    log("  The map still SHOWS dots because they were fetched before the")
+    log("  cookie went stale. Nothing new can land until you sign in again.")
+    log("")
+    log("  Clearing the stale cookie now so AT&T has to show a real login...")
+    log("!" * 68)
+    try:
+        page.context.clear_cookies()
+    except Exception as e:
+        log("  (could not clear cookies: %s -- sign out by hand)" % str(e)[:60])
+    try:
+        safe_goto(page, MAP_URL)
+    except Exception:
+        pass
+    log("")
+    log("  SIGN IN AGAIN in the browser window, then leave it on the Fiber Map.")
+    log("  The sweep resumes by itself -- do not restart the hunter.")
+    if _FEED:
+        try:
+            _FEED.truth(auth_ok=False, note="session died mid-sweep, recovering")
+            _FEED.phase("SESSION_RECOVERY_%d" % _RECOVERED[0])
+        except Exception:
+            pass
+    ok = _wait_for_login(page, LOGIN_WAIT_SECS)
+    if ok:
+        log("  Signed in -- resuming the sweep where it left off.")
+        _AUTH_FAIL[0] = 0
+        if _FEED:
+            try:
+                _FEED.truth(auth_ok=True)
+                _FEED.phase("resumed_after_login")
+            except Exception:
+                pass
+    else:
+        log("  Still not signed in. Stopping rather than sweeping login pages.")
+    return ok
 
 
 def sweep_continuous(page, ws, seen, area_label, dry, capture):
