@@ -54,11 +54,21 @@ def _gh_token():
     return os.environ.get("GITHUB_TOKEN")
 
 
+_GH_TOKEN_WARNED = []      # warn once per run, not once per push
+
+
 def gh_put(path, text):
     """Best-effort: commit a small text file so Claude can read it at the raw URL."""
     import base64, urllib.request
     token = _gh_token()
     if not token:
+        # Silent here means the scraper runs for hours while its live count sits
+        # frozen on GitHub and nobody can tell it is still working. Say it once.
+        if not _GH_TOKEN_WARNED:
+            _GH_TOKEN_WARNED.append(1)
+            print("  (GitHub push OFF: no github_token.txt found. Put it at "
+                  "%s and the live counts start working.)"
+                  % os.path.join(os.path.expanduser("~"), "github_token.txt"))
         return False
     api = "https://api.github.com/repos/%s/contents/%s" % (GH_REPO, path)
     hdr = {"Authorization": "token %s" % token, "User-Agent": "optimus-scraper",
