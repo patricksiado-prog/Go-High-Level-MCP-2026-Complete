@@ -2233,6 +2233,16 @@ class NetCapture:
                 # already in this payload; we have simply never looked at it.
                 if is_customer_ban(ld.get("ban")):
                     _FEED.note_customer(_raw, _code, dot_color(dot_status))
+                # Publish mid-run, not only at exit. optimus_feed has always had
+                # should_flush() for this and nothing ever called it, so a sweep
+                # that ran for an hour and was then force-quit reported NOTHING
+                # -- the exit report is registered with atexit, and a hard kill
+                # never runs it. Now the evidence lands while the sweep works.
+                try:
+                    if _FEED.should_flush():
+                        _publish_feed()
+                except Exception:
+                    pass
             if dot_color(dot_status) == "GREY":
                 grey_ct += 1
                 # A dot we ALREADY recorded as gold that now reads grey is the
