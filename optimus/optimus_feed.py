@@ -184,6 +184,81 @@ def diagnose(body, content_type=""):
         return ("could not diagnose (%s)" % str(e)[:60], "unknown")
 
 
+# ---------------------------------------------------------------------------
+# CAPTURE TRUTH -- counters at every boundary, so the FIRST place the dots
+# disappear is named instead of inferred. A viewport with visible dots that
+# reports zero is lying somewhere; this says where.
+# ---------------------------------------------------------------------------
+_BOUNDARIES = [
+    ("delivery",       "AT&T response"),
+    ("raw_features",   "features parsed from the payload"),
+    ("rendered",       "features the live map is rendering"),
+    ("classified",     "classify_wire output"),
+    ("written",        "rows written to the sheet"),
+]
+
+_TRUTH = {"delivery": None, "raw_features": None, "rendered": None,
+          "classified": None, "written": None, "auth_ok": None,
+          "map_ok": None, "zoom_ok": None, "notes": []}
+
+
+def truth(**kw):
+    """Record a boundary count. Unset stays None -- never confuse 'not measured'
+    with 'measured zero', which is the whole point of the exercise."""
+    try:
+        for k, v in kw.items():
+            if k == "note":
+                _TRUTH["notes"].append(str(v)[:160])
+            elif k in _TRUTH:
+                _TRUTH[k] = v
+    except Exception:
+        pass
+
+
+def first_failure():
+    """The first boundary where a nonzero upstream becomes zero.
+
+    Returns (boundary_key, human_label) or (None, '') when nothing broke.
+    A boundary that was never measured cannot be blamed.
+    """
+    prev = None
+    for key, label in _BOUNDARIES:
+        v = _TRUTH.get(key)
+        if v is None:
+            continue
+        if isinstance(v, str):          # delivery is a verdict, not a count
+            if v not in ("DATA_OK", "OK"):
+                return key, label
+            prev = None
+            continue
+        if v == 0 and (prev is None or prev > 0):
+            return key, label
+        prev = v
+    return None, ""
+
+
+def truth_report(log=print):
+    """One readable block per run. No interpretation required."""
+    t = _TRUTH
+    log("")
+    log("=== PRECISE HUNTER CAPTURE TRUTH ===")
+    log("  auth / delivery   : %s" % (t.get("delivery") or "not measured"))
+    log("  map + style ok    : %s" % t.get("map_ok"))
+    log("  zoom inside band  : %s" % t.get("zoom_ok"))
+    for key, label in _BOUNDARIES[1:]:
+        v = t.get(key)
+        log("  %-17s : %s" % (label[:17], "not measured" if v is None else v))
+    for n in t.get("notes", [])[:6]:
+        log("    - %s" % n)
+    k, label = first_failure()
+    if k:
+        log("  RESULT: BROKEN AT %s" % k.upper())
+        log("  FIRST FAILURE: %s" % label)
+    else:
+        log("  RESULT: HEALTHY (no boundary lost the dots)")
+    log("=" * 36)
+
+
 def build_report(counts=None, undecoded=None, undecoded_samples=None,
                  dedupe=None, note_text=""):
     codes = {}
@@ -200,6 +275,8 @@ def build_report(counts=None, undecoded=None, undecoded_samples=None,
         "counts": dict(counts or {}),
         "undecoded_codes": codes,
         "dedupe": dict(dedupe or {}),
+        "capture_truth": dict(_TRUTH),
+        "first_failure": first_failure()[0],
         "capture_diagnostic": dict(_DIAG),
         "zero_lead_responses": list(_EMPTY),
         "sample_count": len(_SAMPLES),
