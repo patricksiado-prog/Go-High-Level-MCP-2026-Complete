@@ -1792,6 +1792,13 @@ class NetCapture:
                                 "zone_label": "WORKING", "popup_status": ld.get("status"),
                                 "ban": ld.get("ban"), "area": area_label, "ts": ts,
                                 "via": "network", "lat": ld.get("lat"), "lng": ld.get("lng"),
+                                # AT&T's payload carries city/state/zip beside the
+                                # street. Dropping them is what produced a gold tab
+                                # that DealMachine cannot skip-trace: enrich_address
+                                # fails hard with no ZIP.
+                                "city": ld.get("city") or "",
+                                "state": ld.get("state") or "",
+                                "zip": ld.get("zip") or "",
                                 "biz_name": (_b or {}).get("name", ""),
                                 "biz_phone": (_b or {}).get("phone", "")})
         if not new_rows:
@@ -1892,10 +1899,18 @@ class NetCapture:
             if dot_color(dot_status) == "GREY":
                 continue
             ts = time.strftime("%Y-%m-%d %H:%M:%S")
+            # Split mode used to drop run_id/operator/geography entirely, so a
+            # gold row captured this way landed with no ZIP and no provenance --
+            # unskip-traceable AND unauditable, depending only on which code path
+            # happened to save it.
             new_records.append({"address": addr, "dot_status": dot_status,
+                                "run_id": RUN_ID, "operator": OPERATOR(),
                                 "zone_label": "WORKING", "popup_status": ld.get("status"),
                                 "ban": ld.get("ban"), "area": area_label, "ts": ts,
-                                "via": "network", "lat": ld.get("lat"), "lng": ld.get("lng")})
+                                "via": "network", "lat": ld.get("lat"), "lng": ld.get("lng"),
+                                "city": ld.get("city") or "",
+                                "state": ld.get("state") or "",
+                                "zip": ld.get("zip") or ""})
         if not new_records:
             return 0
         if dry:
@@ -2052,7 +2067,40 @@ GOLD_SHEET_TITLE = "OPTIMUS GOLD DOTS"
 GOLD_OWNER_EMAIL = "patricksiado@gmail.com"
 _GOLD = {"ws": None, "seen": None}
 _GOLD_HEADER = ["Address", "Captured At", "Lat", "Lng", "Business", "Phone",
-                "Run ID", "Operator"]
+                "Run ID", "Operator", "City", "State", "ZIP"]
+
+
+def _coord_key(lat, lng):
+    """Identity from coordinates, ~1 m. Present on 100% of the live gold rows."""
+    try:
+        return "@%.5f,%.5f" % (float(lat), float(lng))
+    except (TypeError, ValueError):
+        return None
+
+
+def _gold_keys(addr, lat=None, lng=None):
+    """Every key one gold row should dedupe on.
+
+    The hunter used to write a STREET-ONLY address; it now writes the full
+    "STREET, CITY STATE ZIP" that AT&T's own payload carries. Those two strings
+    never match, so without help the 3,328 legacy rows would each be written a
+    SECOND time the next time that property was captured -- the compose fix
+    quietly became a duplicate generator.
+
+    Coordinates are the bridge. Every legacy row has lat/lng, so a fresh capture
+    of the same property matches on position no matter which address form was
+    stored. Street-only is deliberately NOT used as a key: '5309 WENDA ST'
+    exists in both Houston and Beaumont, and collapsing those would silently
+    drop a real $140 lead.
+    """
+    keys = set()
+    a = (addr or "").strip().upper()
+    if a:
+        keys.add(a)
+    ck = _coord_key(lat, lng)
+    if ck:
+        keys.add(ck)
+    return keys
 
 
 def _ensure_gold_tab(sh):
@@ -2092,7 +2140,18 @@ def _ensure_gold_tab(sh):
         # single run that captured it again.
         if col and col[0].strip().lower() == _GOLD_HEADER[0].strip().lower():
             col = col[1:]
-        _GOLD["seen"] = set(a.strip().upper() for a in col if a and a.strip())
+        # Coordinates come from columns C and D so a legacy street-only row is
+        # still recognisable when the same property is captured again under its
+        # new full-address form.
+        lat_col, lng_col = gw.col_values(3), gw.col_values(4)
+        if col and col[0].strip().lower() == _GOLD_HEADER[0].strip().lower():
+            lat_col, lng_col = lat_col[1:], lng_col[1:]
+        seen = set()
+        for i, a in enumerate(col):
+            la = lat_col[i] if i < len(lat_col) else None
+            ln = lng_col[i] if i < len(lng_col) else None
+            seen.update(_gold_keys(a, la, ln))
+        _GOLD["seen"] = seen
     except Exception:
         _GOLD["seen"] = set()
     _GOLD["ws"] = gw
@@ -2124,16 +2183,18 @@ def write_gold_dots(sh, records):
         addr = (r.get("address") or "").strip()
         if not addr:
             continue
-        k = addr.upper()
-        if k in seen:
+        keys = _gold_keys(addr, r.get("lat"), r.get("lng"))
+        if keys & seen:
             continue
-        seen.add(k)
+        seen.update(keys)
         rows.append([addr, r.get("ts") or "",
                      r.get("lat") if r.get("lat") is not None else "",
                      r.get("lng") if r.get("lng") is not None else "",
                      r.get("biz_name") or "", r.get("biz_phone") or "",
                      r.get("run_id") or RUN_ID,
-                     r.get("operator") or OPERATOR()])
+                     r.get("operator") or OPERATOR(),
+                     r.get("city") or "", r.get("state") or "",
+                     r.get("zip") or ""])
     if not rows:
         return 0
     try:
