@@ -246,7 +246,13 @@ DRAG_FRAC = 0.45
 # Map the internal dot status -> the on-map LEGEND COLOR, so the sheet says
 # GREEN / ORANGE / GREY at a glance (green = eligible lead, orange = copper
 # upgrade, grey = existing customer/skip) instead of "lead"/"customer".
-DOT_COLOR = {"lead": "GREEN", "copper_upgrade": "ORANGE", "customer": "GREY"}
+DOT_COLOR = {"lead": "GREEN", "copper_upgrade": "ORANGE", "customer": "GREY",
+             # A customer whose build code we cannot decode is NOT a confirmed
+             # fiber customer. Calling it GREY deletes it -- grey never reaches
+             # the sheet -- so every undecodable customer silently vanished.
+             # UNKNOWN is written out instead: visible, reviewable, and NOT on
+             # the call list until a human or a decoded build code says so.
+             "unknown_customer": "UNKNOWN"}
 
 
 def dot_color(dot_status):
@@ -373,11 +379,30 @@ _UNKNOWN_CODE_SAMPLE = {}
 #                       call list. Only use this if gold collapses to zero and
 #                       the report below shows the codes really are copper.
 # Override with:  set OPTIMUS_UNKNOWN_CUSTOMER=gold
-_UNKNOWN_CUSTOMER = (os.environ.get("OPTIMUS_UNKNOWN_CUSTOMER") or "grey").strip().lower()
+_UNKNOWN_CUSTOMER = (os.environ.get("OPTIMUS_UNKNOWN_CUSTOMER")
+                     or "unknown").strip().lower()
 
 
 def _unknown_customer_status():
-    return "copper_upgrade" if _UNKNOWN_CUSTOMER == "gold" else "customer"
+    """What to call a CUSTOMER whose build code we cannot decode.
+
+    Three settings, via OPTIMUS_UNKNOWN_CUSTOMER:
+      unknown (default) -- write it to the sheet as UNKNOWN. Not a lead, not
+                           deleted. This is how `unavailable` stops being
+                           invisible: it is the most common build code AT&T
+                           sends, and both previous settings were wrong about
+                           it -- "gold" put fiber customers on the call list,
+                           "grey" threw real copper away.
+      grey              -- old behaviour: treat as an existing fiber customer
+                           and drop the row entirely.
+      gold              -- the original behaviour that produced the
+                           contaminated 3,328 rows. Do not use.
+    """
+    if _UNKNOWN_CUSTOMER == "gold":
+        return "copper_upgrade"
+    if _UNKNOWN_CUSTOMER == "grey":
+        return "customer"
+    return "unknown_customer"
 
 
 def _publish_feed():
