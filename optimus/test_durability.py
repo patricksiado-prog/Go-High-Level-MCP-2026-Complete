@@ -67,7 +67,7 @@ class FakeSheet(object):
 def main():
     tmp = tempfile.mkdtemp(prefix="optimus_dur_")
     ns = load({"_park_batch", "commit_rows", "replay_pending", "stage",
-               "stage_report", "_STAGE", "_STAGE_ORDER"})
+               "stage_report", "_STAGE", "_STAGE_ORDER", "_as_spreadsheet"})
     ns["_pending_dir"] = lambda: tmp
     try:
         print("\n1. FAILURE INJECTION -- a failed write must not lose the rows")

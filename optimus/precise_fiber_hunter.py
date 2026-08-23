@@ -2525,6 +2525,7 @@ NEW_SHEET_ID_FILE = os.path.join(os.path.expanduser("~"), "optimus", "optimus_sh
 def _sheet_is_full(sh):
     """Probe: can we add even a 1-cell tab? If that raises the cell-cap error, the
     workbook is full and won't take any more writes."""
+    sh = _as_spreadsheet(sh)
     try:
         tmp = sh.add_worksheet(title="_optimus_probe", rows="1", cols="1")
         try:
@@ -2664,6 +2665,7 @@ def _ensure_gold_tab(sh):
 
     `sh` is the open gspread Spreadsheet the hunter is already writing to.
     """
+    sh = _as_spreadsheet(sh)
     if _GOLD["ws"] is not None:
         return _GOLD["ws"]
     try:
@@ -2867,6 +2869,7 @@ def commit_rows(ws, tab, rows, tries=3):
 
 def replay_pending(sh, log=print):
     """Re-commit batches parked by an earlier run. Best-effort, at startup."""
+    sh = _as_spreadsheet(sh)
     if sh is None:
         return 0
     d = _pending_dir()
@@ -2918,6 +2921,7 @@ def write_gold_recheck(sh, records):
     confirmed on the map it goes into build_codes.json and every row carrying it
     is promoted to real gold in one move.
     """
+    sh = _as_spreadsheet(sh)
     if sh is None or not records:
         return 0
     rows_in = [r for r in records
@@ -3051,6 +3055,7 @@ def _backfill_gold_from(sh, log=print):
     already captured in 'Precise Fiber' on the big sheet `sh`. Reads just the
     Address + color columns, dedupes against what's already in the gold sheet,
     batches the write. Returns rows written. Best-effort."""
+    sh = _as_spreadsheet(sh)
     try:
         pf = sh.worksheet(OUT_TAB)
     except Exception:
@@ -5279,6 +5284,7 @@ def _ensure_biz_tab(sh, title):
     """Open the result tab, or create it with a TINY footprint (100x5 = 500 cells,
     grows as rows append) so it fits even on a near-full sheet. Returns None if the
     sheet is genuinely maxed out -- the caller then falls back to a local CSV."""
+    sh = _as_spreadsheet(sh)
     try:
         ws = sh.worksheet(title)
         if not ws.get_all_values():
@@ -5598,6 +5604,7 @@ def _dd_dedupe_tab(sh, tab, key_fn, score_fn=None):
     scattered deletes -- the old way choked on a 17k-dupe tab). Append-safe: a
     live append lands at row >= N+2, BELOW the trimmed range [K+2 .. N+1], so it
     survives and just shifts up. Returns rows removed."""
+    sh = _as_spreadsheet(sh)
     try:
         ws = sh.worksheet(tab)
     except Exception:
@@ -5637,6 +5644,7 @@ def _dd_dedupe_tab(sh, tab, key_fn, score_fn=None):
 
 def _dd_acquire_lock(sh):
     """Advisory cross-machine lock so hunter+scraper never dedupe at once."""
+    sh = _as_spreadsheet(sh)
     import time as _t, socket as _s
     try:
         try:
@@ -5712,6 +5720,7 @@ def dedupe_all_tabs(sh):
 
 
 def _dd_count_col(sh, tab, col=1):
+    sh = _as_spreadsheet(sh)
     try:
         return max(0, len(sh.worksheet(tab).col_values(col)) - 1)
     except Exception:
@@ -5719,6 +5728,7 @@ def _dd_count_col(sh, tab, col=1):
 
 
 def _dd_unique_phones(sh, tab):
+    sh = _as_spreadsheet(sh)
     try:
         vals = sh.worksheet(tab).col_values(2)[1:]   # the Phone column
     except Exception:
@@ -5918,6 +5928,7 @@ _INTEL_WHY = {}
 
 def _intel_tab(sh, name):
     """Open a tab. Returns (rows, None) or (None, reason). Never raises."""
+    sh = _as_spreadsheet(sh)
     try:
         return sh.worksheet(name).get_all_values(), None
     except Exception as e:
@@ -5938,6 +5949,7 @@ def _intel_int(v):
 
 def _intel_recent_outages(sh, limit=INTEL_ROWS):
     """Newest outage signals that nobody has worked yet."""
+    sh = _as_spreadsheet(sh)
     rows, why = _intel_tab(sh, OUTAGE_TAB)
     if rows is None:
         _INTEL_WHY["outages"] = why
@@ -5970,6 +5982,7 @@ def _intel_gold_pockets(sh, limit=INTEL_ROWS):
     Grids the coordinates to ~1km cells and returns the thickest pockets. Read
     only, best-effort, and silent on any failure.
     """
+    sh = _as_spreadsheet(sh)
     rows, why = _intel_tab(sh, GOLD_TAB_NAME)
     if rows is None:
         _INTEL_WHY["gold"] = why
@@ -6022,6 +6035,7 @@ def _intel_gold_pockets(sh, limit=INTEL_ROWS):
 
 def _intel_suggested_zips(sh, limit=INTEL_ROWS):
     """Newest scan per ZIP, ranked by how much NEW green it turned up."""
+    sh = _as_spreadsheet(sh)
     rows, why = _intel_tab(sh, ZONES_TAB_NAME)
     if rows is None:
         _INTEL_WHY["zips"] = why
@@ -6045,7 +6059,23 @@ def _intel_suggested_zips(sh, limit=INTEL_ROWS):
     return [z for z in ranked if z["new_green"] or z["green"] or z["gold"]][:limit]
 
 
+def _as_spreadsheet(obj):
+    """Return the Spreadsheet for either a Spreadsheet or a Worksheet.
+
+    gspread's Worksheet and Spreadsheet are easy to confuse at a call site, and
+    passing the wrong one fails with 'Worksheet object has no attribute
+    add_worksheet' -- a message that names the symptom and hides the cause.
+    Three separate opening-intel lines died that way on 2026-08-23, one of them
+    reading "could not read 'Gold Dots'", which looks exactly like gold capture
+    being broken when it is only the banner.
+    """
+    if obj is None:
+        return None
+    return getattr(obj, "spreadsheet", obj)
+
+
 def _print_dispatch(sh, web):
+    sh = _as_spreadsheet(sh)
     """WHERE TO GO NEXT -- a dispatch, not a report.
 
     Areas come from NATIONWIDE AT&T announcements, never from what we have
