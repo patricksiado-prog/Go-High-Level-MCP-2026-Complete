@@ -414,6 +414,11 @@ def _publish_feed():
         if _DEDUPE_REPORT:
             ded = dict((f, getattr(_DEDUPE_REPORT, f))
                        for f in _DEDUPE_REPORT.FIELDS)
+        c = _WIRE_COUNTS
+        _FEED.truth(classified=(c["green"] + c["fiber"] + c["copper"]
+                                + c["unknown"] + c["no_code"]),
+                    written=(_DEDUPE_REPORT.written if _DEDUPE_REPORT else None))
+        _FEED.truth_report()
         _FEED.publish(gh_put, counts=_WIRE_COUNTS,
                       undecoded=_UNKNOWN_CODES,
                       undecoded_samples=_UNKNOWN_CODE_SAMPLE,
@@ -1315,6 +1320,12 @@ def capture_diagnostic(page):
         diag["verdict"] = "MAPBOX_OK"
     if _FEED:
         try:
+            mbx = diag.get("mapbox") or {}
+            _FEED.truth(map_ok=bool(mbx.get("map_captured")
+                                    and mbx.get("style_loaded")),
+                        zoom_ok=(diag.get("layers_in_band", 0) > 0),
+                        rendered=mbx.get("rendered_total"),
+                        note="mapbox verdict %s" % diag.get("verdict"))
             _FEED.note_diagnostic(diag)
         except Exception:
             pass
@@ -1748,6 +1759,10 @@ class NetCapture:
                         print("!" * 64 + "\n")
                     if _FEED:
                         try:
+                            _FEED.truth(delivery=("AUTH_EXPIRED"
+                                                  if st in (301, 302, 401, 403)
+                                                  else "HTTP_ERROR"),
+                                        note="HTTP %d %s" % (st, hint))
                             _FEED.note_empty(url, ct, "HTTP %d -- %s" % (st, hint))
                         except Exception:
                             pass
@@ -1767,8 +1782,11 @@ class NetCapture:
                     # cause never surfaced anywhere.
                     if _FEED:
                         try:
-                            _FEED.note_empty(url, ct, body)
                             _m, _k = _FEED.diagnose(body, ct)
+                            _FEED.truth(delivery=("AUTH_EXPIRED" if _k == "auth"
+                                                  else "PARSE_ERROR"),
+                                        note=_m[:150])
+                            _FEED.note_empty(url, ct, body)
                             if _k not in _SVC_SAID:
                                 _SVC_SAID.add(_k)
                                 print("\n" + "!" * 64)
@@ -1785,6 +1803,11 @@ class NetCapture:
                         pass
                     return
                 self.svc_seen += 1
+                if _FEED:
+                    try:
+                        _FEED.truth(delivery="DATA_OK")
+                    except Exception:
+                        pass
                 _t0 = time.time()
                 leads = extract_leads_from_json(data)
                 # ALSO run the proven extractor (catches the AT&T 'serviceability'
@@ -1850,6 +1873,7 @@ class NetCapture:
                         # is enough and a sweep must never balloon the feed.
                         if _FEED:
                             try:
+                                _FEED.truth(delivery="DATA_OK", raw_features=0)
                                 _FEED.note_empty(url, ct, body)
                                 _msg, _kind = _FEED.diagnose(body, ct)
                                 # Say it ONCE, loudly. A silent +0 is
