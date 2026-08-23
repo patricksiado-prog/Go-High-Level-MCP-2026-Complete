@@ -2209,7 +2209,7 @@ class NetCapture:
             # the uploader process ships them. A write CANNOT pause a pan.
             return self.flush_local(seen, area_label, dry)
         self.seen = seen
-        new_rows, new_records = [], []
+        new_rows, new_records, staged_keys = [], [], []
         grey_ct = 0                        # existing fiber customers in this batch
         while self.pending:
             ld = self.pending.pop()
@@ -2219,7 +2219,7 @@ class NetCapture:
             key = addr.upper()
             if key in seen:
                 continue
-            seen.add(key)
+            staged_keys.append(key)   # NOT seen until the write is acknowledged
             dot_status = classify_lead(ld)
             _raw = ld.get("raw") or {}
             _code = _bld_code(_raw)
@@ -2318,11 +2318,16 @@ class NetCapture:
             for r in new_rows[:20]:
                 print("   + %s | %s" % (r[0], r[1]))
         else:
-            try:
-                for i in range(0, len(new_rows), 500):   # ONE call per 500 rows
-                    ws.append_rows(new_rows[i:i + 500], value_input_option="RAW")
-            except Exception as e:
-                print("   batch write error: %s" % str(e)[:120])
+            _n = commit_rows(ws, "Precise Fiber", new_rows)
+            for _k in staged_keys[:_n]:
+                seen.add(_k)          # only what Google actually acknowledged
+            _greens = sum(1 for r in new_rows if r[1] == "GREEN")
+            stage(green_queued=_greens,
+                  green_committed=int(_greens * _n / max(1, len(new_rows))))
+            if _n < len(new_rows):
+                print("   %d of %d row(s) did NOT commit -- parked for retry, "
+                      "and NOT marked seen, so the next sweep picks them up."
+                      % (len(new_rows) - _n, len(new_rows)))
         # GOLD DOTS: write EVERY gold (copper-upgrade) dot to its own tab -- all
         # of them, not just business matches. Upgrade leads are the easiest call.
         if not (dry or ws is None):
@@ -2742,6 +2747,8 @@ _STAGE_ORDER = [
     ("gold_committed",     "GOLD COMMITTED"),
     ("gold_seen",          "GOLD SEEN"),
     ("gold_pending",       "GOLD PENDING"),
+    ("green_queued",       "GREEN QUEUED"),
+    ("green_committed",    "GREEN COMMITTED"),
 ]
 
 
