@@ -100,6 +100,57 @@ def note_empty(url, content_type, body):
         pass
 
 
+# ---------------------------------------------------------------------------
+# CUSTOMER SPECIMENS -- the evidence that decodes `unavailable`.
+#
+# Gold is decided by curr_ntwrk_bld_type_cd, and `unavailable` -- AT&T's most
+# common value -- is in neither the fiber nor the copper list. Every customer
+# carrying it has been guessed at all day. Guessing has now been wrong in both
+# directions: "gold" put existing fiber customers on the call list, "grey" threw
+# real copper away.
+#
+# So stop guessing and look. These are FULL records for CUSTOMER dots (a BAN is
+# present), which is the population the question is about. Some other field --
+# `speed` is the obvious candidate -- almost certainly separates a DSL customer
+# from a fiber one, and it is already in the payload we are throwing away.
+#
+# The BAN itself is redacted to a boolean. It is an account number and it is not
+# needed to answer the question.
+# ---------------------------------------------------------------------------
+CUSTOMER_CAP = 40
+
+_CUSTOMERS = []
+_CUST_SEEN = set()
+
+
+def note_customer(raw, code, color):
+    """Keep a full specimen of a CUSTOMER record. Never raises into a sweep.
+
+    Spread across build codes rather than first-come: one specimen of forty
+    different codes answers the question, forty of the same code does not.
+    """
+    try:
+        if not isinstance(raw, dict):
+            return
+        key = (str(code or "").strip().lower(), str(color or ""))
+        if key in _CUST_SEEN and len(_CUSTOMERS) >= 8:
+            return                      # already have this code represented
+        if len(_CUSTOMERS) >= CUSTOMER_CAP:
+            return
+        _CUST_SEEN.add(key)
+        rec = {}
+        for k, v in raw.items():
+            lk = str(k).lower()
+            if "ban" in lk:             # subscriber_ban, subscriber_ban_masked
+                rec[k] = bool(str(v or "").strip())
+            else:
+                rec[k] = v
+        rec["_our_color"] = color
+        _CUSTOMERS.append(rec)
+    except Exception:
+        pass
+
+
 _DIAG = {}
 
 
@@ -366,6 +417,8 @@ def build_report(counts=None, undecoded=None, undecoded_samples=None,
         "capture_truth": dict(_TRUTH),
         "first_failure": first_failure()[0],
         "capture_diagnostic": dict(_DIAG),
+        "customer_specimens": list(_CUSTOMERS),
+        "customer_specimen_count": len(_CUSTOMERS),
         "zero_lead_responses": list(_EMPTY),
         "sample_count": len(_SAMPLES),
         "samples": list(_SAMPLES),

@@ -2080,12 +2080,18 @@ class NetCapture:
                 continue
             seen.add(key)
             dot_status = classify_lead(ld)
+            _raw = ld.get("raw") or {}
+            _code = _bld_code(_raw)
             if _FEED:
                 # The build code is what actually decides gold vs grey, and it
                 # is the one field a console photo cannot carry. Publish it.
                 _FEED.note(addr, ld.get("lat"), ld.get("lng"), ld.get("ban"),
-                           _bld_code(ld.get("raw") or {}), dot_status,
-                           dot_color(dot_status))
+                           _code, dot_status, dot_color(dot_status))
+                # And for CUSTOMERS specifically, keep the whole record. The
+                # field that separates a DSL customer from a fiber one is
+                # already in this payload; we have simply never looked at it.
+                if is_customer_ban(ld.get("ban")):
+                    _FEED.note_customer(_raw, _code, dot_color(dot_status))
             if dot_color(dot_status) == "GREY":
                 grey_ct += 1
                 # A dot we ALREADY recorded as gold that now reads grey is the
@@ -2115,7 +2121,11 @@ class NetCapture:
                                 "state": ld.get("state") or "",
                                 "zip": ld.get("zip") or "",
                                 "biz_name": (_b or {}).get("name", ""),
-                                "biz_phone": (_b or {}).get("phone", "")})
+                                "biz_phone": (_b or {}).get("phone", ""),
+                                # WHY this row was called gold. Without it the
+                                # Gold tab records a verdict and destroys the
+                                # evidence for it.
+                                "build_code": _code})
         if not new_rows:
             return 0
         # GOLD CLUSTER ALERT: gold = copper-to-fiber UPGRADE prospects (hottest
@@ -2177,6 +2187,7 @@ class NetCapture:
         if not (dry or ws is None):
             try:
                 ng = write_gold_dots(ws.spreadsheet, new_records)
+                write_gold_recheck(ws.spreadsheet, new_records)
                 if ng:
                     print("   + %d gold (upgrade) dots -> '%s' tab" % (ng, GOLD_TAB))
                 # Evidence from this batch: dots we had already called gold that
@@ -2384,8 +2395,31 @@ def _sheet_is_full(sh):
 GOLD_SHEET_TITLE = "OPTIMUS GOLD DOTS"
 GOLD_OWNER_EMAIL = "patricksiado@gmail.com"
 _GOLD = {"ws": None, "seen": None}
+# Tier and Build Code are what make a re-check possible. Without them every row
+# on this tab looks equally confirmed, which is exactly why the existing 3,328
+# rows cannot be trusted: nothing records WHY a row was called gold.
 _GOLD_HEADER = ["Address", "Captured At", "Lat", "Lng", "Business", "Phone",
-                "Run ID", "Operator", "City", "State", "ZIP"]
+                "Run ID", "Operator", "City", "State", "ZIP",
+                "Tier", "Build Code"]
+
+# VERIFIED_GOLD  -- AT&T said copper, or the build code decodes to copper.
+#                   This is the call list. Dave works these.
+# NEEDS_RECHECK  -- a real CUSTOMER on a build code we cannot decode. Not a
+#                   confirmed upgrade, but not rubbish either: it is a live
+#                   account on a lit street. Written so it can be reviewed
+#                   instead of deleted. NOT on the call list.
+TIER_VERIFIED = "VERIFIED_GOLD"
+TIER_RECHECK = "NEEDS_RECHECK"
+
+
+def gold_tier(dot_status):
+    """Which tier a classified dot belongs to, or None if it is not gold at all."""
+    c = dot_color(dot_status)
+    if c in ("GOLD", "ORANGE"):
+        return TIER_VERIFIED
+    if c == "UNKNOWN":
+        return TIER_RECHECK
+    return None
 
 
 def _coord_key(lat, lng):
@@ -2530,6 +2564,79 @@ def _gold_layout(gw):
 
 
 _GOLD_WARNED = []
+_GOLD_RECHECK_WARNED = []
+
+
+RECHECK_TAB = "Gold Recheck"
+RECHECK_HEADER = ["Address", "Captured At", "Lat", "Lng", "Build Code",
+                  "City", "State", "ZIP", "Run ID", "Operator"]
+_RECHECK = {"seen": set()}
+
+
+def write_gold_recheck(sh, records):
+    """Customers we could NOT decode -- written, never deleted, never called.
+
+    These are real AT&T accounts on lit streets whose build code is in neither
+    the fiber nor the copper list (`unavailable` is most of them). Calling them
+    gold put existing fiber customers in front of a rep; calling them grey threw
+    real $140 upgrades away. Both were guesses, and both were wrong.
+
+    So they land here instead: a review queue, on its own tab, off the call
+    list. The Build Code column is the point -- once one of these codes is
+    confirmed on the map it goes into build_codes.json and every row carrying it
+    is promoted to real gold in one move.
+    """
+    if sh is None or not records:
+        return 0
+    rows_in = [r for r in records
+               if gold_tier(r.get("dot_status")) == TIER_RECHECK]
+    if not rows_in:
+        return 0
+    try:
+        try:
+            ws = sh.worksheet(RECHECK_TAB)
+        except Exception:
+            ws = sh.add_worksheet(title=RECHECK_TAB, rows="5000",
+                                  cols=str(len(RECHECK_HEADER)))
+            ws.append_row(RECHECK_HEADER)
+            print("   created '%s' tab (undecodable customers, for review)"
+                  % RECHECK_TAB)
+    except Exception as e:
+        print("   (RECHECK TAB FAILED: %s)" % str(e)[:110])
+        return 0
+
+    seen, rows = _RECHECK["seen"], []
+    for r in rows_in:
+        addr = (r.get("address") or "").strip()
+        if not addr:
+            continue
+        keys = _gold_keys(addr, r.get("lat"), r.get("lng"))
+        if keys & seen:
+            continue
+        seen.update(keys)
+        rows.append([addr, r.get("ts") or "",
+                     r.get("lat") if r.get("lat") is not None else "",
+                     r.get("lng") if r.get("lng") is not None else "",
+                     (r.get("build_code") or "").upper(),
+                     r.get("city") or "", r.get("state") or "",
+                     r.get("zip") or "",
+                     r.get("run_id") or RUN_ID,
+                     r.get("operator") or OPERATOR()])
+    if not rows:
+        return 0
+    written = 0
+    for i in range(0, len(rows), 500):
+        batch = rows[i:i + 500]
+        try:
+            ws.append_rows(batch, value_input_option="RAW")
+            written += len(batch)
+        except Exception as e:
+            print("   (RECHECK WRITE FAILED for %d rows: %s)"
+                  % (len(batch), str(e)[:90]))
+    if written:
+        print("   %d undecodable customer(s) -> '%s' (NOT on the call list)"
+              % (written, RECHECK_TAB))
+    return written
 
 
 def write_gold_dots(sh, records):
@@ -2540,8 +2647,7 @@ def write_gold_dots(sh, records):
     """
     if sh is None or not records:
         return 0
-    golds = [r for r in records
-             if dot_color(r.get("dot_status")) in ("GOLD", "ORANGE")]
+    golds = [r for r in records if gold_tier(r.get("dot_status"))]
     if not golds:
         return 0
     try:
@@ -2556,6 +2662,13 @@ def write_gold_dots(sh, records):
         print("   (Gold Dots has no header row: writing ONLY columns A-D so "
               "nothing else on the tab is overwritten. Add the header row to "
               "capture Run ID / Operator / City / State / ZIP.)")
+    # 'Gold Dots' is the CALL LIST and stays confirmed-only. Unconfirmed
+    # customers go to their own tab, so nothing here can put a fiber customer
+    # in front of a rep.
+    golds = [r for r in golds
+             if gold_tier(r.get("dot_status")) == TIER_VERIFIED]
+    if not golds:
+        return 0
 
     seen = _GOLD["seen"]
     rows = []
@@ -2579,6 +2692,8 @@ def write_gold_dots(sh, records):
             "city": r.get("city") or "",
             "state": r.get("state") or "",
             "zip": r.get("zip") or "",
+            "tier": gold_tier(r.get("dot_status")) or "",
+            "build code": (r.get("build_code") or "").upper(),
         }
         if layout is None:
             # Headerless: the four columns the tab has always meant. Anything
@@ -4519,6 +4634,7 @@ def uploader_main():
             if new_records:
                 try:
                     ng = write_gold_dots(ws.spreadsheet, new_records)
+                    write_gold_recheck(ws.spreadsheet, new_records)
                     if ng:
                         _ulog("shipped %d gold (upgrade) dots to '%s'" % (ng, GOLD_TAB))
                     _flush_verification(ws.spreadsheet)

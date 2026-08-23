@@ -102,6 +102,15 @@ def unit_token(addr):
     return m.group(1) if m else ""
 
 
+_HOUSE_RE = re.compile(r"^\s*([0-9]+[A-Z]?)\b")
+
+
+def house_number(addr):
+    """The leading street number, or ''. e.g. '8231 DEVONWOOD LN' -> '8231'."""
+    m = _HOUSE_RE.match((addr or "").upper())
+    return m.group(1) if m else ""
+
+
 def keys_for(addr, lat=None, lng=None):
     """Every key this record may be claimed under.
 
@@ -116,11 +125,19 @@ def keys_for(addr, lat=None, lng=None):
         keys.add(na)
     ck = coord_key(lat, lng)
     if ck:
-        # A multi-unit building reports one coordinate for every unit, so the
-        # positional key is qualified by the unit. Without this, APT 2 and APT 3
-        # dedupe into a single row and one of the two sales disappears.
-        u = unit_token(addr)
-        keys.add(ck + ("#" + u if u else ""))
+        # AT&T geocodes more than one address to a single point -- every unit of
+        # an apartment building, and neighbouring townhouses to a shared parcel.
+        # A bare positional key therefore MERGES DISTINCT CUSTOMERS: 8231 and
+        # 8233 Devonwood arrive on the same lat/lng and one of the two $140
+        # leads disappears with no trace. Caught in test 2026-08-23.
+        #
+        # So the coordinate key carries the street number and the unit. Two
+        # different doors at one point stay two rows; the SAME door written two
+        # ways -- '5309 WENDA ST' and '5309 WENDA ST, HOUSTON TX 77016', which
+        # is exactly the legacy-vs-current format split this key exists for --
+        # still collapses to one, because the street number is identical.
+        qual = "-".join(x for x in (house_number(addr), unit_token(addr)) if x)
+        keys.add(ck + ("#" + qual if qual else ""))
     return keys
 
 
