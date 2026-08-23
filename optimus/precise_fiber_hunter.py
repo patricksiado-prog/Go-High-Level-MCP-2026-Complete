@@ -331,6 +331,36 @@ if _BLD_CODES["copper"]:
 else:
     print("CODE UPDATED %s -- (gold capture LIMITED: build_codes.json missing -- "
           "copper customers will be skipped as GREY)" % BUILD_DATE)
+
+def print_identity():
+    """Prove WHICH file, from WHICH repo, is running -- before anything else.
+
+    There are two hunters and two repos. `fiber_hunter.py` (v5.27, pixel-based)
+    lives in patricksiado-prog/optimus-map-tools and self-updates from main;
+    THIS file is precise_fiber_hunter.py and self-updates from the branch below.
+    An outside review of the public repo in 2026-08 read v5.27, reasonably
+    assumed it was the running code, and reported a writer bug that is real --
+    but in a program that is not executing. Hours go to that mix-up. So the
+    console states its own identity, and the feed publishes it.
+    """
+    try:
+        me = os.path.abspath(__file__)
+    except NameError:
+        me = "(exec'd -- no __file__)"
+    print("-" * 68)
+    print("  RUNNING FILE : %s" % me)
+    print("  BUILD_DATE   : %s   fingerprint: %s" % (BUILD_DATE, _FINGERPRINT))
+    print("  SOURCE REPO  : %s" % GH_REPO)
+    print("  BRANCH       : %s" % REPO_BRANCH)
+    print("  SELF-UPDATE  : https://raw.githubusercontent.com/%s/%s/optimus/"
+          "precise_fiber_hunter.py" % (GH_REPO, REPO_BRANCH))
+    print("  NOT this one : optimus-map-tools/main/fiber_hunter.py (v5.27, "
+          "pixel-based, a different tool)")
+    print("-" * 68)
+
+
+print_identity()
+
 # Derived, so it cannot disagree with the code the way BUILD_DATE did. Printed
 # outside the if/else because it is true either way.
 print("  THIS FILE : written %s   fingerprint %s   (derived -- cannot go stale)"
@@ -1020,6 +1050,19 @@ MAPBOX_DIAG_JS = """
                        props: f[0].properties || {},
                        source_layer: f[0].sourceLayer || null};
     } catch (e) {}
+    // SOURCE-level truth, a DIFFERENT question from rendered: what is in the
+    // loaded tiles, regardless of whether the style draws it right now. A layer
+    // hidden by zoom band, filter or visibility renders zero while its source
+    // is full -- and a rendered-only diagnostic calls that "empty ground".
+    // With both numbers the distinction is free:
+    //   src>0 rend>0 healthy       src>0 rend=0 style/zoom/filter hides it
+    //   src=0 rend>0 wrong source  src=0 rend=0 data/session/load problem
+    let srcN = null;
+    try {
+      const q = {};
+      if (L['source-layer']) q.sourceLayer = L['source-layer'];
+      srcN = m.querySourceFeatures(srcId, q).length;
+    } catch (e) {}
     let color = null;
     try { color = JSON.stringify(m.getPaintProperty(L.id, 'circle-color')); } catch (e) {}
     let vis = null;
@@ -1027,6 +1070,7 @@ MAPBOX_DIAG_JS = """
     out.candidate_layers.push({
       id: L.id, type: t, source: srcId,
       source_layer: L['source-layer'] || null,
+      source_features: srcN,
       minzoom: (L.minzoom === undefined ? null : L.minzoom),
       maxzoom: (L.maxzoom === undefined ? null : L.maxzoom),
       visibility: vis, circle_color: color,
@@ -1315,8 +1359,20 @@ def capture_diagnostic(page):
         diag["verdict"] = "NO_DOT_LAYERS"
         diag["advice"] = "no circle/symbol layer looks like a dot layer"
     elif not mb.get("rendered_total"):
-        diag["verdict"] = "ZERO_RENDERED"
-        diag["advice"] = "layers are in band but nothing is drawn in this view"
+        # Source vs rendered separates "nothing is here" from "something is
+        # here and the style is hiding it" -- the same zero, opposite causes.
+        _src = sum((L.get("source_features") or 0) for L in cands)
+        if _src:
+            diag["verdict"] = "RENDERED_ZERO_SOURCE_FULL"
+            diag["advice"] = ("%d feature(s) ARE in the loaded tiles but the "
+                              "style renders none of them -- a filter, a "
+                              "visibility flag or the zoom band is hiding "
+                              "them. This zero is INVALID, not empty ground."
+                              % _src)
+        else:
+            diag["verdict"] = "ZERO_RENDERED"
+            diag["advice"] = ("nothing drawn AND nothing in the source tiles "
+                              "-- no data reached the map for this view")
     else:
         diag["verdict"] = "MAPBOX_OK"
     if _FEED:
@@ -2567,6 +2623,113 @@ _GOLD_WARNED = []
 _GOLD_RECHECK_WARNED = []
 
 
+# ---------------------------------------------------------------------------
+# DURABLE WRITES. A row is not captured until Google acknowledges it.
+#
+# The old fiber_hunter (v5.27, still in the optimus-map-tools repo) cleared its
+# batch buffer in a finally-shaped path that ran on failure too, so a transient
+# Sheets error silently destroyed the rows. This hunter never had that buffer --
+# but it had the same defect wearing different clothes: the dedupe key was
+# marked `seen` while BUILDING the row, before the write was attempted. A failed
+# batch was therefore lost AND permanently marked captured, so not even a
+# re-sweep would pick it up. Same outcome, quieter.
+#
+# Rule: mark seen only after an ACK, retry with bounded backoff, and if it still
+# fails, write the batch to disk so the next run replays it. Never say "wrote".
+# ---------------------------------------------------------------------------
+def _pending_dir():
+    d = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_pending")
+    try:
+        os.makedirs(d, exist_ok=True)
+    except Exception:
+        pass
+    return d
+
+
+def _park_batch(tab, rows):
+    """Persist a batch we could not commit, so it is replayed, not lost."""
+    try:
+        path = os.path.join(_pending_dir(), "%s__%s__%s.json"
+                            % (re.sub(r"[^A-Za-z0-9]+", "_", tab), RUN_ID,
+                               len(rows)))
+        with open(path, "w") as f:
+            json.dump({"tab": tab, "run_id": RUN_ID, "rows": rows}, f)
+        print("   PRESERVED FOR RETRY: %d row(s) parked at %s"
+              % (len(rows), os.path.basename(path)))
+        return True
+    except Exception as e:
+        # If even this fails the rows really are gone -- say so in full.
+        print("   *** %d ROW(S) LOST: could not commit and could not park (%s)"
+              % (len(rows), str(e)[:80]))
+        return False
+
+
+def commit_rows(ws, tab, rows, tries=3):
+    """Append rows and return the count Google ACKED. Never raises.
+
+    Rows that cannot be committed are parked on disk. The caller must not treat
+    an uncommitted row as captured.
+    """
+    if ws is None or not rows:
+        return 0
+    done = 0
+    for i in range(0, len(rows), 500):
+        batch = rows[i:i + 500]
+        ok = False
+        for attempt in range(tries):
+            try:
+                ws.append_rows(batch, value_input_option="RAW")
+                ok = True
+                break
+            except Exception as e:
+                print("   SHEET COMMIT FAILED %s batch=%d attempt=%d/%d: %s"
+                      % (tab, len(batch), attempt + 1, tries, str(e)[:80]))
+                if attempt + 1 < tries:
+                    time.sleep(2 ** attempt)
+        if ok:
+            done += len(batch)
+            print("   SHEET COMMITTED %s batch=%d" % (tab, len(batch)))
+        else:
+            _park_batch(tab, batch)
+            if _DEDUPE_REPORT:
+                _DEDUPE_REPORT.failed_writes += len(batch)
+    return done
+
+
+def replay_pending(sh, log=print):
+    """Re-commit batches parked by an earlier run. Best-effort, at startup."""
+    if sh is None:
+        return 0
+    d = _pending_dir()
+    try:
+        files = sorted(f for f in os.listdir(d) if f.endswith(".json"))
+    except Exception:
+        return 0
+    if not files:
+        return 0
+    log("   replaying %d parked batch(es) from a previous run..." % len(files))
+    total = 0
+    for name in files:
+        path = os.path.join(d, name)
+        try:
+            with open(path) as f:
+                blob = json.load(f)
+            ws = sh.worksheet(blob["tab"])
+        except Exception as e:
+            log("   (cannot replay %s: %s)" % (name, str(e)[:60]))
+            continue
+        got = commit_rows(ws, blob["tab"], blob.get("rows") or [])
+        if got:
+            total += got
+            try:
+                os.remove(path)          # only once it is really in the sheet
+            except Exception:
+                pass
+    if total:
+        log("   replayed %d row(s) that an earlier run could not commit." % total)
+    return total
+
+
 RECHECK_TAB = "Gold Recheck"
 RECHECK_HEADER = ["Address", "Captured At", "Lat", "Lng", "Build Code",
                   "City", "State", "ZIP", "Run ID", "Operator"]
@@ -2605,7 +2768,7 @@ def write_gold_recheck(sh, records):
         print("   (RECHECK TAB FAILED: %s)" % str(e)[:110])
         return 0
 
-    seen, rows = _RECHECK["seen"], []
+    seen, rows, staged = _RECHECK["seen"], [], []
     for r in rows_in:
         addr = (r.get("address") or "").strip()
         if not addr:
@@ -2613,7 +2776,7 @@ def write_gold_recheck(sh, records):
         keys = _gold_keys(addr, r.get("lat"), r.get("lng"))
         if keys & seen:
             continue
-        seen.update(keys)
+        staged.append(keys)          # NOT marked seen until Google ACKs
         rows.append([addr, r.get("ts") or "",
                      r.get("lat") if r.get("lat") is not None else "",
                      r.get("lng") if r.get("lng") is not None else "",
@@ -2624,15 +2787,9 @@ def write_gold_recheck(sh, records):
                      r.get("operator") or OPERATOR()])
     if not rows:
         return 0
-    written = 0
-    for i in range(0, len(rows), 500):
-        batch = rows[i:i + 500]
-        try:
-            ws.append_rows(batch, value_input_option="RAW")
-            written += len(batch)
-        except Exception as e:
-            print("   (RECHECK WRITE FAILED for %d rows: %s)"
-                  % (len(batch), str(e)[:90]))
+    written = commit_rows(ws, RECHECK_TAB, rows)
+    for keys in staged[:written]:
+        seen.update(keys)            # only what actually landed
     if written:
         print("   %d undecodable customer(s) -> '%s' (NOT on the call list)"
               % (written, RECHECK_TAB))
@@ -2671,7 +2828,7 @@ def write_gold_dots(sh, records):
         return 0
 
     seen = _GOLD["seen"]
-    rows = []
+    rows, staged = [], []
     for r in golds:
         addr = (r.get("address") or "").strip()
         if not addr:
@@ -2679,7 +2836,7 @@ def write_gold_dots(sh, records):
         keys = _gold_keys(addr, r.get("lat"), r.get("lng"))
         if keys & seen:
             continue
-        seen.update(keys)
+        staged.append(keys)          # NOT marked seen until Google ACKs
         vals = {
             "address": addr,
             "captured at": r.get("ts") or "",
@@ -2709,19 +2866,9 @@ def write_gold_dots(sh, records):
     if not rows:
         return 0
 
-    written = 0
-    for i in range(0, len(rows), 500):
-        batch = rows[i:i + 500]
-        try:
-            gw.append_rows(batch, value_input_option="RAW")
-            written += len(batch)
-        except Exception as e:
-            # Never silent. A swallowed gold write is how an operator ends up
-            # believing rows were saved that were not.
-            print("   (GOLD WRITE FAILED for %d rows: %s)"
-                  % (len(batch), str(e)[:90]))
-            if _DEDUPE_REPORT:
-                _DEDUPE_REPORT.failed_writes += len(batch)
+    written = commit_rows(gw, GOLD_TAB, rows)
+    for keys in staged[:written]:
+        seen.update(keys)            # only what actually landed
     if _DEDUPE_REPORT:
         _DEDUPE_REPORT.written += written
     return written
@@ -6141,6 +6288,11 @@ def main():
 
         ws = None if args.dry else open_sheet()
         _phase("sheet_open")
+        if ws is not None:
+            try:
+                replay_pending(ws.spreadsheet)
+            except Exception as e:
+                print("   (replay skipped: %s)" % str(e)[:70])
         searched = [False]   # only search the ZIP on the first pass
         seen = already_seen(ws)            # resume set, persists across passes
         _phase("resume_loaded")
