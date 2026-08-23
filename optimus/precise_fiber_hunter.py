@@ -380,6 +380,23 @@ def _unknown_customer_status():
     return "copper_upgrade" if _UNKNOWN_CUSTOMER == "gold" else "customer"
 
 
+def _publish_feed():
+    """Ship this run's classification evidence to GitHub. Best-effort."""
+    if not _FEED:
+        return
+    try:
+        ded = {}
+        if _DEDUPE_REPORT:
+            ded = dict((f, getattr(_DEDUPE_REPORT, f))
+                       for f in _DEDUPE_REPORT.FIELDS)
+        _FEED.publish(gh_put, counts=_WIRE_COUNTS,
+                      undecoded=_UNKNOWN_CODES,
+                      undecoded_samples=_UNKNOWN_CODE_SAMPLE,
+                      dedupe=ded, note_text=_CUR_AREA[0] or "")
+    except Exception as e:
+        print("  (feed publish skipped: %s)" % str(e)[:70])
+
+
 def wire_classification_report():
     """One block at the end of a run saying how every customer dot was decided.
 
@@ -1803,6 +1820,12 @@ class NetCapture:
                 continue
             seen.add(key)
             dot_status = classify_lead(ld)
+            if _FEED:
+                # The build code is what actually decides gold vs grey, and it
+                # is the one field a console photo cannot carry. Publish it.
+                _FEED.note(addr, ld.get("lat"), ld.get("lng"), ld.get("ban"),
+                           _bld_code(ld.get("raw") or {}), dot_status,
+                           dot_color(dot_status))
             if dot_color(dot_status) == "GREY":
                 grey_ct += 1
                 # A dot we ALREADY recorded as gold that now reads grey is the
@@ -3713,6 +3736,7 @@ def _find_git():
 # so pushing it to the branch changes nothing there. Add new tools here or they
 # do not ship.
 _CORE_FILES = ("precise_fiber_hunter.py", "optimus_dedupe.py",
+               "optimus_feed.py",
                "optimus_web_intel.py",
                "optimus_territory.py", "optimus_operator.py",
                "optimus_dot_detect.py",
@@ -5027,6 +5051,11 @@ try:
 except Exception:                     # dedupe is safety, not a hard dependency
     _DEDUPE = None
 
+try:
+    import optimus_feed as _FEED
+except Exception:                     # the feed is telemetry, never a blocker
+    _FEED = None
+
 # One report per run, filled by the flush paths and printed at the end.
 _DEDUPE_REPORT = _DEDUPE.DedupeReport() if _DEDUPE else None
 _VERIFY_ROWS = []                     # verification observations, appended only
@@ -5839,6 +5868,9 @@ if __name__ == "__main__":
     # Ctrl-C, and the gold/grey split is exactly what we need to see when it is.
     import atexit
     atexit.register(wire_classification_report)
+    if _FEED is not None:
+        _FEED.configure(RUN_ID, OPERATOR(), "", _FINGERPRINT)
+        atexit.register(_publish_feed)
     # Same reasoning as above: a sweep is normally ended with Ctrl-C, and the
     # duplicate / GOLD->GREY split is exactly what we need to see when it is.
     if _DEDUPE_REPORT is not None:
