@@ -34,14 +34,15 @@ FLUSH_EVERY = 250         # publish mid-run too, so a force-quit still reports
 
 _SAMPLES = []
 _STATE = {"pushed": 0, "run_id": "", "operator": "", "area": "",
-          "fingerprint": "", "machine": ""}
+          "fingerprint": "", "machine": "", "mode": ""}
 
 
-def configure(run_id="", operator="", area="", fingerprint=""):
+def configure(run_id="", operator="", area="", fingerprint="", mode=""):
     _STATE["run_id"] = str(run_id or "")
     _STATE["operator"] = str(operator or "")
     _STATE["area"] = str(area or "")
     _STATE["fingerprint"] = str(fingerprint or "")
+    _STATE["mode"] = str(mode or "")
     _STATE["machine"] = (os.environ.get("COMPUTERNAME")
                          or os.environ.get("HOSTNAME") or "")
 
@@ -185,6 +186,77 @@ def diagnose(body, content_type=""):
 
 
 # ---------------------------------------------------------------------------
+# RUN PHASE -- how far the run actually got.
+#
+# Every boundary counter below lives INSIDE the sweep, so a run that dies before
+# the sweep starts reports all-nulls and the report cannot say why. That is what
+# happened all of 2026-08-23: six runs, six empty reports, and no way to tell
+# "swept and found nothing" from "never reached the map". The phase list is the
+# breadcrumb -- each milestone is stamped as it is passed AND pushed live, so a
+# run that hangs or is force-quit still names the last thing it did.
+# ---------------------------------------------------------------------------
+PHASES = ("start", "browser_up", "page_loaded", "sheet_open", "resume_loaded",
+          "wait_done", "diag_done", "sweep_start", "pass_done", "exit")
+
+_PHASES = []          # [(name, "HH:MM:SS", seconds_since_start)]
+_T0 = [None]
+_HEARTBEAT = [None]   # gh_put, set by arm_heartbeat()
+
+
+def arm_heartbeat(gh_put):
+    """Give the feed an uploader so phase() can push live. Optional."""
+    _HEARTBEAT[0] = gh_put
+
+
+def phase(name, log=None):
+    """Stamp a milestone and push it immediately.
+
+    Pushed rather than buffered on purpose: the whole point is to survive a run
+    that never reaches its own exit report.
+    """
+    try:
+        now = time.time()
+        if _T0[0] is None:
+            _T0[0] = now
+        _PHASES.append((str(name), time.strftime("%H:%M:%S"),
+                        round(now - _T0[0], 1)))
+        if log:
+            log("  [phase] %s" % name)
+        put = _HEARTBEAT[0]
+        if put:
+            put("optimus/_feed/heartbeat.json", json.dumps({
+                "run_id": _STATE["run_id"], "operator": _STATE["operator"],
+                "machine": _STATE["machine"],
+                "build_fingerprint": _STATE["fingerprint"],
+                "mode": _STATE.get("mode", ""),
+                "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "last_phase": name,
+                "phases": [list(p) for p in _PHASES],
+            }, indent=1))
+    except Exception:
+        pass
+
+
+def last_phase():
+    return _PHASES[-1][0] if _PHASES else ""
+
+
+def phase_report(log=print):
+    """Where the run got to, and how long each step took."""
+    log("")
+    log("=== RUN PHASES ===")
+    if not _PHASES:
+        log("  (none stamped -- this build predates phase tracking)")
+        return
+    for name, at, secs in _PHASES:
+        log("  %-14s %s  (+%ss)" % (name, at, secs))
+    reached = set(n for n, _, _ in _PHASES)
+    missed = [p for p in PHASES if p not in reached]
+    if missed:
+        log("  NEVER REACHED: %s" % ", ".join(missed))
+
+
+# ---------------------------------------------------------------------------
 # CAPTURE TRUTH -- counters at every boundary, so the FIRST place the dots
 # disappear is named instead of inferred. A viewport with visible dots that
 # reports zero is lying somewhere; this says where.
@@ -222,10 +294,17 @@ def first_failure():
     A boundary that was never measured cannot be blamed.
     """
     prev = None
+    measured = False
     for key, label in _BOUNDARIES:
         v = _TRUTH.get(key)
         if v is None:
             continue
+        if not measured and v == 0:
+            # Nothing upstream was ever measured, so this boundary did not lose
+            # the dots -- the run never got far enough to hand it any. Blaming
+            # it sends the next hour to the wrong file.
+            continue
+        measured = True
         if isinstance(v, str):          # delivery is a verdict, not a count
             if v not in ("DATA_OK", "OK"):
                 return key, label
@@ -254,6 +333,12 @@ def truth_report(log=print):
     if k:
         log("  RESULT: BROKEN AT %s" % k.upper())
         log("  FIRST FAILURE: %s" % label)
+    elif not any(t.get(b) for b, _ in _BOUNDARIES):
+        # All zeros with nothing upstream measured is NOT health. It means the
+        # sweep never ran, and calling that "HEALTHY" is how six empty reports
+        # in a row read as six clean runs.
+        log("  RESULT: THE SWEEP NEVER RAN -- no boundary was ever measured.")
+        log("  See RUN PHASES below for how far it got.")
     else:
         log("  RESULT: HEALTHY (no boundary lost the dots)")
     log("=" * 36)
@@ -275,6 +360,9 @@ def build_report(counts=None, undecoded=None, undecoded_samples=None,
         "counts": dict(counts or {}),
         "undecoded_codes": codes,
         "dedupe": dict(dedupe or {}),
+        "mode": _STATE.get("mode", ""),
+        "phases": [list(p) for p in _PHASES],
+        "last_phase": last_phase(),
         "capture_truth": dict(_TRUTH),
         "first_failure": first_failure()[0],
         "capture_diagnostic": dict(_DIAG),

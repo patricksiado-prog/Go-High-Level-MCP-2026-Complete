@@ -419,6 +419,7 @@ def _publish_feed():
                                 + c["unknown"] + c["no_code"]),
                     written=(_DEDUPE_REPORT.written if _DEDUPE_REPORT else None))
         _FEED.truth_report()
+        _FEED.phase_report()
         _FEED.publish(gh_put, counts=_WIRE_COUNTS,
                       undecoded=_UNKNOWN_CODES,
                       undecoded_samples=_UNKNOWN_CODE_SAMPLE,
@@ -3245,6 +3246,57 @@ def on_map(page):
     return False
 
 
+_LOGIN_MARKERS = ("choose your method of access", "at&t employee",
+                  "retiree/affiliate", "sign in", "log in", "global logon",
+                  "user id", "password")
+
+
+def _logged_in(page):
+    """False when AT&T is showing the access chooser or a sign-in form.
+
+    The whole of 2026-08-23 was spent reading empty reports off runs that had
+    quietly loaded THIS page instead of the map. The chooser answers 200, the
+    hunter swept it, found nothing, and reported a clean zero -- indistinguishable
+    from an empty neighbourhood. Checked positively (is the map there?) and then
+    negatively (is the login text there?), because either alone can be fooled:
+    the portal landing page has no map but is not a login, and a slow map render
+    is not a logout.
+    """
+    if on_map(page):
+        return True
+    try:
+        txt = (page.inner_text("body") or "")[:6000].lower()
+    except Exception:
+        return True            # cannot read the page: don't cry logout on noise
+    if any(m in txt for m in _LOGIN_MARKERS):
+        return False
+    return True                # portal landing, or something else -- not a login
+
+
+# Long by design: signing in to AT&T means a password and often an MFA prompt on
+# a phone. A 60-second timeout would fail people who are doing exactly the right
+# thing, and a failed run costs far more than waiting.
+LOGIN_WAIT_SECS = int(os.environ.get("OPTIMUS_LOGIN_WAIT") or 600)
+
+
+def _wait_for_login(page, secs):
+    """Poll until the map appears. True if it did, False on timeout."""
+    end = time.time() + max(1, secs)
+    told = 0
+    while time.time() < end:
+        try:
+            if on_map(page):
+                return True
+        except Exception:
+            pass
+        left = int(end - time.time())
+        if left // 60 != told // 60 and left > 0:
+            told = left
+            print("     ...still waiting (%d min left)" % (left // 60 + 1))
+        time.sleep(3)
+    return bool(on_map(page))
+
+
 def open_map_view(page):
     """A fresh load of /yourefer/fiber lands on the PORTAL page; the dot map is
     revealed by clicking 'Fiber Availability Map'. ONLY click it when we're on
@@ -5315,6 +5367,16 @@ try:
 except Exception:                     # the feed is telemetry, never a blocker
     _FEED = None
 
+def _phase(name):
+    """Stamp a startup milestone. Telemetry only -- never blocks a sweep."""
+    if _FEED is None:
+        return
+    try:
+        _FEED.phase(name, log=print)
+    except Exception:
+        pass
+
+
 # One report per run, filled by the flush paths and printed at the end.
 _DEDUPE_REPORT = _DEDUPE.DedupeReport() if _DEDUPE else None
 _VERIFY_ROWS = []                     # verification observations, appended only
@@ -5718,6 +5780,17 @@ def _wait_for_start(secs):
 
 def main():
     self_update()
+    # Configured FIRST so every later milestone can be pushed live. A run that
+    # hangs or is force-quit never reaches its exit report, and for a full day
+    # that made "died before the map loaded" and "swept and found nothing" look
+    # identical from here. The heartbeat tells them apart.
+    if _FEED is not None:
+        try:
+            _FEED.configure(RUN_ID, OPERATOR(), "", _FINGERPRINT)
+            _FEED.arm_heartbeat(gh_put)
+            _FEED.phase("start")
+        except Exception:
+            pass
     # Straight after the update, so the console always answers "did the update
     # actually take, and what am I running?" before anything else happens.
     # Wrapped: a manifest is diagnostics, and diagnostics must never be the
@@ -5911,7 +5984,37 @@ def main():
         page.on("response", capture.handle)   # grab dot data off the wire
         _NET_CAPTURE[0] = capture
 
+        _phase("browser_up")
         safe_goto(page, MAP_URL)
+        _phase("page_loaded")
+        if not _logged_in(page):
+            _phase("LOGGED_OUT")
+            if _FEED:
+                _FEED.truth(auth_ok=False, note="access chooser, not the map")
+            print("")
+            print("  " + "!" * 62)
+            print("  NOT LOGGED IN -- AT&T is showing the access chooser, not")
+            print("  the fiber map. Nothing can be captured from this screen.")
+            print("")
+            print("     1. Dismiss 'Restore pages?' with the X (not Restore)")
+            print("     2. Click 'AT&T Employee' and sign in")
+            print("     3. Open the Fiber Map and put it on your area")
+            print("")
+            print("  Waiting up to %d minutes for you to finish..."
+                  % (LOGIN_WAIT_SECS // 60))
+            print("  " + "!" * 62)
+            if _wait_for_login(page, LOGIN_WAIT_SECS):
+                print("  Logged in -- map is up. Carrying on.")
+                if _FEED:
+                    _FEED.truth(auth_ok=True)
+                _phase("logged_in")
+            else:
+                print("  Still not on the map after %ds. Stopping rather than"
+                      % LOGIN_WAIT_SECS)
+                print("  sweeping a login page and reporting a clean zero.")
+                _phase("LOGIN_TIMEOUT")
+                ctx.close()
+                return 1
 
         if args.login:
             print("\nLOG IN in the browser, open the Fiber Map, then come back here.")
@@ -5921,8 +6024,10 @@ def main():
             return
 
         ws = None if args.dry else open_sheet()
+        _phase("sheet_open")
         searched = [False]   # only search the ZIP on the first pass
         seen = already_seen(ws)            # resume set, persists across passes
+        _phase("resume_loaded")
         area_label = args.zip or "manual"
 
         # COMBO: load the scraped businesses FIRST so flush() and the backfill can
@@ -6112,6 +6217,7 @@ def main():
             # back empty, and nothing anywhere says "I am waiting for a keypress".
             # That cost most of 2026-08-23. It now starts on its own.
             _wait_for_start(START_WAIT_SECS)
+            _phase("wait_done")
             # Report our own health before a single cell is swept, so a bad
             # capture state is known up front instead of inferred from zeros.
             try:
@@ -6125,6 +6231,7 @@ def main():
                     print("                safe capture zoom ~ %s" % _d["safe_zoom"])
             except Exception as _e:
                 print("  (diagnostic skipped: %s)" % str(_e)[:70])
+            _phase("diag_done")
             # 5-second grace period so you can MINIMIZE this window before the
             # hunter takes over the mouse (real-mouse motion). Countdown so you
             # know how long you've got.
@@ -6147,6 +6254,7 @@ def main():
             print("\n  WATCHING: pan the map by hand to new areas -- it grabs each "
                   "one off the server every %ds. Close the browser to stop.\n" % loop_secs)
         _start_stop_watcher()          # slam mouse to top-left corner to stop
+        _phase("sweep_start")
         passno = 0
         while True:
             passno += 1
@@ -6198,8 +6306,8 @@ if __name__ == "__main__":
     import atexit
     atexit.register(wire_classification_report)
     if _FEED is not None:
-        _FEED.configure(RUN_ID, OPERATOR(), "", _FINGERPRINT)
         atexit.register(_publish_feed)
+        atexit.register(lambda: _FEED.phase("exit"))
     # Same reasoning as above: a sweep is normally ended with Ctrl-C, and the
     # duplicate / GOLD->GREY split is exactly what we need to see when it is.
     if _DEDUPE_REPORT is not None:
