@@ -608,7 +608,8 @@ _BACKEND_WRITTEN = [0]
 _CUR_AREA = [""]        # set per cell so every backend row says WHERE
 _CUR_ZOOM = [""]         # live map zoom, stamped on every backend row
 _DOT_LAYERS = [None]     # dot-layer minzoom/maxzoom, printed once
-_SVC_SAID = set()       # verdicts already announced this run
+_SVC_SAID = set()          # payload verdicts announced this run
+_SVC_STATUS_SAID = set()   # HTTP statuses announced this run
 _SEEN_ENDPOINTS = set()  # normalised endpoints already logged once
 _SEEN_ENDPOINTS_MAX = 300   # bound it; a runaway pattern can never eat memory
 
@@ -1562,14 +1563,56 @@ class NetCapture:
                             503: "AT&T unavailable -- transient"}.get(st, "non-200, body not read")
                     log_backend("serviceability", url, st, ct, note=hint,
                                 area=_CUR_AREA[0])
-                    print("  (serviceability reply %s -- skipping, map keeps moving)" % st)
+                    # A console line scrolls away. THIS is how "serviceability
+                    # reply 301" hid for weeks: the sweep kept moving, every cell
+                    # read +0, and nothing anywhere said the session was dead.
+                    if st not in _SVC_STATUS_SAID:
+                        _SVC_STATUS_SAID.add(st)
+                        print("\n" + "!" * 64)
+                        print("!! AT&T REPLIED %s -- NOTHING CAN LAND THIS RUN" % st)
+                        print("!! %s" % hint)
+                        if st in (301, 302, 401, 403):
+                            print("!! FIX: log OUT of youachieve.att.com, close the "
+                                  "browser,")
+                            print("!!      log back in, then start the hunter again.")
+                        print("!" * 64 + "\n")
+                    if _FEED:
+                        try:
+                            _FEED.note_empty(url, ct, "HTTP %d -- %s" % (st, hint))
+                        except Exception:
+                            pass
                     return
                 try:
                     body = response.body()
                     if not body or len(body) > 8 * 1024 * 1024:
                         return
+                except Exception:
+                    return
+                try:
                     data = json.loads(body)
                 except Exception:
+                    # A 200 that is not JSON is almost always AT&T's login page
+                    # wearing a 200. This used to `return` silently, so the whole
+                    # run reported "no serviceability responses" and the real
+                    # cause never surfaced anywhere.
+                    if _FEED:
+                        try:
+                            _FEED.note_empty(url, ct, body)
+                            _m, _k = _FEED.diagnose(body, ct)
+                            if _k not in _SVC_SAID:
+                                _SVC_SAID.add(_k)
+                                print("\n" + "!" * 64)
+                                print("!! AT&T SENT 200 BUT THE BODY IS NOT DATA:")
+                                print("!! " + _m)
+                                print("!" * 64 + "\n")
+                        except Exception:
+                            pass
+                    try:
+                        log_backend("serviceability", url, 200, ct, len(body),
+                                    note="200 but body is not JSON",
+                                    area=_CUR_AREA[0])
+                    except Exception:
+                        pass
                     return
                 self.svc_seen += 1
                 _t0 = time.time()
