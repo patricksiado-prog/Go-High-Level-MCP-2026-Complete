@@ -2197,12 +2197,37 @@ def _ensure_gold_tab(sh):
     return gw
 
 
+def _gold_layout(gw):
+    """Map the LIVE header to column indexes, or None when there is no header.
+
+    Column positions must never be assumed. The live tab has no header row and
+    something else now occupies column G (a Full Address column added outside
+    the hunter). Writing our own 8-column row would have overwritten every one
+    of those values on the next sweep -- silent destruction of somebody else's
+    work, which is exactly the class of bug this file keeps getting bitten by.
+
+    So: if row 1 is a real header we place each field BY NAME. If row 1 is data,
+    we write only the four legacy columns we can be certain of and leave every
+    other column strictly alone.
+    """
+    try:
+        head = gw.row_values(1)
+    except Exception:
+        return None
+    if not head or head[0].strip().lower() != _GOLD_HEADER[0].strip().lower():
+        return None                    # row 1 is data: headerless legacy tab
+    return dict((h.strip().lower(), i) for i, h in enumerate(head) if h.strip())
+
+
+_GOLD_WARNED = []
+
+
 def write_gold_dots(sh, records):
-    """Append EVERY gold (copper-upgrade) dot to the 'Gold Dots' TAB in the main
-    sheet -- all of them, deduped by address, business + phone inline.
-    `records` = the same dicts flush()/the uploader build (address, dot_status,
-    ts, lat, lng, optional biz_name/biz_phone). Best-effort: never raises into
-    the sweep. Returns how many new gold rows were written."""
+    """Append every gold (copper-upgrade) dot to the 'Gold Dots' tab.
+
+    Deduped on normalised full address + coordinates (see optimus_dedupe).
+    Best-effort: never raises into the sweep. Returns rows actually written.
+    """
     if sh is None or not records:
         return 0
     golds = [r for r in records
@@ -2212,10 +2237,16 @@ def write_gold_dots(sh, records):
     try:
         gw = _ensure_gold_tab(sh)
     except Exception as e:
-        # Never silent again. A gold write that cannot happen must SAY so --
-        # this failing quietly is exactly what hid the bug for weeks.
         print("   (GOLD TAB FAILED: %s)" % str(e)[:120])
         return 0
+
+    layout = _gold_layout(gw)
+    if layout is None and not _GOLD_WARNED:
+        _GOLD_WARNED.append(1)
+        print("   (Gold Dots has no header row: writing ONLY columns A-D so "
+              "nothing else on the tab is overwritten. Add the header row to "
+              "capture Run ID / Operator / City / State / ZIP.)")
+
     seen = _GOLD["seen"]
     rows = []
     for r in golds:
@@ -2226,16 +2257,33 @@ def write_gold_dots(sh, records):
         if keys & seen:
             continue
         seen.update(keys)
-        rows.append([addr, r.get("ts") or "",
-                     r.get("lat") if r.get("lat") is not None else "",
-                     r.get("lng") if r.get("lng") is not None else "",
-                     r.get("biz_name") or "", r.get("biz_phone") or "",
-                     r.get("run_id") or RUN_ID,
-                     r.get("operator") or OPERATOR(),
-                     r.get("city") or "", r.get("state") or "",
-                     r.get("zip") or ""])
+        vals = {
+            "address": addr,
+            "captured at": r.get("ts") or "",
+            "lat": r.get("lat") if r.get("lat") is not None else "",
+            "lng": r.get("lng") if r.get("lng") is not None else "",
+            "business": r.get("biz_name") or "",
+            "phone": r.get("biz_phone") or "",
+            "run id": r.get("run_id") or RUN_ID,
+            "operator": r.get("operator") or OPERATOR(),
+            "city": r.get("city") or "",
+            "state": r.get("state") or "",
+            "zip": r.get("zip") or "",
+        }
+        if layout is None:
+            # Headerless: the four columns the tab has always meant. Anything
+            # to the right belongs to somebody else -- do not touch it.
+            rows.append([vals["address"], vals["captured at"],
+                         vals["lat"], vals["lng"]])
+        else:
+            row = [""] * (max(layout.values()) + 1)
+            for name, idx in layout.items():
+                if name in vals:
+                    row[idx] = vals[name]
+            rows.append(row)
     if not rows:
         return 0
+
     written = 0
     for i in range(0, len(rows), 500):
         batch = rows[i:i + 500]
