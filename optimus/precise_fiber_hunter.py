@@ -445,6 +445,14 @@ def _publish_feed():
             ded = dict((f, getattr(_DEDUPE_REPORT, f))
                        for f in _DEDUPE_REPORT.FIELDS)
         c = _WIRE_COUNTS
+        stage(classified_green=c["green"], classified_gold=c["copper"],
+              classified_grey=c["fiber"],
+              classified_unknown=c["unknown"] + c["no_code"])
+        stage_report()
+        try:
+            _FEED.note_stages(_STAGE)
+        except Exception:
+            pass
         _FEED.truth(classified=(c["green"] + c["fiber"] + c["copper"]
                                 + c["unknown"] + c["no_code"]),
                     written=(_DEDUPE_REPORT.written if _DEDUPE_REPORT else None))
@@ -1071,6 +1079,16 @@ MAPBOX_DIAG_JS = """
       id: L.id, type: t, source: srcId,
       source_layer: L['source-layer'] || null,
       source_features: srcN,
+      // The SOURCE's own maxzoom caps which tiles exist; the LAYER's maxzoom
+      // caps where the style draws them. They are different numbers and they
+      // fail differently: past source maxzoom the tiles are overzoomed from a
+      // lower level (data still there); past layer maxzoom the layer is simply
+      // not drawn (data there, rendered zero). Conflating them misreads which.
+      source_maxzoom: (function(){
+        try { const sp = (style.sources || {})[srcId] || {};
+              return (sp.maxzoom === undefined ? null : sp.maxzoom); }
+        catch (e) { return null; }
+      })(),
       minzoom: (L.minzoom === undefined ? null : L.minzoom),
       maxzoom: (L.maxzoom === undefined ? null : L.maxzoom),
       visibility: vis, circle_color: color,
@@ -1375,6 +1393,28 @@ def capture_diagnostic(page):
                               "-- no data reached the map for this view")
     else:
         diag["verdict"] = "MAPBOX_OK"
+    # A zero is only evidence of empty ground when EVERY precondition held.
+    # Otherwise it is an artefact of our own broken state, and writing "+0" for
+    # it is how a working neighbourhood gets recorded as barren.
+    _pre = {
+        "map_captured": bool(mb.get("map_captured")),
+        "style_loaded": bool(mb.get("style_loaded")),
+        "map_loaded": bool(mb.get("map_loaded")),
+        "dot_layers_found": bool(cands),
+        "zoom_in_band": diag.get("layers_in_band", 0) > 0,
+        "query_ok": not mb.get("error"),
+    }
+    diag["preconditions"] = _pre
+    _failed = [k for k, ok in _pre.items() if not ok]
+    if _failed:
+        diag["zero_verdict"] = "INVALID_ZERO"
+        diag["zero_reason"] = ("a zero from this view proves nothing -- "
+                               "failed: %s" % ", ".join(_failed))
+    else:
+        diag["zero_verdict"] = "VALID_ZERO"
+        diag["zero_reason"] = ("all preconditions held, so a zero here really "
+                               "does mean no dots in this view")
+
     if _FEED:
         try:
             mbx = diag.get("mapbox") or {}
@@ -1382,7 +1422,8 @@ def capture_diagnostic(page):
                                     and mbx.get("style_loaded")),
                         zoom_ok=(diag.get("layers_in_band", 0) > 0),
                         rendered=mbx.get("rendered_total"),
-                        note="mapbox verdict %s" % diag.get("verdict"))
+                        note="mapbox %s / %s" % (diag.get("verdict"),
+                                                 diag.get("zero_verdict")))
             _FEED.note_diagnostic(diag)
         except Exception:
             pass
@@ -2637,6 +2678,68 @@ _GOLD_RECHECK_WARNED = []
 # Rule: mark seen only after an ACK, retry with bounded backoff, and if it still
 # fails, write the batch to disk so the next run replays it. Never say "wrote".
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# STAGE COUNTERS. One number per boundary, so the FIRST drop is obvious instead
+# of argued about. The point is the shape, not the totals:
+#
+#   GOLD CLASSIFIED 12 / QUEUED 12 / COMMITTED 0   -> stop looking at Mapbox
+#   GOLD CLASSIFIED 0  / RAW 480                   -> it is the classifier
+#   RAW 0                                          -> nothing was delivered
+# ---------------------------------------------------------------------------
+_STAGE = {}
+_STAGE_ORDER = [
+    ("raw_features",       "RAW FEATURES"),
+    ("classified_green",   "  GREEN classified"),
+    ("classified_gold",    "  GOLD classified"),
+    ("classified_grey",    "  GREY classified"),
+    ("classified_unknown", "  UNKNOWN classified"),
+    ("gold_queued",        "GOLD QUEUED"),
+    ("gold_attempted",     "GOLD WRITE ATTEMPTED"),
+    ("gold_committed",     "GOLD COMMITTED"),
+    ("gold_seen",          "GOLD SEEN"),
+    ("gold_pending",       "GOLD PENDING"),
+]
+
+
+def stage(**kw):
+    """Add to a stage counter. Never raises into a sweep."""
+    try:
+        for k, v in kw.items():
+            _STAGE[k] = _STAGE.get(k, 0) + int(v or 0)
+    except Exception:
+        pass
+
+
+def stage_report(log=print):
+    log("")
+    log("=== STAGE COUNTERS (the first drop is the bug) ===")
+    for key, label in _STAGE_ORDER:
+        if key in _STAGE:
+            log("  %-22s %6d" % (label, _STAGE[key]))
+    g = _STAGE.get
+    # Invariants. Each is a sentence about where leads go, and a breach names
+    # the stage instead of leaving it to be inferred from totals.
+    for name, ok, why in (
+        ("gold_queued == gold_classified",
+         "gold_queued" not in _STAGE
+         or g("gold_queued", 0) == g("classified_gold", 0),
+         "gold was classified but never reached the writer"),
+        ("gold_committed <= gold_queued",
+         g("gold_committed", 0) <= g("gold_queued", 0),
+         "more committed than queued -- a counter is wrong"),
+        ("gold_seen == gold_committed",
+         g("gold_seen", 0) == g("gold_committed", 0),
+         "a dot was marked seen without being committed -- IT WILL NEVER RETRY"),
+    ):
+        if not ok:
+            log("  !! INVARIANT BROKEN: %s" % name)
+            log("     %s" % why)
+    if g("gold_pending"):
+        log("  %d gold row(s) PENDING -- parked on disk, replayed next run."
+            % g("gold_pending"))
+    log("=" * 49)
+
+
 def _pending_dir():
     d = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_pending")
     try:
@@ -2866,7 +2969,10 @@ def write_gold_dots(sh, records):
     if not rows:
         return 0
 
+    stage(gold_queued=len(rows), gold_attempted=len(rows))
     written = commit_rows(gw, GOLD_TAB, rows)
+    stage(gold_committed=written, gold_seen=written,
+          gold_pending=len(rows) - written)
     for keys in staged[:written]:
         seen.update(keys)            # only what actually landed
     if _DEDUPE_REPORT:
@@ -6493,6 +6599,8 @@ def main():
                 print("\n  [HUNTER DIAG] mapbox=%s  zoom=%s  layers_in_band=%s"
                       % (_d.get("verdict"), (_d.get("mapbox") or {}).get("zoom"),
                          _d.get("layers_in_band")))
+                print("                %s -- %s"
+                      % (_d.get("zero_verdict"), _d.get("zero_reason")))
                 if _d.get("advice"):
                     print("                %s" % _d["advice"])
                 if _d.get("safe_zoom"):

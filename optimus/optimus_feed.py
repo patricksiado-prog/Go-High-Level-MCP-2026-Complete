@@ -151,6 +151,17 @@ def note_customer(raw, code, color):
         pass
 
 
+_STAGE_COUNTS = {}
+
+
+def note_stages(d):
+    """Stage counters from the hunter, carried into the report."""
+    try:
+        _STAGE_COUNTS.clear(); _STAGE_COUNTS.update(d or {})
+    except Exception:
+        pass
+
+
 _DIAG = {}
 
 
@@ -414,6 +425,7 @@ def build_report(counts=None, undecoded=None, undecoded_samples=None,
         "mode": _STATE.get("mode", ""),
         "phases": [list(p) for p in _PHASES],
         "last_phase": last_phase(),
+        "stage_counters": dict(_STAGE_COUNTS),
         "capture_truth": dict(_TRUTH),
         "first_failure": first_failure()[0],
         "capture_diagnostic": dict(_DIAG),
