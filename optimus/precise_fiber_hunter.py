@@ -129,9 +129,15 @@ GH_REPO = "patricksiado-prog/Go-High-Level-MCP-2026-Complete"
 GH_BRANCH = REPO_BRANCH
 
 
+_GH_TOKEN_WARNED = []      # warn once per run, not once per push
+
+
 def _gh_token():
     home = os.path.expanduser("~")
-    here = os.path.dirname(os.path.abspath(__file__))
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))
+    except Exception:
+        here = os.getcwd()      # frozen/exec-wrapped launcher has no __file__
     for p in [os.path.join(home, "Downloads", "github_token.txt"),
               os.path.join(home, "Desktop", "github_token.txt"),
               os.path.join(home, "github_token.txt"),
@@ -152,6 +158,14 @@ def gh_put(path, text):
     import base64
     token = _gh_token()
     if not token:
+        # Silent here is how LIVE_COUNTS_hunter.txt never got written once: no
+        # token file, no push, no message, and nothing on GitHub to notice was
+        # missing. Say it out loud and say exactly where to put the file.
+        if not _GH_TOKEN_WARNED:
+            _GH_TOKEN_WARNED.append(1)
+            print("  (GitHub push OFF: no github_token.txt found. Put it at "
+                  "%s and the live counts start working.)"
+                  % os.path.join(os.path.expanduser("~"), "github_token.txt"))
         return False
     import urllib.request
     api = "https://api.github.com/repos/%s/contents/%s" % (GH_REPO, path)
