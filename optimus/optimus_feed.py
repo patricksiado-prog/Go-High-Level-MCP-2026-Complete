@@ -305,7 +305,7 @@ def phase(name, log=None):
             log("  [phase] %s" % name)
         put = _HEARTBEAT[0]
         if put:
-            put("optimus/_feed/heartbeat.json", json.dumps({
+            blob = json.dumps({
                 "run_id": _STATE["run_id"], "operator": _STATE["operator"],
                 "machine": _STATE["machine"],
                 "build_fingerprint": _STATE["fingerprint"],
@@ -313,7 +313,15 @@ def phase(name, log=None):
                 "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "last_phase": name,
                 "phases": [list(p) for p in _PHASES],
-            }, indent=1))
+            }, indent=1)
+            put("optimus/_feed/heartbeat.json", blob)
+            # ALSO per-run. The shared file is convenient but a second launch
+            # overwrites it, and that is not hypothetical: on 2026-08-23 a
+            # second window clobbered the breadcrumb of the run that was
+            # actually working, leaving only the loser's trail to read.
+            rid = _STATE.get("run_id")
+            if rid:
+                put("optimus/_feed/heartbeat_%s.json" % rid, blob)
     except Exception:
         pass
 
