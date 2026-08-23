@@ -99,6 +99,79 @@ def note_empty(url, content_type, body):
         pass
 
 
+_AUTH_HINTS = ("sign in", "log in", "login", "session has expired",
+               "session expired", "not authorized", "unauthorized",
+               "access denied", "csrf", "please authenticate",
+               "you achieve is a 24/7 platform", "choose your method of access")
+
+
+def diagnose(body, content_type=""):
+    """Say IN ENGLISH why a 200 response produced no leads.
+
+    A silent zero is indistinguishable from an empty neighbourhood, and that
+    ambiguity has cost more time here than any real bug. JSON is tried FIRST:
+    this endpoint is declared text/html but actually serves JSON, so sniffing
+    the content-type would misread a legitimate error envelope as a login page.
+    """
+    try:
+        if isinstance(body, bytes):
+            body = body.decode("utf-8", "replace")
+        body = (body or "").strip()
+        if not body:
+            return ("EMPTY RESPONSE -- AT&T returned nothing at all.", "empty")
+        low = body[:4000].lower()
+
+        import json as _j
+        try:
+            data = _j.loads(body)
+        except Exception:
+            data = None
+
+        if data is None:                       # not JSON: HTML of some kind
+            if any(h in low for h in _AUTH_HINTS):
+                return ("SESSION EXPIRED -- AT&T sent a login page, not data. "
+                        "Log OUT of youachieve.att.com, close the browser, log "
+                        "back in, then re-run.", "auth")
+            return ("NOT JSON -- AT&T sent something this parser cannot read. "
+                    "First 120 chars: %s" % body[:120].replace("\n", " "),
+                    "notjson")
+
+        if not isinstance(data, dict):
+            return ("JSON was a %s, not an object -- shape changed."
+                    % type(data).__name__, "shape")
+
+        err = data.get("error")
+        if isinstance(err, dict) and str(err.get("status")) not in ("200", "None"):
+            return ("AT&T ERROR %s: %s -- usually a stale csrfToken. Log out "
+                    "and back in." % (err.get("status"), err.get("message")),
+                    "error")
+        if data.get("success") is False:
+            return ("AT&T replied success=false -- the request was rejected. "
+                    "Usually a stale csrfToken: log out and back in.", "auth")
+
+        content = data.get("content")
+        if isinstance(content, list) and not content:
+            return ("VALID reply, but AT&T returned ZERO addresses for this "
+                    "viewport. Nothing serviceable here, or the search centre "
+                    "moved off the dots.", "novalues")
+        if isinstance(content, list) and content:
+            rec = content[0] if isinstance(content[0], dict) else {}
+            keys = sorted(rec.keys())
+            flat = set(k.lower().replace("_", "") for k in keys)
+            if flat & {"address", "addr", "fulladdress", "serviceaddress",
+                       "streetaddress", "addressline", "address1"}:
+                return ("%d records WITH an address came back -- the payload is "
+                        "fine, so the failure is downstream of the parse. Keys: "
+                        "%s" % (len(content), ", ".join(keys)[:200]), "parsed")
+            return ("PAYLOAD SHAPE CHANGED -- %d records came back but none "
+                    "carry a readable address. Record keys: %s"
+                    % (len(content), ", ".join(keys)[:200]), "shape")
+        return ("VALID JSON but no 'content' list. Top-level keys: %s"
+                % ", ".join(sorted(data.keys()))[:200], "shape")
+    except Exception as e:
+        return ("could not diagnose (%s)" % str(e)[:60], "unknown")
+
+
 def build_report(counts=None, undecoded=None, undecoded_samples=None,
                  dedupe=None, note_text=""):
     codes = {}

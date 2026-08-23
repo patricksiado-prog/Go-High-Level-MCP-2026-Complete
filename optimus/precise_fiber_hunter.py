@@ -608,6 +608,7 @@ _BACKEND_WRITTEN = [0]
 _CUR_AREA = [""]        # set per cell so every backend row says WHERE
 _CUR_ZOOM = [""]         # live map zoom, stamped on every backend row
 _DOT_LAYERS = [None]     # dot-layer minzoom/maxzoom, printed once
+_SVC_SAID = set()       # verdicts already announced this run
 _SEEN_ENDPOINTS = set()  # normalised endpoints already logged once
 _SEEN_ENDPOINTS_MAX = 300   # bound it; a runaway pattern can never eat memory
 
@@ -1637,6 +1638,17 @@ class NetCapture:
                         if _FEED:
                             try:
                                 _FEED.note_empty(url, ct, body)
+                                _msg, _kind = _FEED.diagnose(body, ct)
+                                # Say it ONCE, loudly. A silent +0 is
+                                # indistinguishable from an empty street, and
+                                # that ambiguity is what wastes an afternoon.
+                                if _kind not in _SVC_SAID:
+                                    _SVC_SAID.add(_kind)
+                                    print("\n" + "!" * 64)
+                                    print("!! WHY THIS VIEW CAPTURED NOTHING:")
+                                    print("!! " + _msg)
+                                    print("!" * 64 + "\n")
+                                _note += " | " + _msg[:120]
                             except Exception:
                                 pass
                     elif (len(leads) in BACKEND_CAP_VALUES
