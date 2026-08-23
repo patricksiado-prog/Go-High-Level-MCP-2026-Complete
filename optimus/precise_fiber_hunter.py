@@ -90,6 +90,7 @@ import threading
 
 from optimus_dot_detect import (GREEN_MIN, GREEN_MAX, GOLD_MIN, GOLD_MAX,
                                 GRAY_MIN, GRAY_MAX, classify_status,
+                                is_customer_ban,
                                 zone_freshness,
                                 ADDRESS_REGEX, STATUS_REGEX, BAN_REGEX,
                                 ELIGIBLE_REGEX, POPUP_READY_HINTS,
@@ -428,7 +429,20 @@ def classify_wire(status, ban, raw):
     because nothing stamps which rule wrote a row. If a code is genuinely copper,
     confirm it on the map and add it to build_codes.json -- do not widen the
     default."""
-    if ban:
+    # GREY MEANS CUSTOMER. Nothing becomes grey without a real subscriber
+    # account behind it -- a placeholder like "non-cust" is truthy, and reading
+    # it as a customer turns a $500 GREEN into a GREY, which the write path
+    # drops entirely. The lead does not get misfiled, it disappears.
+    if is_customer_ban(ban):
+        # AT&T sometimes SAYS it outright: "Status: Existing Copper Customer".
+        # That is a direct statement from the source and it outranks a build
+        # code we failed to decode. Without this, a dot whose own popup names it
+        # a copper customer is filed GREY the moment its code is unfamiliar --
+        # a confirmed $140 upgrade thrown away on a technicality.
+        _txt = (status or "").lower() if isinstance(status, str) else ""
+        if "copper" in _txt:
+            _WIRE_COUNTS["copper"] += 1
+            return "copper_upgrade"
         code = _bld_code(raw)
         if not code:
             # No build code on the record at all. We cannot tell fiber from

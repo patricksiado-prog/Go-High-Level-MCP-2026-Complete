@@ -93,6 +93,32 @@ def zone_freshness(green, gold, gray):
     return "WORKING", gray_share
 
 
+# A Subscriber BAN is an ACCOUNT NUMBER. Grey means "already an AT&T fiber
+# customer", so nothing becomes grey without a real account behind it. These are
+# the values seen standing in for "no account" -- AT&T's own analysis field uses
+# "non-cust" for exactly that, and a plain `if ban:` reads it as truthy. Treating
+# one of these as a customer marks a $500 GREEN as GREY, and grey is dropped from
+# the sheet entirely, so the lead is not just misfiled -- it is gone.
+_NON_CUSTOMER_BAN = frozenset((
+    "", "-", "--", "0", "n/a", "na", "none", "null", "nil", "false",
+    "non-cust", "noncust", "non cust", "non-customer", "noncustomer",
+    "not a customer", "no ban", "unavailable", "unknown",
+))
+
+
+def is_customer_ban(ban):
+    """True only when `ban` is a real subscriber account number.
+
+    Anything blank, or one of the documented placeholders, is NOT a customer.
+    """
+    if ban is None:
+        return False
+    b = str(ban).strip().lower()
+    if b in _NON_CUSTOMER_BAN:
+        return False
+    return any(ch.isalnum() for ch in b)
+
+
 def classify_status(text=None, ban=None, color=None):
     """Decide LEAD / CUSTOMER / COPPER_UPGRADE for one dot.
 
@@ -109,7 +135,7 @@ def classify_status(text=None, ban=None, color=None):
         return STATUS_LEAD
     if "customer" in low or "subscriber" in low:
         return STATUS_CUSTOMER
-    if ban:
+    if is_customer_ban(ban):
         return STATUS_CUSTOMER
     return STATUS_LEAD
 
