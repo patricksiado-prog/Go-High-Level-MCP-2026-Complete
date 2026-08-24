@@ -4233,6 +4233,7 @@ def sweep_grid(page, ws, seen, area_label, dry, capture):
         n = capture.flush(ws, seen, area_label, dry)
         tally["total"] += n
         tally["cells"] += 1
+        touch_lock()          # keep this instance's liveness fresh
         # Stop the moment the session dies. Grinding on is how 150 cells were
         # spent capturing login pages.
         if _AUTH_FAIL[0] >= AUTH_FAIL_LIMIT:
@@ -4339,6 +4340,48 @@ AUTH_FAIL_LIMIT = int(os.environ.get("OPTIMUS_AUTH_FAIL_LIMIT") or 3)
 _RECOVERED = [0]
 
 
+def _lock_path():
+    return os.path.join(PROFILE_DIR, "optimus_run_%d.lock" % os.getpid())
+
+
+def touch_lock():
+    """Mark this instance alive. Cheap, best-effort."""
+    try:
+        os.makedirs(PROFILE_DIR, exist_ok=True)
+        with open(_lock_path(), "w") as f:
+            f.write("%s %d %s" % (RUN_ID, os.getpid(), time.time()))
+    except Exception:
+        pass
+
+
+def other_instance_live(max_age=180):
+    """True when another hunter has touched its lock recently.
+
+    This exists because of a live interaction, not a theory: two hunters share
+    one Chromium profile AND one cookie store, so a second instance clearing
+    cookies logged the FIRST one out mid-sweep, and the report came back
+    delivery=AUTH_EXPIRED -- indistinguishable from AT&T expiring the session.
+    """
+    try:
+        me = _lock_path()
+        now = time.time()
+        for name in os.listdir(PROFILE_DIR):
+            if not name.startswith("optimus_run_") or not name.endswith(".lock"):
+                continue
+            path = os.path.join(PROFILE_DIR, name)
+            if os.path.abspath(path) == os.path.abspath(me):
+                continue
+            if now - os.path.getmtime(path) < max_age:
+                return True
+            try:
+                os.remove(path)          # stale lock from a dead run
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return False
+
+
 def recover_session(page, log=print):
     """Clear the dead session and wait for a fresh sign-in. True if recovered."""
     _RECOVERED[0] += 1
@@ -4351,10 +4394,17 @@ def recover_session(page, log=print):
     log("")
     log("  Clearing the stale cookie now so AT&T has to show a real login...")
     log("!" * 68)
-    try:
-        page.context.clear_cookies()
-    except Exception as e:
-        log("  (could not clear cookies: %s -- sign out by hand)" % str(e)[:60])
+    if other_instance_live():
+        log("")
+        log("  ANOTHER HUNTER IS RUNNING on this machine. NOT clearing cookies --")
+        log("  doing so would sign THAT run out mid-sweep, which is exactly how a")
+        log("  healthy run got reported as AUTH_EXPIRED earlier today.")
+        log("  Close the other window, then sign in here.")
+    else:
+        try:
+            page.context.clear_cookies()
+        except Exception as e:
+            log("  (could not clear cookies: %s -- sign out by hand)" % str(e)[:60])
     try:
         safe_goto(page, MAP_URL)
     except Exception:
@@ -6678,6 +6728,7 @@ def main():
 
     with sync_playwright() as pw:
         _phase("playwright_up")
+        touch_lock()
         _kill_stale_browser()   # a frozen run's leftover Chromium would block
         try:
             _lock = os.path.join(PROFILE_DIR, "SingletonLock")
