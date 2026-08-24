@@ -2561,7 +2561,7 @@ class NetCapture:
             # the uploader process ships them. A write CANNOT pause a pan.
             return self.flush_local(seen, area_label, dry)
         self.seen = seen
-        new_rows, new_records, staged_keys = [], [], []
+        new_rows, new_records, staged_keys, grey_records = [], [], [], []
         grey_ct = 0                        # existing fiber customers in this batch
         while self.pending:
             ld = self.pending.pop()
@@ -2621,6 +2621,13 @@ class NetCapture:
                     pass
             if dot_color(dot_status) == "GREY":
                 grey_ct += 1
+                grey_records.append({
+                    "address": addr, "lat": ld.get("lat"), "lng": ld.get("lng"),
+                    "build_code": _code,
+                    "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "city": ld.get("city") or "", "state": ld.get("state") or "",
+                    "zip": ld.get("zip") or "", "run_id": RUN_ID,
+                    "operator": OPERATOR()})
                 # A dot we ALREADY recorded as gold that now reads grey is the
                 # single most valuable observation a re-sweep produces: it is an
                 # existing fiber customer sitting on the upgrade call list. Record
@@ -2720,6 +2727,7 @@ class NetCapture:
             try:
                 ng = write_gold_dots(ws.spreadsheet, new_records)
                 write_gold_recheck(ws.spreadsheet, new_records)
+                write_grey_dots(ws.spreadsheet, grey_records)
                 if ng:
                     print("   + %d gold (upgrade) dots -> '%s' tab" % (ng, GOLD_TAB))
                 # Evidence from this batch: dots we had already called gold that
@@ -3139,6 +3147,7 @@ _STAGE_ORDER = [
     ("gold_pending",       "GOLD PENDING"),
     ("green_queued",       "GREEN QUEUED"),
     ("green_committed",    "GREEN COMMITTED"),
+    ("grey_committed",     "GREY COMMITTED"),
     ("grey_rejected_from_gold",    "GREY rejected from gold"),
     ("unknown_rejected_from_gold", "UNKNOWN rejected from gold"),
     ("auth_expired",       "AUTH_EXPIRED replies"),
@@ -3297,6 +3306,63 @@ def replay_pending(sh, log=print):
     if total:
         log("   replayed %d row(s) that an earlier run could not commit." % total)
     return total
+
+
+# GREY = an existing AT&T fiber customer. Not a fiber lead -- but not rubbish
+# either: it is a confirmed fiber household, which is what a competitor pitch
+# and a penetration ratio are computed from. Grey used to be DISCARDED, and
+# "grey never reaches the sheet" is how real leads were silently deleted
+# whenever the classifier got one wrong. Nothing is thrown away now: every
+# classified dot lands on a tab.
+GREY_TAB = "Grey Dots"
+GREY_HEADER = ["Address", "Captured At", "Lat", "Lng", "Build Code",
+               "City", "State", "ZIP", "Run ID", "Operator"]
+_GREY = {"seen": set()}
+
+
+def write_grey_dots(sh, records):
+    """Existing fiber customers -> their own tab. Never the gold call list."""
+    sh = _as_spreadsheet(sh)
+    if sh is None or not records:
+        return 0
+    try:
+        try:
+            ws = sh.worksheet(GREY_TAB)
+        except Exception:
+            ws = sh.add_worksheet(title=GREY_TAB, rows="5000",
+                                  cols=str(len(GREY_HEADER)))
+            ws.append_row(GREY_HEADER)
+            print("   created '%s' tab (existing fiber customers)" % GREY_TAB)
+    except Exception as e:
+        print("   (GREY TAB FAILED: %s)" % str(e)[:110])
+        return 0
+
+    seen, rows, staged = _GREY["seen"], [], []
+    for r in records:
+        addr = (r.get("address") or "").strip()
+        if not addr:
+            continue
+        keys = _gold_keys(addr, r.get("lat"), r.get("lng"))
+        if keys & seen:
+            continue
+        staged.append(keys)          # NOT marked seen until Google ACKs
+        rows.append([addr, r.get("ts") or "",
+                     r.get("lat") if r.get("lat") is not None else "",
+                     r.get("lng") if r.get("lng") is not None else "",
+                     (r.get("build_code") or "").upper(),
+                     r.get("city") or "", r.get("state") or "",
+                     r.get("zip") or "",
+                     r.get("run_id") or RUN_ID,
+                     r.get("operator") or OPERATOR()])
+    if not rows:
+        return 0
+    written = commit_rows(ws, GREY_TAB, rows)
+    for keys in staged[:written]:
+        seen.update(keys)
+    stage(grey_committed=written)
+    if written:
+        print("   %d existing fiber customer(s) -> '%s'" % (written, GREY_TAB))
+    return written
 
 
 RECHECK_TAB = "Gold Recheck"
@@ -5474,6 +5540,7 @@ def uploader_main():
                 try:
                     ng = write_gold_dots(ws.spreadsheet, new_records)
                     write_gold_recheck(ws.spreadsheet, new_records)
+                    write_grey_dots(ws.spreadsheet, grey_records)
                     if ng:
                         _ulog("shipped %d gold (upgrade) dots to '%s'" % (ng, GOLD_TAB))
                     _flush_verification(ws.spreadsheet)
