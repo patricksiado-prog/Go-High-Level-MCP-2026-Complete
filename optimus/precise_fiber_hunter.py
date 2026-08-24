@@ -5671,6 +5671,11 @@ def uploader_main():
                 for i in range(0, len(main_sheet_rows), 500):
                     ws.append_rows(main_sheet_rows[i:i + 500], value_input_option="RAW")
                 _ulog("shipped %d rows to the sheet" % len(main_sheet_rows))
+                _g = [r[0] for r in main_sheet_rows if r[1] == "GREEN"]
+                if _g:
+                    _extra = (" +%d more" % (len(_g) - 5)) if len(_g) > 5 else ""
+                    _ulog("   GREEN x%d -> %s%s"
+                          % (len(_g), ", ".join(_g[:5]), _extra))
                 # ONLY mark seen after successful write
                 for row in main_sheet_rows:
                     addr = row[0]
@@ -5690,6 +5695,13 @@ def uploader_main():
                     ng = write_gold_dots(ws.spreadsheet, gold_records)
                     write_gold_recheck(ws.spreadsheet, gold_records)
                     write_grey_dots(ws.spreadsheet, grey_records)
+                    if grey_records:
+                        _greys = [(_r.get("address") or "?")
+                                  for _r in grey_records]
+                        _extra = ((" +%d more" % (len(_greys) - 8))
+                                  if len(_greys) > 8 else "")
+                        _ulog("   GREY x%d -> %s%s"
+                              % (len(_greys), ", ".join(_greys[:8]), _extra))
                     if ng:
                         _ulog("shipped %d gold (upgrade) dots to '%s'" % (ng, GOLD_TAB))
                         for _r in gold_records:
