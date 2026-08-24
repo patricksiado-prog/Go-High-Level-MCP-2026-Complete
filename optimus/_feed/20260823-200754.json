@@ -1,0 +1,129 @@
+{
+ "generated_at": "2026-08-23 20:11:19",
+ "run_id": "20260823-200754",
+ "operator": "Patrick",
+ "machine": "LAPTOP-FJEEPATI",
+ "area": "",
+ "build_fingerprint": "c0b9433e",
+ "counts": {
+  "green": 0,
+  "fiber": 0,
+  "copper": 0,
+  "unknown": 0,
+  "no_code": 0
+ },
+ "undecoded_codes": {},
+ "dedupe": {
+  "seen": 0,
+  "written": 0,
+  "duplicates": 0,
+  "unchanged": 0,
+  "gold_to_grey": 0,
+  "grey_to_gold": 0,
+  "unknown": 0,
+  "failed_writes": 0,
+  "history_rows": 0,
+  "history_failed": 0
+ },
+ "mode": "",
+ "phases": [
+  [
+   "start",
+   "20:07:59",
+   0.0
+  ],
+  [
+   "playwright_up",
+   "20:08:23",
+   24.5
+  ],
+  [
+   "chromium_up",
+   "20:08:30",
+   31.5
+  ],
+  [
+   "browser_up",
+   "20:08:34",
+   35.6
+  ],
+  [
+   "page_loaded",
+   "20:08:45",
+   46.3
+  ],
+  [
+   "sheet_open",
+   "20:09:03",
+   64.8
+  ],
+  [
+   "resume_loaded",
+   "20:09:16",
+   77.4
+  ],
+  [
+   "wait_done",
+   "20:10:28",
+   149.4
+  ],
+  [
+   "diag_done",
+   "20:10:35",
+   156.1
+  ],
+  [
+   "sweep_start",
+   "20:10:47",
+   168.0
+  ],
+  [
+   "pass_done",
+   "20:11:11",
+   192.6
+  ]
+ ],
+ "last_phase": "pass_done",
+ "stage_counters": {
+  "classified_green": 0,
+  "classified_gold": 0,
+  "classified_grey": 0,
+  "classified_unknown": 0
+ },
+ "crash": {},
+ "capture_truth": {
+  "delivery": "AUTH_EXPIRED",
+  "raw_features": 0,
+  "rendered": null,
+  "classified": 0,
+  "written": 0,
+  "auth_ok": null,
+  "map_ok": false,
+  "zoom_ok": false,
+  "notes": [
+   "HTTP 301 REDIRECTED TO LOGIN -- not logged in, nothing lands",
+   "mapbox MAP_NOT_READY / INVALID_ZERO",
+   "capture: NO serviceability responses seen -- the map isn't loading fiber data (check you're LOGGED IN and dots are visible)"
+  ]
+ },
+ "first_failure": "delivery",
+ "capture_diagnostic": {
+  "serviceability_responses": 0,
+  "leads_decoded": 0,
+  "empty_payload_top_keys": null,
+  "capture_reason": "NO serviceability responses seen -- the map isn't loading fiber data (check you're LOGGED IN and dots are visible)"
+ },
+ "customer_specimens": [],
+ "customer_specimen_count": 0,
+ "zero_lead_responses": [
+  {
+   "url": "https://youachieve.att.com/yourefer/fiber",
+   "content_type": "text/html; charset=UTF-8",
+   "total_bytes": 63,
+   "body_head": "HTTP 301 -- REDIRECTED TO LOGIN -- not logged in, nothing lands"
+  }
+ ],
+ "sample_count": 0,
+ "samples": [],
+ "note": "manual"
+}
