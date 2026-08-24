@@ -112,12 +112,20 @@ MAP_URL = "https://youachieve.att.com/yourefer/fiber"
 PROFILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "att_profile")
 
 SHEET_ID = "1FhO2BTMXGefm1tLwKbbMPXvzT1160882Auauzep7ooA"  # ATT FIBER LEADS (production)
-OUT_TAB = "TEST-Green-2026-08-24"
-GOLD_TAB = "TEST-Gold-2026-08-24"         # EVERY gold (copper-upgrade) dot address -- all of
+# Tab promotion (Patrick, 2026-08-24, after the field-verified end-to-end test):
+#   green is trusted  -> main output goes back to production 'Precise Fiber'
+#                        (which also feeds the maps scraper's green/orange
+#                        cross-match -- it reads this tab by name)
+#   gold going forward-> fresh permanent 'Gold Confirmed' tab, NEW-RULE rows
+#                        only. The old 'Gold Dots' tab is contaminated with
+#                        gold-by-default rows (BRAIN 22.14) and stays retired.
+#   grey start fresh  -> fresh permanent 'Grey Fiber Customers' tab.
+OUT_TAB = "Precise Fiber"
+GOLD_TAB = "Gold Confirmed"    # EVERY confirmed copper-upgrade dot address -- all of
                                # them, not just business matches. For analysis +
                                # calling the upgrades first (Patrick, 2026-08-18).
-GREY_TAB = "TEST-Grey-2026-08-24"        # existing fiber customers
-UNKNOWN_TAB = "TEST-Unknown-2026-08-24"  # customer, undecodable build code
+GREY_TAB = "Grey Fiber Customers"        # existing fiber customers
+UNKNOWN_TAB = "Unknown Customers"        # customer, undecodable build code
 STATUS_TAB = "Hunter Status"   # live "what it's doing" log, on Drive in the same sheet
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
           "https://www.googleapis.com/auth/drive"]
@@ -316,7 +324,7 @@ try:
     _BLD_CODES["copper"] = tuple(str(x).lower() for x in _bc.get("copper", []))
 except Exception:
     pass
-BUILD_DATE = "2026-08-23"   # bump on every push so the console proves the version
+BUILD_DATE = "2026-08-24"   # bump on every push so the console proves the version
 
 # ---- DERIVED VERSION STAMP -------------------------------------------------
 # RULE (Patrick 2026-08-20, after BUILD_DATE reported 08-18 while running 08-20
@@ -3391,7 +3399,7 @@ def replay_pending(sh, log=print):
 # "grey never reaches the sheet" is how real leads were silently deleted
 # whenever the classifier got one wrong. Nothing is thrown away now: every
 # classified dot lands on a tab.
-GREY_TAB = "TEST-Grey-2026-08-24"
+GREY_TAB = "Grey Fiber Customers"
 GREY_HEADER = ["Address", "Captured At", "Lat", "Lng", "Build Code",
                "City", "State", "ZIP", "Run ID", "Operator"]
 _GREY = {"seen": set()}
