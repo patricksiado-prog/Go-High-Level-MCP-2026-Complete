@@ -154,6 +154,28 @@ def _gh_token():
     return os.environ.get("GITHUB_TOKEN")
 
 
+def gh_get(path):
+    """Read a file back out of the repo. The wire audit appends to it, and
+    without a read the next run would overwrite the last one's evidence."""
+    import base64
+    token = _gh_token()
+    if not token:
+        return ""
+    import urllib.request
+    api = "https://api.github.com/repos/%s/contents/%s?ref=%s" % (
+        GH_REPO, path, GH_BRANCH)
+    try:
+        req = urllib.request.Request(api, headers={
+            "Authorization": "token %s" % token,
+            "User-Agent": "optimus-hunter",
+            "Accept": "application/vnd.github+json"})
+        with urllib.request.urlopen(req, timeout=25) as r:
+            blob = json.load(r)
+        return base64.b64decode(blob.get("content") or "").decode("utf-8", "replace")
+    except Exception:
+        return ""
+
+
 def gh_put(path, text):
     """Best-effort: commit a small text file so Claude can read it at the raw URL."""
     import base64
@@ -499,6 +521,7 @@ def _publish_feed():
                     written=(_DEDUPE_REPORT.written if _DEDUPE_REPORT else None))
         _FEED.truth_report()
         _FEED.phase_report()
+        _FEED.publish_audit(gh_put)
         _FEED.publish(gh_put, counts=_WIRE_COUNTS,
                       undecoded=_UNKNOWN_CODES,
                       undecoded_samples=_UNKNOWN_CODE_SAMPLE,
@@ -1468,10 +1491,12 @@ def capture_diagnostic(page):
                                "the path capture actually uses -- not a capture "
                                "failure" % ", ".join(_failed))
     elif _failed:
+        stage(invalid_zero=1)
         diag["zero_verdict"] = "INVALID_ZERO"
         diag["zero_reason"] = ("a zero from this view proves nothing -- "
                                "failed: %s" % ", ".join(_failed))
     else:
+        stage(valid_zero=1)
         diag["zero_verdict"] = "VALID_ZERO"
         diag["zero_reason"] = ("all preconditions held, so a zero here really "
                                "does mean no dots in this view")
@@ -2001,6 +2026,9 @@ class NetCapture:
                         print("!" * 64 + "\n")
                     if st in (301, 302, 401, 403):
                         _AUTH_FAIL[0] += 1
+                        stage(auth_expired=1)
+                    else:
+                        stage(http_error=1)
                     if _FEED:
                         try:
                             _FEED.truth(delivery=("AUTH_EXPIRED"
@@ -2036,6 +2064,7 @@ class NetCapture:
                             _m, _k = _FEED.diagnose(body, ct)
                             if _k in ("auth", "notjson"):
                                 _AUTH_FAIL[0] += 1
+                            stage(auth_expired=1) if _k == "auth" else stage(parse_error=1)
                             _FEED.truth(delivery=("AUTH_EXPIRED" if _k == "auth"
                                                   else "PARSE_ERROR"),
                                         note=_m[:150])
@@ -2059,6 +2088,7 @@ class NetCapture:
                 if _FEED:
                     try:
                         _AUTH_FAIL[0] = 0        # a real reply clears the streak
+                        stage(serviceability_replies=1)
                         _FEED.truth(delivery="DATA_OK")
                     except Exception:
                         pass
@@ -2345,6 +2375,30 @@ class NetCapture:
                 # already in this payload; we have simply never looked at it.
                 if is_customer_ban(ld.get("ban")):
                     _FEED.note_customer(_raw, _code, dot_color(dot_status))
+                # WIRE AUDIT: the full non-secret record beside the verdict, so
+                # gold and grey can be diffed field by field without another
+                # field run. Observability only -- reads nothing, decides nothing.
+                try:
+                    _reason = ("no account -> GREEN" if not is_customer_ban(ld.get("ban"))
+                               else ("build code %r in copper list -> GOLD" % _code
+                                     if dot_color(dot_status) == "ORANGE"
+                                     else ("build code %r in fiber list -> GREY" % _code
+                                           if dot_color(dot_status) == "GREY"
+                                           else "account present, build code %r decodes to neither list"
+                                                % (_code or "(none)"))))
+                    _c_now = dot_color(dot_status)
+                    stage(raw_backend_records=1)
+                    if _c_now == "GREY":
+                        stage(grey_rejected_from_gold=1)
+                    elif _c_now == "UNKNOWN":
+                        stage(unknown_rejected_from_gold=1)
+                    _FEED.audit(cell=_CUR_AREA[0], lat=ld.get("lat"), lng=ld.get("lng"),
+                                http_status=200, response_kind="DATA_OK",
+                                raw=_raw, classification=dot_color(dot_status),
+                                reason=_reason, queued=True, write_attempted=False,
+                                committed=False, seen=False, pending=True)
+                except Exception:
+                    pass
                 # Publish mid-run, not only at exit. optimus_feed has always had
                 # should_flush() for this and nothing ever called it, so a sweep
                 # that ran for an hour and was then force-quit reported NOTHING
@@ -2861,6 +2915,8 @@ _GOLD_RECHECK_WARNED = []
 # ---------------------------------------------------------------------------
 _STAGE = {}
 _STAGE_ORDER = [
+    ("serviceability_replies", "AT&T REPLIES (200 JSON)"),
+    ("raw_backend_records", "RAW BACKEND RECORDS"),
     ("raw_features",       "RAW FEATURES"),
     ("classified_green",   "  GREEN classified"),
     ("classified_gold",    "  GOLD classified"),
@@ -2873,6 +2929,13 @@ _STAGE_ORDER = [
     ("gold_pending",       "GOLD PENDING"),
     ("green_queued",       "GREEN QUEUED"),
     ("green_committed",    "GREEN COMMITTED"),
+    ("grey_rejected_from_gold",    "GREY rejected from gold"),
+    ("unknown_rejected_from_gold", "UNKNOWN rejected from gold"),
+    ("auth_expired",       "AUTH_EXPIRED replies"),
+    ("http_error",         "HTTP_ERROR replies"),
+    ("parse_error",        "PARSE_ERROR replies"),
+    ("valid_zero",         "VALID_ZERO cells"),
+    ("invalid_zero",       "INVALID_ZERO cells"),
 ]
 
 
@@ -2890,7 +2953,7 @@ def stage_report(log=print):
     log("=== STAGE COUNTERS (the first drop is the bug) ===")
     for key, label in _STAGE_ORDER:
         if key in _STAGE:
-            log("  %-22s %6d" % (label, _STAGE[key]))
+            log("  %-28s %6d" % (label, _STAGE[key]))
     g = _STAGE.get
     # Invariants. Each is a sentence about where leads go, and a breach names
     # the stage instead of leaving it to be inferred from totals.
@@ -2909,6 +2972,23 @@ def stage_report(log=print):
         if not ok:
             log("  !! INVARIANT BROKEN: %s" % name)
             log("     %s" % why)
+    # FIRST_DROP: RAW -> CLASSIFIED -> QUEUED -> COMMITTED, named not inferred.
+    _chain = [("DELIVERY", g("serviceability_replies")),
+              ("RAW", g("raw_backend_records")),
+              ("CLASSIFIED", (g("classified_green", 0) + g("classified_gold", 0)
+                              + g("classified_grey", 0) + g("classified_unknown", 0))),
+              ("QUEUED", g("gold_queued")),
+              ("COMMITTED", g("gold_committed"))]
+    _drop = "NONE"
+    _prev = None
+    for _name, _v in _chain:
+        if _v is None:
+            continue
+        if _v == 0 and _prev not in (None, 0):
+            _drop = _name
+            break
+        _prev = _v
+    log("  FIRST_DROP: %s" % _drop)
     if g("gold_pending"):
         log("  %d gold row(s) PENDING -- parked on disk, replayed next run."
             % g("gold_pending"))
@@ -6428,6 +6508,7 @@ def main():
         try:
             _FEED.configure(RUN_ID, OPERATOR(), "", _FINGERPRINT)
             _FEED.arm_heartbeat(gh_put)
+            _FEED.arm_reader(gh_get)
             _FEED.phase("start")
         except Exception:
             pass

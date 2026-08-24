@@ -217,6 +217,117 @@ def note_crash(summary, tb=""):
         pass
 
 
+# ---------------------------------------------------------------------------
+# WIRE AUDIT -- one line per candidate backend record, appended, never
+# overwritten within a run.
+#
+# The counters say WHERE leads are lost. This says WHAT each record actually
+# carried, so gold and grey can be diffed field by field WITHOUT another field
+# run. That is the whole point: the question "what separates gold from grey" has
+# cost a day already, and the answer is in these records.
+#
+# SECRETS: any key containing 'ban' is published as a boolean. The account
+# number never leaves the machine. Same for token/secret/auth/cookie/csrf.
+# ---------------------------------------------------------------------------
+AUDIT_CAP = 400              # lines per run
+AUDIT_PATH = "optimus/_feed/wire_audit.jsonl"
+_AUDIT = []
+_AUDIT_PUSHED = [0]
+
+_SECRET_HINT = ("ban", "token", "secret", "auth", "cookie", "csrf", "session",
+                "password", "ssn")
+
+
+def _safe_props(raw):
+    """Every non-secret backend property, verbatim. Secrets -> boolean."""
+    out = {}
+    try:
+        for k, v in (raw or {}).items():
+            lk = str(k).lower()
+            if any(h in lk for h in _SECRET_HINT):
+                out[k] = bool(str(v or "").strip())
+            elif isinstance(v, (str, int, float, bool)) or v is None:
+                out[k] = v
+            else:
+                out[k] = str(v)[:120]
+    except Exception:
+        pass
+    return out
+
+
+def audit(cell=None, lat=None, lng=None, http_status=None, response_kind=None,
+          raw=None, classification=None, reason="", queued=None,
+          write_attempted=None, committed=None, seen=None, pending=None):
+    """Record one candidate. Never raises into a sweep."""
+    try:
+        if len(_AUDIT) >= AUDIT_CAP:
+            return
+        r = raw or {}
+        code = ""
+        for k, v in r.items():
+            if "bld_typ" in str(k).lower() or "bld_type" in str(k).lower():
+                code = str(v or "")
+        ban_present = False
+        for k, v in r.items():
+            if "ban" in str(k).lower() and "banner" not in str(k).lower():
+                if str(v or "").strip():
+                    ban_present = True
+        _AUDIT.append({
+            "run_id": _STATE.get("run_id"),
+            "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "cell": cell, "lat": lat, "lng": lng,
+            "http_status": http_status,
+            "response_kind": response_kind,
+            "subscriber_ban_present": ban_present,
+            "curr_ntwrk_bld_type_cd": code,
+            "backend_fields": _safe_props(r),
+            "classifier_result": classification,
+            "classifier_reason": reason,
+            "queued": queued, "write_attempted": write_attempted,
+            "committed": committed, "seen": seen, "pending": pending,
+        })
+    except Exception:
+        pass
+
+
+def publish_audit(gh_put, log=print):
+    """Append this run's audit lines. Existing content is preserved, so a
+    second run in the same session cannot erase the first one's evidence."""
+    try:
+        if not _AUDIT:
+            return False
+        lines = "\n".join(json.dumps(a, default=str) for a in _AUDIT)
+        prev = ""
+        try:
+            prev = gh_get(AUDIT_PATH) or ""
+        except Exception:
+            prev = ""
+        body = (prev.rstrip("\n") + "\n" + lines).lstrip("\n") if prev else lines
+        ok = gh_put(AUDIT_PATH, body + "\n")
+        if ok:
+            _AUDIT_PUSHED[0] += len(_AUDIT)
+            log("  WIRE AUDIT -> %d record(s) appended to %s"
+                % (len(_AUDIT), AUDIT_PATH))
+        return bool(ok)
+    except Exception as e:
+        log("  (wire audit skipped: %s)" % str(e)[:70])
+        return False
+
+
+_GH_GET = [None]
+
+
+def arm_reader(fn):
+    """Give the feed a way to READ a repo file, so the audit can append rather
+    than overwrite. Without it each run would destroy the last run's evidence."""
+    _GH_GET[0] = fn
+
+
+def gh_get(path):
+    fn = _GH_GET[0]
+    return fn(path) if fn else ""
+
+
 _DIAG = {}
 
 
@@ -490,6 +601,7 @@ def build_report(counts=None, undecoded=None, undecoded_samples=None,
         "last_phase": last_phase(),
         "stage_counters": dict(_STAGE_COUNTS),
         "crash": dict(_CRASH),
+        "wire_audit_records": len(_AUDIT),
         "capture_truth": dict(_TRUTH),
         "first_failure": first_failure()[0],
         "capture_diagnostic": dict(_DIAG),
