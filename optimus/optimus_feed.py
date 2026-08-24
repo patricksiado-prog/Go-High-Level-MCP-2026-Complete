@@ -229,10 +229,22 @@ def note_crash(summary, tb=""):
 # SECRETS: any key containing 'ban' is published as a boolean. The account
 # number never leaves the machine. Same for token/secret/auth/cookie/csrf.
 # ---------------------------------------------------------------------------
-AUDIT_CAP = 400              # lines per run
+AUDIT_CAP = 400              # lines per run, overall
+# PER-COLOUR RESERVATION. A first-come cap is the wrong shape here: a
+# green-heavy viewport fills 400 slots with green and leaves nothing to diff
+# gold against, which is the entire question. Every colour gets a guaranteed
+# quota, so ONE run always yields known-green, known-gold and known-grey
+# records side by side from the same payload.
+AUDIT_PER_COLOUR = 25
 AUDIT_PATH = "optimus/_feed/wire_audit.jsonl"
 _AUDIT = []
+_AUDIT_BY_COLOUR = {}
 _AUDIT_PUSHED = [0]
+
+
+def audit_coverage():
+    """What the audit has actually collected, per colour."""
+    return dict(_AUDIT_BY_COLOUR)
 
 _SECRET_HINT = ("ban", "token", "secret", "auth", "cookie", "csrf", "session",
                 "password", "ssn")
@@ -260,7 +272,12 @@ def audit(cell=None, lat=None, lng=None, http_status=None, response_kind=None,
           write_attempted=None, committed=None, seen=None, pending=None):
     """Record one candidate. Never raises into a sweep."""
     try:
-        if len(_AUDIT) >= AUDIT_CAP:
+        _col = str(classification or "UNKNOWN").upper()
+        _have = _AUDIT_BY_COLOUR.get(_col, 0)
+        # Fill each colour's quota first; only then use the shared remainder.
+        if _have >= AUDIT_PER_COLOUR and len(_AUDIT) >= AUDIT_CAP:
+            return
+        if _have >= AUDIT_PER_COLOUR:
             return
         r = raw or {}
         code = ""
@@ -286,6 +303,7 @@ def audit(cell=None, lat=None, lng=None, http_status=None, response_kind=None,
             "queued": queued, "write_attempted": write_attempted,
             "committed": committed, "seen": seen, "pending": pending,
         })
+        _AUDIT_BY_COLOUR[_col] = _have + 1
     except Exception:
         pass
 
@@ -602,6 +620,7 @@ def build_report(counts=None, undecoded=None, undecoded_samples=None,
         "stage_counters": dict(_STAGE_COUNTS),
         "crash": dict(_CRASH),
         "wire_audit_records": len(_AUDIT),
+        "wire_audit_by_colour": dict(_AUDIT_BY_COLOUR),
         "capture_truth": dict(_TRUTH),
         "first_failure": first_failure()[0],
         "capture_diagnostic": dict(_DIAG),
