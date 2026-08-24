@@ -5597,7 +5597,11 @@ def uploader_main():
         offset = int(os.environ.get("OPTIMUS_OUTBOX_OFFSET", "0") or 0)
     except ValueError:
         offset = 0
-    queued_rows = []          # rows that failed to write stay here and retry
+    green_records = []
+    gold_records = []
+    grey_records = []
+    unknown_records = []
+    main_sheet_rows = []      # all colors route through here FIRST
     remainder = b""
     last_status = ""
     idle_since = time.time()
@@ -5624,43 +5628,62 @@ def uploader_main():
                     except Exception:
                         continue
                     addr = (d.get("address") or "").strip()
-                    if not addr or addr.upper() in seen:
+                    if not addr:
                         continue
-                    seen.add(addr.upper())
+                    # CLASSIFY FIRST, before any seen check or routing
                     ds = d.get("dot_status")
-                    if dot_color(ds) == "GREY":
+                    color = dot_color(ds)
+                    # Skip only AFTER classifying (no global seen skip)
+                    if addr.upper() in seen:
                         continue
                     # June's exact Precise Fiber shape: Address | Dot Color |
                     # Captured At | Business | Phone (biz merged like the flush)
                     _bidx = _BIZ.get("index") or {}
                     _b = _bidx.get(_norm_addr(addr)) if _bidx else None
-                    # was 5 columns here vs 6 in flush() -- the same tab was
-                    # getting two different row shapes depending on which path
-                    # saved it. Both write OUT_HEADER's 7 columns now.
-                    queued_rows.append([addr, dot_color(ds), d.get("ts") or "",
-                                        (_b or {}).get("name", ""),
-                                        (_b or {}).get("phone", ""),
-                                        d.get("run_id") or RUN_ID,
-                                        d.get("operator") or OPERATOR()])
+                    row = [addr, color, d.get("ts") or "",
+                           (_b or {}).get("name", ""),
+                           (_b or {}).get("phone", ""),
+                           d.get("run_id") or RUN_ID,
+                           d.get("operator") or OPERATOR()]
                     d["biz_name"] = (_b or {}).get("name", "")
                     d["biz_phone"] = (_b or {}).get("phone", "")
+                    # Route to appropriate bucket BEFORE main sheet write
+                    if color == "GREEN":
+                        green_records.append(d)
+                    elif color == "GOLD":
+                        gold_records.append(d)
+                    elif color == "GREY":
+                        grey_records.append(d)
+                    else:
+                        unknown_records.append(d)
+                    # Add to main sheet queue
+                    main_sheet_rows.append(row)
                     new_records.append(d)
         except Exception as e:
             _ulog("outbox read error: %s" % str(e)[:80])
-        if queued_rows:
+        if main_sheet_rows:
             idle_since = time.time()
             try:
-                for i in range(0, len(queued_rows), 500):
-                    ws.append_rows(queued_rows[i:i + 500], value_input_option="RAW")
-                _ulog("shipped %d rows to the sheet" % len(queued_rows))
-                queued_rows = []
+                for i in range(0, len(main_sheet_rows), 500):
+                    ws.append_rows(main_sheet_rows[i:i + 500], value_input_option="RAW")
+                _ulog("shipped %d rows to the sheet" % len(main_sheet_rows))
+                # ONLY mark seen after successful write
+                for row in main_sheet_rows:
+                    addr = row[0]
+                    if addr:
+                        seen.add(addr.upper())
+                main_sheet_rows = []
+                green_records = []
+                gold_records = []
+                grey_records = []
+                unknown_records = []
             except Exception as e:
                 _ulog("write failed (%s) -- %d rows stay queued for retry"
-                      % (str(e)[:60], len(queued_rows)))
+                      % (str(e)[:60], len(main_sheet_rows)))
             if new_records:
                 try:
-                    ng = write_gold_dots(ws.spreadsheet, new_records)
-                    write_gold_recheck(ws.spreadsheet, new_records)
+                    ng = write_gold_dots(ws.spreadsheet, gold_records)
+                    write_gold_recheck(ws.spreadsheet, gold_records)
                     write_grey_dots(ws.spreadsheet, grey_records)
                     if ng:
                         _ulog("shipped %d gold (upgrade) dots to '%s'" % (ng, GOLD_TAB))
