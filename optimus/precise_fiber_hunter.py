@@ -110,8 +110,8 @@ MAP_URL = "https://youachieve.att.com/yourefer/fiber"
 PROFILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "att_profile")
 
 SHEET_ID = "1FhO2BTMXGefm1tLwKbbMPXvzT1160882Auauzep7ooA"  # ATT FIBER LEADS (production)
-OUT_TAB = "Precise Fiber"
-GOLD_TAB = "Gold Dots"         # EVERY gold (copper-upgrade) dot address -- all of
+OUT_TAB = "TEST-Green-2026-08-24"
+GOLD_TAB = "TEST-Gold-2026-08-24"         # EVERY gold (copper-upgrade) dot address -- all of
                                # them, not just business matches. For analysis +
                                # calling the upgrades first (Patrick, 2026-08-18).
 STATUS_TAB = "Hunter Status"   # live "what it's doing" log, on Drive in the same sheet
@@ -3353,7 +3353,7 @@ def replay_pending(sh, log=print):
 # "grey never reaches the sheet" is how real leads were silently deleted
 # whenever the classifier got one wrong. Nothing is thrown away now: every
 # classified dot lands on a tab.
-GREY_TAB = "Grey Dots"
+GREY_TAB = "TEST-Grey-2026-08-24"
 GREY_HEADER = ["Address", "Captured At", "Lat", "Lng", "Build Code",
                "City", "State", "ZIP", "Run ID", "Operator"]
 _GREY = {"seen": set()}
