@@ -1,6 +1,6 @@
 {
- "generated_at": "2026-08-23 19:50:53",
- "run_id": "20260823-194223",
+ "generated_at": "2026-08-23 20:06:12",
+ "run_id": "20260823-194602",
  "operator": "Patrick",
  "machine": "LAPTOP-FJEEPATI",
  "area": "",
@@ -29,71 +29,16 @@
  "phases": [
   [
    "start",
-   "19:42:27",
+   "19:46:02",
    0.0
   ],
   [
-   "playwright_up",
-   "19:42:56",
-   29.4
-  ],
-  [
-   "chromium_up",
-   "19:43:06",
-   39.3
-  ],
-  [
-   "browser_up",
-   "19:43:10",
-   42.8
-  ],
-  [
-   "page_loaded",
-   "19:43:19",
-   52.1
-  ],
-  [
-   "LOGGED_OUT",
-   "19:43:23",
-   56.2
-  ],
-  [
-   "logged_in",
-   "19:44:59",
-   151.7
-  ],
-  [
-   "sheet_open",
-   "19:45:14",
-   166.8
-  ],
-  [
-   "resume_loaded",
-   "19:45:29",
-   181.7
-  ],
-  [
-   "wait_done",
-   "19:46:46",
-   259.6
-  ],
-  [
-   "diag_done",
-   "19:46:56",
-   269.5
-  ],
-  [
-   "sweep_start",
-   "19:47:09",
-   282.3
-  ],
-  [
-   "pass_done",
-   "19:50:46",
-   499.3
+   "exit",
+   "20:06:04",
+   1201.4
   ]
  ],
- "last_phase": "pass_done",
+ "last_phase": "exit",
  "stage_counters": {
   "classified_green": 0,
   "classified_gold": 0,
@@ -102,88 +47,22 @@
  },
  "crash": {},
  "capture_truth": {
-  "delivery": "DATA_OK",
-  "raw_features": 0,
+  "delivery": null,
+  "raw_features": null,
   "rendered": null,
   "classified": 0,
   "written": 0,
-  "auth_ok": true,
-  "map_ok": false,
-  "zoom_ok": false,
-  "notes": [
-   "HTTP 301 REDIRECTED TO LOGIN -- not logged in, nothing lands",
-   "HTTP 302 redirected -- session likely expired",
-   "HTTP 302 redirected -- session likely expired",
-   "HTTP 302 redirected -- session likely expired",
-   "SESSION EXPIRED -- AT&T sent a login page, not data. Log OUT of youachieve.att.com, close the browser, log back in, then re-run.",
-   "access chooser, not the map",
-   "SESSION EXPIRED -- AT&T sent a login page, not data. Log OUT of youachieve.att.com, close the browser, log back in, then re-run.",
-   "SESSION EXPIRED -- AT&T sent a login page, not data. Log OUT of youachieve.att.com, close the browser, log back in, then re-run.",
-   "NOT JSON -- AT&T sent something this parser cannot read. First 120 chars: <!DOCTYPE html> <html lang=\"en\">     <head>         <!-- The following 3 met",
-   "NOT JSON -- AT&T sent something this parser cannot read. First 120 chars: <!DOCTYPE html> <html lang=\"en\">     <head>         <!-- The following 3 met",
-   "NOT JSON -- AT&T sent something this parser cannot read. First 120 chars: <!DOCTYPE html> <html lang=\"en\">     <head>         <!-- The following 3 met",
-   "NOT JSON -- AT&T sent something this parser cannot read. First 120 chars: \ufffdPNG\r \u001a \u0000\u0000\u0000\rIHDR\u0000\u0000\u0002\ufffd\u0000\u0000\u0001,\b\u0006\u0000\u0000\u0000\ufffdF\ufffd\f\u0000\u0000\u0000\u0006bKGD\u0000\ufffd\u0000\ufffd\u0000\ufffd\ufffd\ufffd\ufffd\ufffd\u0000\u0000\u0000\tpHYs\u0000\u0000\u000b\u0013\u0000\u0000\u000b\u0013\u0001\u0000\ufffd\ufffd\u0018\u0000\u0000\u0000\u0007",
-   "NOT JSON -- AT&T sent something this parser cannot read. First 120 chars: \ufffd\ufffd\ufffd\ufffd\u0000\u0010JFIF\u0000\u0001\u0001\u0001\u0000H\u0000H\u0000\u0000\ufffd\ufffd\u0000\ufffd\u0000 \u0007\u0007\b\u0007\u0006 \b\b\b\u000b  \u000b\u000e\u0018\u0010\u000e\r\r\u000e\u001d\u0015\u0016\u0011\u0018#\u001f%$\"\u001f\"!&+7/&)4)!\"0A149;>",
-   "NOT JSON -- AT&T sent something this parser cannot read. First 120 chars: \ufffdPNG\r \u001a \u0000\u0000\u0000\rIHDR\u0000\u0000\u0000\ufffd\u0000\u0000\u0000!\b\u0006\u0000\u0000\u0000\ufffd(\ufffd\ufffd\u0000\u0000\u0000\tpHYs\u0000\u0000\u000b\u0013\u0000\u0000\u000b\u0013\u0001\u0000\ufffd\ufffd\u0018\u0000\u0000 OiCCPPhotoshop ICC ",
-   "mapbox MAP_NOT_READY / INVALID_ZERO"
-  ]
+  "auth_ok": null,
+  "map_ok": null,
+  "zoom_ok": null,
+  "notes": []
  },
- "first_failure": "raw_features",
- "capture_diagnostic": {
-  "mapbox": {
-   "hook_installed": true,
-   "maps_hooked": 0,
-   "has_mapboxgl": false,
-   "canvases": 1,
-   "map_captured": false,
-   "map_loaded": null,
-   "style_loaded": null,
-   "zoom": null,
-   "center": null,
-   "layers_total": null,
-   "sources_total": null,
-   "candidate_layers": [],
-   "rendered_total": null,
-   "error": "no map object found"
-  },
-  "verdict": "MAP_NOT_READY",
-  "advice": "style not loaded yet; query too early",
-  "layers_in_band": 0,
-  "layers_out_of_band": 0,
-  "preconditions": {
-   "map_captured": false,
-   "style_loaded": false,
-   "map_loaded": false,
-   "dot_layers_found": false,
-   "zoom_in_band": false,
-   "query_ok": false
-  },
-  "zero_verdict": "INVALID_ZERO",
-  "zero_reason": "a zero from this view proves nothing -- failed: map_captured, style_loaded, map_loaded, dot_layers_found, zoom_in_band, query_ok"
- },
+ "first_failure": null,
+ "capture_diagnostic": {},
  "customer_specimens": [],
  "customer_specimen_count": 0,
- "zero_lead_responses": [
-  {
-   "url": "https://youachieve.att.com/yourefer/fiber",
-   "content_type": "text/html; charset=UTF-8",
-   "total_bytes": 63,
-   "body_head": "HTTP 301 -- REDIRECTED TO LOGIN -- not logged in, nothing lands"
-  },
-  {
-   "url": "https://youachieve.att.com/yourefer/fiber/",
-   "content_type": "text/html;charset=UTF-8",
-   "total_bytes": 48,
-   "body_head": "HTTP 302 -- redirected -- session likely expired"
-  },
-  {
-   "url": "https://saml.e-access.att.com/isam/sps/oidc/rp/SAML-IDP/kickoff/SAML-IDP-Password?Target=https%3A%2F%2Fsaml.e-access.att.com%2Fisam%2Fsps%2Fattsamlidp_mfaia%2Fsaml20%2Flogininitial%3FRequestBinding%3DHTTPPost%26PartnerId%3Dhttps%3A%2F%2Fyouachieve.att.com%26RelayState%3Dhttps%3A%2F%2Fyouachieve.att.",
-   "content_type": "",
-   "total_bytes": 48,
-   "body_head": "HTTP 302 -- redirected -- session likely expired"
-  }
- ],
+ "zero_lead_responses": [],
  "sample_count": 0,
  "samples": [],
- "note": "manual"
+ "note": ""
 }
