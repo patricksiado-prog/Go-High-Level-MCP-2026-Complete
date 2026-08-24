@@ -1097,24 +1097,84 @@ MAPBOX_DUMP_JS = """
   // console has already shown '[Map marker]' entries, so capture this either
   // way rather than reporting an empty Mapbox dump as if it meant no dots.
   try {
-    const els = document.querySelectorAll(
-      '.mapboxgl-marker, .maplibregl-marker, [class*=marker]');
-    out.marker_note = els.length + " marker element(s) in the DOM";
+    const sel = '.mapboxgl-marker, .maplibregl-marker, [class*=marker], ' +
+                '[class*=dot], [class*=pin], [data-status], [data-type]';
+    const els = document.querySelectorAll(sel);
+    out.marker_note = els.length + " marker-ish element(s) in the DOM";
     let n = 0;
     for (const el of els) {
-      if (n++ >= 60) break;
+      if (n++ >= 80) break;
       const cs = window.getComputedStyle(el);
+      const par = el.parentElement;
+      const pcs = par ? window.getComputedStyle(par) : null;
+
+      // EVERY data-* attribute. AT&T's own state name is far more likely to be
+      // here (data-status="copper") than inferable from an RGB value.
+      const data = {};
+      try { for (const k in el.dataset) data[k] = el.dataset[k]; } catch (e) {}
+      const pdata = {};
+      try { if (par) for (const k in par.dataset) pdata[k] = par.dataset[k]; } catch (e) {}
+
+      // Every attribute, not just the ones we thought to ask for.
+      const attrs = {};
+      try {
+        for (const a of el.attributes) attrs[a.name] = String(a.value).slice(0, 200);
+      } catch (e) {}
+
+      // React keeps the component's props on the DOM node under a hashed key.
+      // If AT&T's frontend decided the colour from a prop, it is in here.
+      let react = null;
+      try {
+        for (const k of Object.keys(el)) {
+          if (k.startsWith('__reactProps') || k.startsWith('__reactEventHandlers')) {
+            const p = el[k];
+            react = {};
+            for (const pk in p) {
+              const pv = p[pk];
+              if (pv === null || ['string','number','boolean'].includes(typeof pv))
+                react[pk] = pv;
+            }
+            break;
+          }
+        }
+      } catch (e) {}
+
+      // The marker's own coordinate -- this is what ties it to a backend record.
+      let lngLat = null;
+      try {
+        for (const k of Object.keys(el)) {
+          const v = el[k];
+          if (v && typeof v === 'object' && 'lng' in v && 'lat' in v) {
+            lngLat = {lng: v.lng, lat: v.lat}; break;
+          }
+        }
+        if (!lngLat && el._lngLat) lngLat = {lng: el._lngLat.lng, lat: el._lngLat.lat};
+      } catch (e) {}
+
       const svg = el.querySelector('svg, circle, path');
       out.markers.push({
-        cls: el.className && el.className.baseVal !== undefined
-             ? el.className.baseVal : String(el.className || ''),
-        style_bg: cs.backgroundColor, style_fill: cs.fill,
-        style_color: cs.color, style_border: cs.borderColor,
-        transform: (el.style && el.style.transform) || '',
-        title: el.getAttribute('title') || el.getAttribute('aria-label') || '',
+        id: el.id || null,
+        className: el.className && el.className.baseVal !== undefined
+                   ? el.className.baseVal : String(el.className || ''),
+        data: data,
+        attributes: attrs,
+        inline_style: (el.getAttribute && el.getAttribute('style')) || '',
+        computed: {backgroundColor: cs.backgroundColor, color: cs.color,
+                   borderColor: cs.borderColor, fill: cs.fill,
+                   stroke: cs.stroke, backgroundImage: (cs.backgroundImage || '').slice(0,160)},
         inner_fill: svg ? (svg.getAttribute('fill') ||
                            window.getComputedStyle(svg).fill || '') : '',
-        html_head: (el.outerHTML || '').slice(0, 300)
+        lngLat: lngLat,
+        react_props: react,
+        title: el.getAttribute('title') || el.getAttribute('aria-label') || '',
+        parent: par ? {
+          className: par.className && par.className.baseVal !== undefined
+                     ? par.className.baseVal : String(par.className || ''),
+          data: pdata,
+          backgroundColor: pcs ? pcs.backgroundColor : '',
+          html_head: (par.outerHTML || '').slice(0, 400)
+        } : null,
+        outerHTML: (el.outerHTML || '').slice(0, 1200)
       });
     }
   } catch (e) { out.marker_note = 'marker scan failed: ' + e; }
