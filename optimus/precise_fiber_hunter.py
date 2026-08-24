@@ -1951,7 +1951,7 @@ def lead_from_dict(d):
         if us_lat and us_lng and has_sig:
             _c = dot_color(classify_wire(
                 status if isinstance(status, str) else None, ban, base))
-            if _c in ("GREEN", "GOLD"):
+            if _c in ("GREEN", "GOLD", "ORANGE"):
                 addr = "(%.6f, %.6f)" % (lat, lng)
         if not addr or not isinstance(addr, str):
             # Record what this dict DID carry. A payload that stops yielding
@@ -4020,7 +4020,7 @@ def drain_viewport_backend(page, ws, seen, area_label, dry, zone_label="WORKING"
             color = classify_pixel(arr, sxpix, sypix)   # else the dot's own pixel
         if color == "GREEN":
             greens += 1
-        elif color == "GOLD":
+        elif color in ("GOLD", "ORANGE"):
             golds += 1
         elif color == "GRAY":
             grays += 1
@@ -5654,7 +5654,7 @@ def uploader_main():
                     # Route to appropriate bucket BEFORE main sheet write
                     if color == "GREEN":
                         green_records.append(d)
-                    elif color == "GOLD":
+                    elif color in ("GOLD", "ORANGE"):
                         gold_records.append(d)
                     elif color == "GREY":
                         grey_records.append(d)
