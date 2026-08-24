@@ -1,6 +1,6 @@
 OPTIMUS SCRAPER -- LIVE COUNTS
-updated: 2026-08-24 10:53:41   host: LAPTOP-FJEEPATI   ZIP now: 77706
+updated: 2026-08-24 11:12:13   host: LAPTOP-FJEEPATI   ZIP now: 77706
 STATUS: scraping (updates as it runs)
 ----------------------------------------
-BUSINESSES pulled this run:   1351
-added to sheet (Maps Biz):    1337
+BUSINESSES pulled this run:   1382
+added to sheet (Maps Biz):    1368
