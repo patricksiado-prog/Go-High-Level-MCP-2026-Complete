@@ -2820,6 +2820,7 @@ class NetCapture:
         local JSONL only (a disk append, microseconds). The uploader process
         ships them to the sheet. The pan loop never waits on Google."""
         new_records = []
+        _report_counter = 0
         while self.pending:
             ld = self.pending.pop()
             addr = (ld.get("address") or "").strip()
@@ -2834,6 +2835,9 @@ class NetCapture:
             #     continue
             # seen.add(key)
             dot_status = classify_lead(ld)
+            _report_counter += 1
+            if _report_counter % 50 == 0:
+                wire_classification_report()
             # Split mode must not drop GREY like the old code did. Production path
             # routes GREY to the Grey Dots tab; split-mode uploader respects
             # dot_color, so GREY records are properly handled downstream.
