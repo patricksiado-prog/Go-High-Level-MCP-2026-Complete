@@ -30,7 +30,7 @@ import os
 import time
 
 SAMPLE_CAP = 300          # records carried per run
-FLUSH_EVERY = 250         # publish mid-run too, so a force-quit still reports
+FLUSH_EVERY = 10          # TESTING: publish every 10 records for real-time feedback to GitHub
 
 _SAMPLES = []
 _STATE = {"pushed": 0, "run_id": "", "operator": "", "area": "",
