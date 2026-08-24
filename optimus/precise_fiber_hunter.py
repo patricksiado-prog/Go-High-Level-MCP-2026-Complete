@@ -4797,7 +4797,7 @@ _CORE_FILES = ("precise_fiber_hunter.py", "optimus_dedupe.py",
                "backend_classifier.py", "build_codes.json",
                "verify_gold_capture.py", "deploy_check.py",
                "test_durability.py", "decode_gold.py",
-               "test_gold_predicate.py")
+               "test_gold_predicate.py", "wire_diff.py")
 
 
 def _raw_refresh(here):
