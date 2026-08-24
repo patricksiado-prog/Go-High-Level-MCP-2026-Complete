@@ -5678,17 +5678,21 @@ def uploader_main():
                         seen.add(addr.upper())
                 main_sheet_rows = []
                 green_records = []
-                gold_records = []
-                grey_records = []
-                unknown_records = []
             except Exception as e:
                 _ulog("write failed (%s) -- %d rows stay queued for retry"
                       % (str(e)[:60], len(main_sheet_rows)))
             if new_records:
                 try:
+                    # Buckets are cleared only AFTER these writes succeed. They
+                    # used to be cleared alongside main_sheet_rows above, which
+                    # handed write_gold_dots an always-empty list -- gold was
+                    # classified all run and the gold tab never got a row.
                     ng = write_gold_dots(ws.spreadsheet, gold_records)
                     write_gold_recheck(ws.spreadsheet, gold_records)
                     write_grey_dots(ws.spreadsheet, grey_records)
+                    gold_records = []
+                    grey_records = []
+                    unknown_records = []
                     if ng:
                         _ulog("shipped %d gold (upgrade) dots to '%s'" % (ng, GOLD_TAB))
                     _flush_verification(ws.spreadsheet)
