@@ -1074,6 +1074,155 @@ MAPBOX_VIEW_JS = """
 # actually return RIGHT NOW. Without the zoom band a zero is unreadable -- a
 # layer above its maxzoom is hidden and returns nothing, which is not the same
 # fact as "no fiber here".
+MAPBOX_DUMP_JS = """
+() => {
+  // EVIDENCE ONLY. Reads the live map; changes nothing.
+  const out = {captured: false, style: null, features: [], markers: [],
+               marker_note: "", error: null};
+  let maps = (window.__optimusMaps || []).slice();
+  if (!maps.length) {
+    try {
+      for (const k in window) {
+        let v; try { v = window[k]; } catch (e) { continue; }
+        if (v && typeof v.queryRenderedFeatures === 'function' &&
+            typeof v.getStyle === 'function') { maps.push(v); break; }
+      }
+    } catch (e) {}
+  }
+  const m = maps[0];
+
+  // DOM MARKERS. If AT&T draws the dots as mapboxgl.Marker elements rather
+  // than as a styled layer, they are NOT in queryRenderedFeatures and there is
+  // no circle-color expression anywhere -- the colour lives in inline CSS. The
+  // console has already shown '[Map marker]' entries, so capture this either
+  // way rather than reporting an empty Mapbox dump as if it meant no dots.
+  try {
+    const els = document.querySelectorAll(
+      '.mapboxgl-marker, .maplibregl-marker, [class*=marker]');
+    out.marker_note = els.length + " marker element(s) in the DOM";
+    let n = 0;
+    for (const el of els) {
+      if (n++ >= 60) break;
+      const cs = window.getComputedStyle(el);
+      const svg = el.querySelector('svg, circle, path');
+      out.markers.push({
+        cls: el.className && el.className.baseVal !== undefined
+             ? el.className.baseVal : String(el.className || ''),
+        style_bg: cs.backgroundColor, style_fill: cs.fill,
+        style_color: cs.color, style_border: cs.borderColor,
+        transform: (el.style && el.style.transform) || '',
+        title: el.getAttribute('title') || el.getAttribute('aria-label') || '',
+        inner_fill: svg ? (svg.getAttribute('fill') ||
+                           window.getComputedStyle(svg).fill || '') : '',
+        html_head: (el.outerHTML || '').slice(0, 300)
+      });
+    }
+  } catch (e) { out.marker_note = 'marker scan failed: ' + e; }
+
+  if (!m) { out.error = 'no mapboxgl.Map object found'; return out; }
+  out.captured = true;
+
+  try {
+    const st = m.getStyle() || {};
+    out.style = {
+      sources: Object.keys(st.sources || {}),
+      layers: (st.layers || []).map(L => ({
+        id: L.id, type: L.type, source: L.source,
+        sourceLayer: L['source-layer'],
+        minzoom: (L.minzoom === undefined ? null : L.minzoom),
+        maxzoom: (L.maxzoom === undefined ? null : L.maxzoom),
+        filter: L.filter === undefined ? null : L.filter,
+        layout: L.layout || null,
+        paint: L.paint || null          // circle-color expression preserved WHOLE
+      }))
+    };
+  } catch (e) { out.error = 'getStyle: ' + e; }
+
+  try {
+    const fs = m.queryRenderedFeatures() || [];
+    for (let i = 0; i < fs.length && i < 300; i++) {
+      const f = fs[i];
+      out.features.push({
+        id: f.id === undefined ? null : f.id,
+        type: f.type, source: f.source, sourceLayer: f.sourceLayer || null,
+        layer_id: (f.layer || {}).id || null,
+        layer_type: (f.layer || {}).type || null,
+        paint: (f.layer || {}).paint || null,
+        geometry_type: (f.geometry || {}).type || null,
+        coordinates: (f.geometry || {}).coordinates || null,
+        properties: f.properties || {}
+      });
+    }
+  } catch (e) { out.error = (out.error || '') + ' qRF: ' + e; }
+  return out;
+}
+"""
+
+
+def dump_mapbox_evidence(page, log=print):
+    """Publish the live Mapbox style and rendered features. Reads only.
+
+    Requested as an evidence-only audit: rather than inferring the gold/grey
+    rule from build codes, read the rule AT&T's own map uses to paint the dots.
+    If the dots turn out to be DOM markers instead of a styled layer, the
+    marker dump says so plainly instead of an empty features list being
+    mistaken for "no dots here".
+    """
+    try:
+        d = page.evaluate(MAPBOX_DUMP_JS)
+    except Exception as e:
+        log("  (mapbox dump failed: %s)" % str(e)[:90])
+        return None
+    try:
+        style = d.get("style") or {}
+        layers = style.get("layers") or []
+        feats = d.get("features") or []
+        marks = d.get("markers") or []
+        dots = [L for L in layers
+                if L.get("type") in ("circle", "symbol")
+                and not re.search(r"mapbox|composite|terrain|satellite|road|label",
+                                  str(L.get("source") or ""), re.I)]
+        log("")
+        log("=== MAPBOX EVIDENCE DUMP ===")
+        log("  map object captured : %s" % d.get("captured"))
+        log("  style layers        : %d  (sources: %d)"
+            % (len(layers), len(style.get("sources") or [])))
+        log("  candidate dot layers: %d" % len(dots))
+        log("  rendered features   : %d" % len(feats))
+        log("  DOM markers         : %s" % d.get("marker_note"))
+        if d.get("error"):
+            log("  error               : %s" % str(d["error"])[:120])
+        for L in dots[:6]:
+            log("    layer %-24s src=%-18s color=%s"
+                % (str(L.get("id"))[:24], str(L.get("source"))[:18],
+                   json.dumps((L.get("paint") or {}).get("circle-color"))[:90]))
+        if not feats and marks:
+            log("")
+            log("  NOTE: zero Mapbox features but %d DOM marker(s) present." % len(marks))
+            log("  The dots are drawn as DOM elements, NOT as a styled Mapbox")
+            log("  layer -- so there is no circle-color expression to read and")
+            log("  queryRenderedFeatures can never see them. The colour lives in")
+            log("  the marker CSS captured above.")
+        blob = json.dumps(d, indent=1, default=str)
+        gh_put("optimus/_feed/mapbox_style_dump.json",
+               json.dumps({"captured": d.get("captured"),
+                           "error": d.get("error"),
+                           "style": style,
+                           "candidate_dot_layers": dots}, indent=1, default=str))
+        gh_put("optimus/_feed/mapbox_features_dump.json",
+               json.dumps({"rendered_features": feats,
+                           "dom_markers": marks,
+                           "marker_note": d.get("marker_note")},
+                          indent=1, default=str))
+        log("  -> optimus/_feed/mapbox_style_dump.json")
+        log("  -> optimus/_feed/mapbox_features_dump.json")
+        log("=" * 30)
+        return d
+    except Exception as e:
+        log("  (mapbox dump publish failed: %s)" % str(e)[:90])
+        return None
+
+
 MAPBOX_DIAG_JS = """
 () => {
   const out = {hook_installed: !!(window.__optimusMaps),
