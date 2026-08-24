@@ -4,8 +4,8 @@
  "machine": "LAPTOP-FJEEPATI",
  "build_fingerprint": "cc822b5d",
  "mode": "",
- "updated_at": "2026-08-24 01:27:29",
- "last_phase": "LOGIN_TIMEOUT",
+ "updated_at": "2026-08-24 01:27:31",
+ "last_phase": "exit",
  "phases": [
   [
    "start",
@@ -41,6 +41,11 @@
    "LOGIN_TIMEOUT",
    "01:27:29",
    637.8
+  ],
+  [
+   "exit",
+   "01:27:31",
+   640.5
   ]
  ]
 }
