@@ -5690,11 +5690,14 @@ def uploader_main():
                     ng = write_gold_dots(ws.spreadsheet, gold_records)
                     write_gold_recheck(ws.spreadsheet, gold_records)
                     write_grey_dots(ws.spreadsheet, grey_records)
+                    if ng:
+                        _ulog("shipped %d gold (upgrade) dots to '%s'" % (ng, GOLD_TAB))
+                        for _r in gold_records:
+                            if gold_tier(_r.get("dot_status")) == TIER_VERIFIED:
+                                _ulog("   GOLD -> %s" % (_r.get("address") or "?"))
                     gold_records = []
                     grey_records = []
                     unknown_records = []
-                    if ng:
-                        _ulog("shipped %d gold (upgrade) dots to '%s'" % (ng, GOLD_TAB))
                     _flush_verification(ws.spreadsheet)
                 except Exception as e:
                     _ulog("gold dots error: %s" % str(e)[:60])
