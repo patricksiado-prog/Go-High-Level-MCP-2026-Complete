@@ -468,6 +468,23 @@ def _publish_feed():
         if _DEDUPE_REPORT:
             ded = dict((f, getattr(_DEDUPE_REPORT, f))
                        for f in _DEDUPE_REPORT.FIELDS)
+        # The capture already works out WHY a 200 yielded nothing -- the
+        # top-level keys of the payload. It was printed to the console and
+        # never published, so the one fact that identifies a changed payload
+        # shape could only be read off a photograph.
+        try:
+            cap = _NET_CAPTURE[0]
+            if cap is not None and _FEED:
+                _FEED.truth(raw_features=getattr(cap, "svc_leads", None),
+                            note="capture: %s" % cap.diag()[:150])
+                _FEED.note_diagnostic({
+                    "serviceability_responses": getattr(cap, "svc_seen", None),
+                    "leads_decoded": getattr(cap, "svc_leads", None),
+                    "empty_payload_top_keys": getattr(cap, "svc_empty_keys", None),
+                    "capture_reason": cap.diag(),
+                })
+        except Exception:
+            pass
         c = _WIRE_COUNTS
         stage(classified_green=c["green"], classified_gold=c["copper"],
               classified_grey=c["fiber"],
@@ -1808,10 +1825,33 @@ class NetCapture:
         return "OK: %d serviceability responses -> %d leads" % (
             self.svc_seen, self.svc_leads)
 
+    ASSET_CT = ("image/", "font/", "video/", "audio/", "text/css",
+                "application/javascript", "application/font",
+                "application/x-protobuf", "application/octet-stream")
+    ASSET_EXT = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico",
+                 ".css", ".js", ".woff", ".woff2", ".ttf", ".eot",
+                 ".pbf", ".mvt", ".map")
+
+    def is_asset(self, url, ct):
+        """True for a website asset -- an image, font, stylesheet or base-map
+        tile. We read AT&T's serviceability JSON off the wire; an asset cannot
+        contain a lead, so its body is never worth fetching. Reading them is
+        what produced pages of 'NOT JSON -- \x89PNG' and crowded the real
+        evidence out of the diagnostics."""
+        try:
+            c = (ct or "").lower()
+            if any(c.startswith(a) or a in c for a in self.ASSET_CT):
+                return True
+            base = (url or "").split("?")[0].lower()
+            return base.endswith(self.ASSET_EXT)
+        except Exception:
+            return False
+
     def handle(self, response):
         try:
             url = response.url
             ct = (response.headers or {}).get("content-type", "")
+            _asset = self.is_asset(url, ct)
             if self.debug:
                 base = url.split("?")[0]
                 try:
@@ -1911,6 +1951,8 @@ class NetCapture:
                         except Exception:
                             pass
                     return
+                if _asset:
+                    return          # an asset cannot carry a lead; skip its body
                 try:
                     body = response.body()
                     if not body or len(body) > 8 * 1024 * 1024:
