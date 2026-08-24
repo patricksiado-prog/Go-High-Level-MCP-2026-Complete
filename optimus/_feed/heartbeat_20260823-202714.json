@@ -1,0 +1,16 @@
+{
+ "run_id": "20260823-202714",
+ "operator": "Patrick",
+ "machine": "LAPTOP-FJEEPATI",
+ "build_fingerprint": "18688412",
+ "mode": "",
+ "updated_at": "2026-08-23 20:27:47",
+ "last_phase": "playwright_up",
+ "phases": [
+  [
+   "playwright_up",
+   "20:27:47",
+   0.0
+  ]
+ ]
+}
