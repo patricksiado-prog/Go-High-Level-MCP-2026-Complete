@@ -1599,12 +1599,66 @@ NET_STATUS_KEYS = {"status", "eligibility", "eligible", "customerstatus",
 NET_BAN_KEYS = {"ban", "subscriberban"}
 
 
-def _pick(low, keyset):
+# Keys whose NAME contains an address word but which are never the address.
+_ADDR_NOT = ("id", "count", "type", "code", "flag", "status", "url", "key")
+
+
+def _pick(low, keyset, kind=None):
+    """Exact match first, then a guarded substring match.
+
+    Exact-only matching is a single point of failure: rename `address` to
+    `svcAddress` upstream and EVERY record silently stops being a lead -- green
+    and gold together, with no error anywhere. That is indistinguishable from an
+    empty neighbourhood, which is the failure this whole system keeps hitting.
+
+    The fallback is guarded by TYPE, not just by name, so a key called
+    `addressId` carrying an integer can never be mistaken for a street address.
+    """
     for k in keyset:
         v = low.get(k)
         if v not in (None, ""):
             return v
+    if not kind:
+        return None
+    for k, v in low.items():
+        if v in (None, ""):
+            continue
+        if kind == "addr":
+            if "addr" not in k or any(b in k for b in _ADDR_NOT):
+                continue
+            if isinstance(v, str) and len(v.strip()) >= 4:
+                return v
+        elif kind == "lat":
+            if not ("lat" in k or k.endswith("y")):
+                continue
+            f = _num(v)
+            if f is not None and 20.0 <= f <= 72.0:
+                return v
+        elif kind == "lng":
+            if not ("lon" in k or "lng" in k or k.endswith("x")):
+                continue
+            f = _num(v)
+            if f is not None and -170.0 <= f <= -50.0:
+                return v
+        elif kind == "ban":
+            if "ban" in k and "banner" not in k:
+                return v
     return None
+
+
+# Keys seen on a dict that LOOKED like a record but produced no lead. This is
+# the fact that identifies a renamed field, and it was never being collected.
+_UNMATCHED_KEYS = {}
+
+
+def note_unmatched(low):
+    try:
+        if len(_UNMATCHED_KEYS) > 60:
+            return
+        for k in low:
+            _UNMATCHED_KEYS[k] = _UNMATCHED_KEYS.get(k, 0) + 1
+    except Exception:
+        pass
 
 
 def _num(v):
@@ -1622,15 +1676,16 @@ def lead_from_dict(d):
     geom = d.get("geometry") if isinstance(d.get("geometry"), dict) else None
     base = d.get("properties") if isinstance(d.get("properties"), dict) else d
     low = {_nkey(k): v for k, v in base.items()}
-    addr = _pick(low, ADDR_KEYS)
-    lat, lng = _num(_pick(low, LAT_KEYS)), _num(_pick(low, LNG_KEYS))
+    addr = _pick(low, ADDR_KEYS, "addr")
+    lat = _num(_pick(low, LAT_KEYS, "lat"))
+    lng = _num(_pick(low, LNG_KEYS, "lng"))
     if geom and geom.get("type") == "Point":
         coords = geom.get("coordinates")
         if isinstance(coords, (list, tuple)) and len(coords) >= 2:
             lng = lng if lng is not None else _num(coords[0])
             lat = lat if lat is not None else _num(coords[1])
     status = _pick(low, NET_STATUS_KEYS)
-    ban = _pick(low, NET_BAN_KEYS)
+    ban = _pick(low, NET_BAN_KEYS, "ban")
     if not addr or not isinstance(addr, str):
         # AT&T sometimes returns a serviceability dot with a STATUS + COORDINATES
         # but no inline street address. Those are still real GREEN/GOLD dots, so
@@ -1649,6 +1704,11 @@ def lead_from_dict(d):
             if _c in ("GREEN", "GOLD"):
                 addr = "(%.6f, %.6f)" % (lat, lng)
         if not addr or not isinstance(addr, str):
+            # Record what this dict DID carry. A payload that stops yielding
+            # leads is otherwise indistinguishable from empty ground, and the
+            # key names are what identify a rename.
+            if len(low) >= 3:
+                note_unmatched(low)
             return None
     # Keep the ORIGINAL record on the lead. The scout's backend classifier reads
     # subscriber_ban + curr_ntwrk_bld_type_cd off ld["raw"] to score GREEN/GOLD/
