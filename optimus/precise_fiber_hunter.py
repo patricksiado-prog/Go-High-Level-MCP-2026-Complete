@@ -2309,10 +2309,15 @@ class NetCapture:
                 if _extract_features is not None:
                     try:
                         for f in _extract_features(data):
-                            leads.append({"address": f.get("address"),
-                                          "lat": f.get("lat"), "lng": f.get("lng"),
-                                          "status": f.get("status"),
-                                          "ban": f.get("ban"), "props": {}})
+                            rec = dict(f)
+                            leads.append(rec)
+                            # Regression check: build codes from raw must survive
+                            # the extraction → leads → classification path, or
+                            # Gold/Grey will fall back to UNKNOWN.
+                            if rec.get("ban"):
+                                code = _bld_code(rec.get("raw") or {})
+                                if not code:
+                                    stage(customer_missing_build_code=1)
                     except Exception:
                         pass
                 # save the RAW serviceability JSON so we can inspect exactly what
@@ -2785,8 +2790,9 @@ class NetCapture:
                 continue
             seen.add(key)
             dot_status = classify_lead(ld)
-            if dot_color(dot_status) == "GREY":
-                continue
+            # Split mode must not drop GREY like the old code did. Production path
+            # routes GREY to the Grey Dots tab; split-mode uploader respects
+            # dot_color, so GREY records are properly handled downstream.
             ts = time.strftime("%Y-%m-%d %H:%M:%S")
             # Split mode used to drop run_id/operator/geography entirely, so a
             # gold row captured this way landed with no ZIP and no provenance --
