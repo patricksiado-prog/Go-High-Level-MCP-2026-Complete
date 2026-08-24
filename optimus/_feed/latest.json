@@ -1,10 +1,10 @@
 {
- "generated_at": "2026-08-23 18:13:30",
- "run_id": "20260823-180249",
+ "generated_at": "2026-08-23 19:50:53",
+ "run_id": "20260823-194223",
  "operator": "Patrick",
  "machine": "LAPTOP-FJEEPATI",
  "area": "",
- "build_fingerprint": "68baa736",
+ "build_fingerprint": "1df36f4c",
  "counts": {
   "green": 0,
   "fiber": 0,
@@ -29,46 +29,71 @@
  "phases": [
   [
    "start",
-   "18:02:52",
+   "19:42:27",
    0.0
   ],
   [
    "playwright_up",
-   "18:03:07",
-   15.1
+   "19:42:56",
+   29.4
   ],
   [
    "chromium_up",
-   "18:03:12",
-   20.5
+   "19:43:06",
+   39.3
   ],
   [
    "browser_up",
-   "18:03:15",
-   23.0
+   "19:43:10",
+   42.8
   ],
   [
    "page_loaded",
-   "18:03:18",
-   26.1
+   "19:43:19",
+   52.1
   ],
   [
    "LOGGED_OUT",
-   "18:03:20",
-   28.5
+   "19:43:23",
+   56.2
   ],
   [
-   "LOGIN_TIMEOUT",
-   "18:13:24",
-   632.3
+   "logged_in",
+   "19:44:59",
+   151.7
   ],
   [
-   "exit",
-   "18:13:28",
-   635.9
+   "sheet_open",
+   "19:45:14",
+   166.8
+  ],
+  [
+   "resume_loaded",
+   "19:45:29",
+   181.7
+  ],
+  [
+   "wait_done",
+   "19:46:46",
+   259.6
+  ],
+  [
+   "diag_done",
+   "19:46:56",
+   269.5
+  ],
+  [
+   "sweep_start",
+   "19:47:09",
+   282.3
+  ],
+  [
+   "pass_done",
+   "19:50:46",
+   499.3
   ]
  ],
- "last_phase": "exit",
+ "last_phase": "pass_done",
  "stage_counters": {
   "classified_green": 0,
   "classified_gold": 0,
@@ -77,22 +102,65 @@
  },
  "crash": {},
  "capture_truth": {
-  "delivery": "PARSE_ERROR",
-  "raw_features": null,
+  "delivery": "DATA_OK",
+  "raw_features": 0,
   "rendered": null,
   "classified": 0,
   "written": 0,
-  "auth_ok": false,
-  "map_ok": null,
-  "zoom_ok": null,
+  "auth_ok": true,
+  "map_ok": false,
+  "zoom_ok": false,
   "notes": [
    "HTTP 301 REDIRECTED TO LOGIN -- not logged in, nothing lands",
+   "HTTP 302 redirected -- session likely expired",
+   "HTTP 302 redirected -- session likely expired",
+   "HTTP 302 redirected -- session likely expired",
+   "SESSION EXPIRED -- AT&T sent a login page, not data. Log OUT of youachieve.att.com, close the browser, log back in, then re-run.",
+   "access chooser, not the map",
+   "SESSION EXPIRED -- AT&T sent a login page, not data. Log OUT of youachieve.att.com, close the browser, log back in, then re-run.",
+   "SESSION EXPIRED -- AT&T sent a login page, not data. Log OUT of youachieve.att.com, close the browser, log back in, then re-run.",
    "NOT JSON -- AT&T sent something this parser cannot read. First 120 chars: <!DOCTYPE html> <html lang=\"en\">     <head>         <!-- The following 3 met",
-   "access chooser, not the map"
+   "NOT JSON -- AT&T sent something this parser cannot read. First 120 chars: <!DOCTYPE html> <html lang=\"en\">     <head>         <!-- The following 3 met",
+   "NOT JSON -- AT&T sent something this parser cannot read. First 120 chars: <!DOCTYPE html> <html lang=\"en\">     <head>         <!-- The following 3 met",
+   "NOT JSON -- AT&T sent something this parser cannot read. First 120 chars: \ufffdPNG\r \u001a \u0000\u0000\u0000\rIHDR\u0000\u0000\u0002\ufffd\u0000\u0000\u0001,\b\u0006\u0000\u0000\u0000\ufffdF\ufffd\f\u0000\u0000\u0000\u0006bKGD\u0000\ufffd\u0000\ufffd\u0000\ufffd\ufffd\ufffd\ufffd\ufffd\u0000\u0000\u0000\tpHYs\u0000\u0000\u000b\u0013\u0000\u0000\u000b\u0013\u0001\u0000\ufffd\ufffd\u0018\u0000\u0000\u0000\u0007",
+   "NOT JSON -- AT&T sent something this parser cannot read. First 120 chars: \ufffd\ufffd\ufffd\ufffd\u0000\u0010JFIF\u0000\u0001\u0001\u0001\u0000H\u0000H\u0000\u0000\ufffd\ufffd\u0000\ufffd\u0000 \u0007\u0007\b\u0007\u0006 \b\b\b\u000b  \u000b\u000e\u0018\u0010\u000e\r\r\u000e\u001d\u0015\u0016\u0011\u0018#\u001f%$\"\u001f\"!&+7/&)4)!\"0A149;>",
+   "NOT JSON -- AT&T sent something this parser cannot read. First 120 chars: \ufffdPNG\r \u001a \u0000\u0000\u0000\rIHDR\u0000\u0000\u0000\ufffd\u0000\u0000\u0000!\b\u0006\u0000\u0000\u0000\ufffd(\ufffd\ufffd\u0000\u0000\u0000\tpHYs\u0000\u0000\u000b\u0013\u0000\u0000\u000b\u0013\u0001\u0000\ufffd\ufffd\u0018\u0000\u0000 OiCCPPhotoshop ICC ",
+   "mapbox MAP_NOT_READY / INVALID_ZERO"
   ]
  },
- "first_failure": "delivery",
- "capture_diagnostic": {},
+ "first_failure": "raw_features",
+ "capture_diagnostic": {
+  "mapbox": {
+   "hook_installed": true,
+   "maps_hooked": 0,
+   "has_mapboxgl": false,
+   "canvases": 1,
+   "map_captured": false,
+   "map_loaded": null,
+   "style_loaded": null,
+   "zoom": null,
+   "center": null,
+   "layers_total": null,
+   "sources_total": null,
+   "candidate_layers": [],
+   "rendered_total": null,
+   "error": "no map object found"
+  },
+  "verdict": "MAP_NOT_READY",
+  "advice": "style not loaded yet; query too early",
+  "layers_in_band": 0,
+  "layers_out_of_band": 0,
+  "preconditions": {
+   "map_captured": false,
+   "style_loaded": false,
+   "map_loaded": false,
+   "dot_layers_found": false,
+   "zoom_in_band": false,
+   "query_ok": false
+  },
+  "zero_verdict": "INVALID_ZERO",
+  "zero_reason": "a zero from this view proves nothing -- failed: map_captured, style_loaded, map_loaded, dot_layers_found, zoom_in_band, query_ok"
+ },
  "customer_specimens": [],
  "customer_specimen_count": 0,
  "zero_lead_responses": [
@@ -105,11 +173,17 @@
   {
    "url": "https://youachieve.att.com/yourefer/fiber/",
    "content_type": "text/html;charset=UTF-8",
-   "total_bytes": 13746,
-   "body_head": "\n\n<!DOCTYPE html>\n<html lang=\"en\">\n    <head>\n        <!-- The following 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->\n        <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge,chrome=1\" />\n        <meta charset=\"utf-8\" />\n        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n\n        \n                <link rel=\"icon\" type=\"image/png\" href=\"/ui/img/YouAchieve_rgb_pos.png\" integrity=\"sha384-JvkF7hO1ndiThbKZ4jdWx6jwPxGPClZU2vk7JW8xWqD0DMi3sLgxdVZOtgyCid4H\" crossorigin=\"anonymous\" />\n                <link rel=\"apple-touch-icon\" sizes=\"57x57\" href=\"/ui/img/apple-icons/yA-apple-icon-57x57.png\" integrity=\"sha384-j4Dc5hCK7j2Jw6aaXrovwi4thZRzBiNTWsH87PfjbVo7+xkdoZF41k+Atilu/+Vy\" crossorigin=\"anonymous\" />\n                <link rel=\"apple-touch-icon\" sizes=\"72x72\" href=\"/ui/img/apple-icons/yA-apple-icon-72x72.png\" integrity=\"sha384-8zbXgQYS6vHMzWXDpnd6HhWnqE9aaQS8twRpqV9TF5nVymQDJQ7uFLq2pqx4LLix\" crossorigin=\"anonymous\" />\n                <link rel=\"apple-touch-icon\" sizes=\"114x114\" href=\"/ui/img/apple-icons/yA-apple-icon-114x114.png\" integrity=\"sha384-Kh6dxaqmRhHl7VBoHkuzrVKxlAt3KsVjKVdWt22aROs0wxHHVPUr2MDRPpfcJlCP\" crossorigin=\"anonymous\" />\n                <link rel=\"apple-touch-icon\" sizes=\"144x144\" href=\"/ui/img/apple-icons/yA-apple-icon-144x144.png\" integrity=\"sha384-2WIpfFnnVjRTqjqYKcjaCKbi5VykMjuwEDHOpNKc77v5Y2+aQjQArRmhz8mbyLQi\" crossorigin=\"anonymous\" />\n            \n\n        <!-- Additional Meta Tags -->\n        <meta name=\"description\" content=\"AT&T You Achieve Platform\"> \n\n        <!-- Site CSS Files -->\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/jquery/jquery-ui-1_14_1/jquery-ui.min.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/bootstrap.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/font-awesome.min.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/indexV2.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/you-perform.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/jquery/ui/tinymce/fonts.css\" />\n        \n\n        <!-- Page CSS Files -->\n        \n\n        <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->\n        <!--[if lt IE 12]>\n          <script src=\"https://cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv.min.js\" integrity=\"sha512-UDJtJXfzfsiPPgnI5S1000FPLBHMhvzAMX15I+qG2E2OAzC9P1JzUwJOfnypXiOH7MRPaqzhPbBGDNNj7zBfoA==\" crossorigin=\"anonymous\" referrerpolicy=\"no-referrer\"></script>\n          <script src=\"https://cdnjs.cloudflare.com/ajax/libs/respond.js/1.4.2/respond.min.js\" integrity=\"sha512-qWVvreMuH9i0DrugcOtifxdtZVBBL0X75r9YweXsdCHtXUidlctw7NXg5KVP3ITPtqZ2S575A0wFkvgS2anqSA==\" crossorigin=\"anonymous\" referrerpolicy=\"no-referrer\"></script>\n        <![endif]-->\n\n        <title>you Achieve | Landing</title>\n    <script type=\"text/javascript\" src=\"https://youachieve.att.com/resources/1357d40556328741d98ac6233c9dc954522001624dcc5\"  ></script></head>\n\n    <body style=\"background-color: #FFF;\">\n        <div id=\"appWrapper\">\n            \n            \n            \n            <div id=\"sidebar-wrapper-left\">\n                <ul class=\"sidebar-nav-left\">\n                    <li style=\"line-height: 56px; text-align:right;\"><button type=\"button\" class=\"btn btn-outline-blue menuLeftToggle\" style=\"margin-bottom: 8px; margin-top:8px; margin-right: 10px;\">Close Menu <i class=\"fa fa-remove\"></i></button></li>\n\n                    \n                </ul>\n            </div>\n            \n            \n            \n            <div id=\"sidebar-wrapper-right\">\n                <ul class=\"sidebar-nav\">\n                    <li style=\"line-height: 56px; text-align:right;\">\n                        <button type=\"button\" class=\"btn btn-outline-blue menuRightToggle\" style=\"margin-bottom: 8px; margin-top:8px; margin-right: 10px;\">Close M"
+   "total_bytes": 48,
+   "body_head": "HTTP 302 -- redirected -- session likely expired"
+  },
+  {
+   "url": "https://saml.e-access.att.com/isam/sps/oidc/rp/SAML-IDP/kickoff/SAML-IDP-Password?Target=https%3A%2F%2Fsaml.e-access.att.com%2Fisam%2Fsps%2Fattsamlidp_mfaia%2Fsaml20%2Flogininitial%3FRequestBinding%3DHTTPPost%26PartnerId%3Dhttps%3A%2F%2Fyouachieve.att.com%26RelayState%3Dhttps%3A%2F%2Fyouachieve.att.",
+   "content_type": "",
+   "total_bytes": 48,
+   "body_head": "HTTP 302 -- redirected -- session likely expired"
   }
  ],
  "sample_count": 0,
  "samples": [],
- "note": ""
+ "note": "manual"
 }
