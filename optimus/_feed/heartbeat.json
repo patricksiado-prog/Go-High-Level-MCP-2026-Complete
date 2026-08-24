@@ -4,8 +4,8 @@
  "machine": "LAPTOP-FJEEPATI",
  "build_fingerprint": "34028c59",
  "mode": "",
- "updated_at": "2026-08-23 20:52:02",
- "last_phase": "browser_up",
+ "updated_at": "2026-08-23 20:52:09",
+ "last_phase": "page_loaded",
  "phases": [
   [
    "start",
@@ -26,6 +26,11 @@
    "browser_up",
    "20:52:02",
    47.4
+  ],
+  [
+   "page_loaded",
+   "20:52:09",
+   54.6
   ]
  ]
 }
