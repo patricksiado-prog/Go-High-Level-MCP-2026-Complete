@@ -2569,9 +2569,20 @@ class NetCapture:
             if not addr:
                 continue
             key = addr.upper()
-            if key in seen:
-                continue
-            staged_keys.append(key)   # NOT seen until the write is acknowledged
+            # THE GOLD BUG, found 2026-08-23. `seen` is built from PRECISE FIBER
+            # -- the GREEN tab -- and this used to `continue` here, before the
+            # dot was ever classified. So any address captured on an earlier
+            # sweep was skipped outright, never reached write_gold_dots, and
+            # could NEVER be added to the Gold Dots tab. That is exactly why
+            # Precise Fiber holds 8,264 orange rows while Gold Dots holds 1,984:
+            # the gap could not close no matter how often the ground was swept.
+            #
+            # Being in Precise Fiber now suppresses only the Precise Fiber ROW.
+            # Classification still runs, and gold/grey/recheck still route --
+            # each of those tabs carries its own dedupe, so nothing duplicates.
+            _already = key in seen
+            if not _already:
+                staged_keys.append(key)   # NOT seen until the write is ACKed
             dot_status = classify_lead(ld)
             _raw = ld.get("raw") or {}
             _code = _bld_code(_raw)
@@ -2639,9 +2650,17 @@ class NetCapture:
             # scraped business: Address | Dot Color | Captured At | Business | Phone.
             _bidx = _BIZ.get("index") or {}
             _b = _bidx.get(_norm_addr(addr)) if _bidx else None
-            new_rows.append([addr, dot_color(dot_status), ts,
-                             (_b or {}).get("name", ""), (_b or {}).get("phone", ""),
-                             RUN_ID, OPERATOR()])
+            # Suppress only the Precise Fiber ROW for an address we already
+            # hold. A `continue` here would skip new_records too -- and
+            # new_records is exactly what feeds write_gold_dots, so it would
+            # re-create the bug this change exists to fix.
+            if _already:
+                stage(revisited=1)
+            else:
+                new_rows.append([addr, dot_color(dot_status), ts,
+                                 (_b or {}).get("name", ""),
+                                 (_b or {}).get("phone", ""),
+                                 RUN_ID, OPERATOR()])
             new_records.append({"address": addr, "dot_status": dot_status,
                                 "run_id": RUN_ID, "operator": OPERATOR(),
                                 "zone_label": "WORKING", "popup_status": ld.get("status"),
@@ -3148,6 +3167,7 @@ _STAGE_ORDER = [
     ("green_queued",       "GREEN QUEUED"),
     ("green_committed",    "GREEN COMMITTED"),
     ("grey_committed",     "GREY COMMITTED"),
+    ("revisited",          "ALREADY IN PRECISE FIBER (re-checked for gold)"),
     ("grey_rejected_from_gold",    "GREY rejected from gold"),
     ("unknown_rejected_from_gold", "UNKNOWN rejected from gold"),
     ("auth_expired",       "AUTH_EXPIRED replies"),
