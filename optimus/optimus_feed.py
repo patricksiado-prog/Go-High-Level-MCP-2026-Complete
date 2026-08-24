@@ -243,8 +243,19 @@ _AUDIT_PUSHED = [0]
 
 
 def audit_coverage():
-    """What the audit has actually collected, per colour."""
+    """What the audit has collected. A key prefixed '?' means the bucket is our
+    own guess because AT&T's rendered colour was not available for that record --
+    NOT ground truth, and it is marked so it can never be mistaken for it."""
     return dict(_AUDIT_BY_COLOUR)
+
+
+def audit_disagreements():
+    """Records where AT&T rendered one colour and our rule said another.
+
+    This is the payload of the whole exercise: every row here is a case the
+    current rule gets wrong, with the backend fields attached to explain why.
+    """
+    return [a for a in _AUDIT if a.get("agrees") is False]
 
 _SECRET_HINT = ("ban", "token", "secret", "auth", "cookie", "csrf", "session",
                 "password", "ssn")
@@ -269,10 +280,29 @@ def _safe_props(raw):
 
 def audit(cell=None, lat=None, lng=None, http_status=None, response_kind=None,
           raw=None, classification=None, reason="", queued=None,
-          write_attempted=None, committed=None, seen=None, pending=None):
-    """Record one candidate. Never raises into a sweep."""
+          write_attempted=None, committed=None, seen=None, pending=None,
+          observed_color=None):
+    """Record one candidate. Never raises into a sweep.
+
+    TWO SEPARATE VERDICTS, and they must never be conflated:
+
+      classifier_result -- what OUR rule decided
+      observed_color    -- what AT&T's own DOM marker is actually painted
+
+    An earlier version bucketed the audit by `classification`, i.e. by the
+    verdict of the classifier the audit exists to verify. That is circular: if
+    the rule calls a real GOLD dot GREY, the audit files it under GREY and the
+    error becomes invisible. observed_color must come from the rendered marker
+    and NEVER from classify_wire.
+
+    A row where the two disagree is the most valuable record this system can
+    produce. It is the only thing that can prove the rule wrong.
+    """
     try:
-        _col = str(classification or "UNKNOWN").upper()
+        # Bucket by what AT&T RENDERED when we know it; fall back to our own
+        # verdict only to spread the sample, never as evidence.
+        _obs = str(observed_color or "").upper()
+        _col = _obs or ("?" + str(classification or "UNKNOWN").upper())
         _have = _AUDIT_BY_COLOUR.get(_col, 0)
         # Fill each colour's quota first; only then use the shared remainder.
         if _have >= AUDIT_PER_COLOUR and len(_AUDIT) >= AUDIT_CAP:
@@ -298,8 +328,12 @@ def audit(cell=None, lat=None, lng=None, http_status=None, response_kind=None,
             "subscriber_ban_present": ban_present,
             "curr_ntwrk_bld_type_cd": code,
             "backend_fields": _safe_props(r),
+            "observed_color": _obs or None,   # AT&T's own rendering, or unknown
             "classifier_result": classification,
             "classifier_reason": reason,
+            "agrees": (None if not _obs else
+                       (_obs == str(classification or "").upper()
+                        or (_obs == "GOLD" and str(classification).upper() == "ORANGE"))),
             "queued": queued, "write_attempted": write_attempted,
             "committed": committed, "seen": seen, "pending": pending,
         })

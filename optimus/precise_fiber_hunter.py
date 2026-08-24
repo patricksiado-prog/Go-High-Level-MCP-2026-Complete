@@ -522,12 +522,13 @@ def _publish_feed():
         _FEED.truth_report()
         _FEED.phase_report()
         _FEED.publish_audit(gh_put)
-        _FEED.publish(gh_put, counts=_WIRE_COUNTS,
-                      undecoded=_UNKNOWN_CODES,
-                      undecoded_samples=_UNKNOWN_CODE_SAMPLE,
-                      dedupe=ded, note_text=_CUR_AREA[0] or "")
+        return _FEED.publish(gh_put, counts=_WIRE_COUNTS,
+                             undecoded=_UNKNOWN_CODES,
+                             undecoded_samples=_UNKNOWN_CODE_SAMPLE,
+                             dedupe=ded, note_text=_CUR_AREA[0] or "")
     except Exception as e:
-        print("  (feed publish skipped: %s)" % str(e)[:70])
+        print("  (feed publish FAILED: %s)" % str(e)[:90])
+        return False
 
 
 def wire_classification_report():
@@ -608,10 +609,10 @@ def classify_wire(status, ban, raw):
             # us) and NO classification rule can fix it.
             _WIRE_COUNTS["no_code"] += 1
             return _unknown_customer_status()
-        if any(c in code for c in _BLD_CODES["fiber"]):
+        if code in _BLD_CODES["fiber"]:
             _WIRE_COUNTS["fiber"] += 1
             return "customer"            # GREY -> confirmed fiber customer, skip
-        if any(c in code for c in _BLD_CODES["copper"]):
+        if code in _BLD_CODES["copper"]:
             _WIRE_COUNTS["copper"] += 1
             return "copper_upgrade"      # GOLD dot -> ORANGE row -> upgrade lead
         # Customer on a code in neither list. Previously this fell through to
@@ -7282,9 +7283,17 @@ def main():
                 # it survived right up to the first pass that ever completed.
                 try:
                     if _FEED:
-                        _publish_feed()
-                except Exception:
-                    pass
+                        _FEED.publish_audit(gh_put)
+                        _ok = _publish_feed()
+                        print("  FEED PUBLISH %s run=%s"
+                              % ("SUCCESS" if _ok else "FAILED", RUN_ID))
+                except Exception as _e:
+                    print("")
+                    print("!" * 64)
+                    print("!! FEED PUBLISH FAILED run=%s: %s" % (RUN_ID, str(_e)[:120]))
+                    print("!! The run's evidence did NOT reach GitHub. Everything")
+                    print("!! downstream is reading a STALE latest.json.")
+                    print("!" * 64)
             except Exception as e:
                 msg = str(e)
                 report_status(ws, args.zip or "manual", "error", note=msg[:120])
