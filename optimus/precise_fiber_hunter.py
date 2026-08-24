@@ -7172,6 +7172,13 @@ def main():
                     print("                safe capture zoom ~ %s" % _d["safe_zoom"])
             except Exception as _e:
                 print("  (diagnostic skipped: %s)" % str(_e)[:70])
+            # EVIDENCE ONLY: dump the live style and rendered features on the
+            # viewport the operator chose -- which is the populated one. Reads
+            # the map, publishes, decides nothing.
+            try:
+                dump_mapbox_evidence(page)
+            except Exception as _e:
+                print("  (mapbox evidence dump skipped: %s)" % str(_e)[:70])
             _phase("diag_done")
             # 5-second grace period so you can MINIMIZE this window before the
             # hunter takes over the mouse (real-mouse motion). Countdown so you
