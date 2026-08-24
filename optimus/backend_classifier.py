@@ -47,6 +47,7 @@ WHAT WE DON'T KNOW YET (a CUSTOMER-area capture answers it)
 """
 
 import json
+from optimus_dot_detect import is_customer_ban
 
 
 # ── BUILD CODES: loaded from build_codes.json, the ONE source of truth ──────
@@ -130,6 +131,61 @@ def classify_lead(rec):
     if bld in COPPER_BUILD_CODES:
         return "GOLD"
     return "CUSTOMER"                        # has account; copper/fiber decode pending
+
+
+def classify_hunter_record(ld):
+    """Canonical classifier for normalized hunter records.
+
+    Accepts BOTH normalized hunter format (ban, status, raw dict) AND raw AT&T
+    format (subscriber_ban, curr_ntwrk_bld_type_cd). Uses is_customer_ban()
+    for proper placeholder detection ("non-cust", "unknown", etc).
+
+    Returns: GREEN, GOLD, GREY, UNKNOWN, SKIP
+    """
+    if not isinstance(ld, dict):
+        return "SKIP"
+
+    address = _norm(ld.get("address"))
+    if not address:
+        return "SKIP"
+
+    raw = ld.get("raw")
+    if not isinstance(raw, dict):
+        raw = {}
+
+    # Accept BOTH normalized hunter fields and original AT&T fields
+    ban = (
+        ld.get("ban")
+        if ld.get("ban") is not None
+        else raw.get("subscriber_ban")
+    )
+
+    status_text = _norm(
+        ld.get("status") or raw.get("status") or ""
+    ).lower()
+
+    build = _norm(
+        raw.get("curr_ntwrk_bld_type_cd")
+        or ld.get("curr_ntwrk_bld_type_cd")
+        or ""
+    ).lower()
+
+    # No REAL subscriber account = GREEN (use is_customer_ban for placeholder detection)
+    if not is_customer_ban(ban):
+        return "GREEN"
+
+    # AT&T explicitly tells us copper -- direct evidence from status field
+    if "copper" in status_text:
+        return "GOLD"
+
+    # Customer + known build code
+    if build in FIBER_BUILD_CODES:
+        return "GREY"
+    if build in COPPER_BUILD_CODES:
+        return "GOLD"
+
+    # Never infer GOLD merely because BAN exists. Unknown build code = UNKNOWN.
+    return "UNKNOWN"
 
 
 # ── VIEW SUMMARY + FRESH VERDICT ───────────────────────────────────────────

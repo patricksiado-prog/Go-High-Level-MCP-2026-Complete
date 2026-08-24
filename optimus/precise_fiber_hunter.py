@@ -87,8 +87,9 @@ import os, sys, time, argparse, re
 
 import json
 import threading
+import hashlib
 
-from backend_classifier import classify_lead as backend_classify_lead
+from backend_classifier import classify_hunter_record
 from optimus_dot_detect import (GREEN_MIN, GREEN_MAX, GOLD_MIN, GOLD_MAX,
                                 GRAY_MIN, GRAY_MAX, classify_status,
                                 is_customer_ban,
@@ -283,6 +284,17 @@ DOT_COLOR = {"lead": "GREEN", "copper_upgrade": "ORANGE", "customer": "GREY",
 def dot_color(dot_status):
     """Legend color word for a classified dot status (defaults to GREEN)."""
     return DOT_COLOR.get((dot_status or "").lower(), "GREEN")
+
+
+def record_id(address, lat, lng, classification):
+    """Deterministic ID for a test record (prove sheet row ↔ captured record)."""
+    payload = "|".join([
+        str(address or "").strip().upper(),
+        str(lat or ""),
+        str(lng or ""),
+        str(classification or "").upper(),
+    ])
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
 # --- GOLD vs GREY on the wire path (build_codes.json tiebreak) ---------------
@@ -635,37 +647,23 @@ def classify_wire(status, ban, raw):
     return classify_status(text=status, ban=ban)   # no ban -> GREEN (eligible)
 
 
+_DOT_STATUS_MAP = {
+    "GREEN": "lead",
+    "GOLD": "copper_upgrade",
+    "GREY": "customer",
+    "UNKNOWN": "unknown_customer",
+    "SKIP": "skip",
+}
+
+
 def classify_lead(ld):
-    """Unified classifier: backend_classifier + wire-status override.
+    """Adapter: canonical hunter classifier → dot_status values.
 
-    Uses backend_classifier.classify_lead() as the single source of truth.
-    Overrides only when status explicitly says "copper customer".
-
-    Returns dot_status values for use throughout the code:
-    - "lead" (GREEN): non-customer, fiber eligible
-    - "copper_upgrade" (ORANGE): copper customer, fiber eligible (upgrade)
-    - "customer" (GREY): fiber customer, skip
-    - "unknown_customer" (UNKNOWN): customer, undecodable build code
+    Uses classify_hunter_record() as the single source of truth.
+    Returns dot_status for use throughout the code.
     """
-    # First check if status explicitly names this a copper customer
-    status_text = (ld.get("status") or "").lower() if isinstance(ld.get("status"), str) else ""
-    if "copper" in status_text:
-        return "copper_upgrade"
-
-    # Otherwise use backend_classifier as sole source of truth
-    backend_result = backend_classify_lead(ld)
-
-    # Map backend classifier results to dot_status values
-    if backend_result == "GREEN":
-        return "lead"
-    elif backend_result == "GOLD":
-        return "copper_upgrade"
-    elif backend_result == "GREY":
-        return "customer"
-    elif backend_result == "CUSTOMER":
-        return "unknown_customer"
-    else:  # SKIP or anything unexpected
-        return "skip"
+    classification = classify_hunter_record(ld)
+    return _DOT_STATUS_MAP.get(classification, "skip")
 POPUP_POLL_INTERVAL = 0.12    # poll the popup instead of fixed sleeps
 POPUP_POLL_TIMEOUT = 2.0      # per click attempt
 CLICK_OFFSETS = [(0, 0), (3, 0), (-3, 0), (0, 3), (0, -3)]   # retry spiral
@@ -2780,7 +2778,7 @@ class NetCapture:
                 for r in new_rows[:20]:
                     print("   + %s | %s" % (r[0], r[1]))
             else:
-                _n = commit_rows(ws, "Precise Fiber", new_rows)
+                _n, _failed = commit_rows(ws, "Precise Fiber", new_rows)
                 for _k in staged_keys[:_n]:
                     seen.add(_k)          # only what Google actually acknowledged
                 _greens = sum(1 for r in new_rows if r[1] == "GREEN")
@@ -3327,14 +3325,15 @@ def _park_batch(tab, rows):
 
 
 def commit_rows(ws, tab, rows, tries=3):
-    """Append rows and return the count Google ACKED. Never raises.
+    """Append rows and return (committed_count, failed_count). Never raises.
 
     Rows that cannot be committed are parked on disk. The caller must not treat
     an uncommitted row as captured.
     """
     if ws is None or not rows:
-        return 0
-    done = 0
+        return 0, 0
+    committed = 0
+    failed = 0
     for i in range(0, len(rows), 500):
         batch = rows[i:i + 500]
         ok = False
@@ -3349,13 +3348,14 @@ def commit_rows(ws, tab, rows, tries=3):
                 if attempt + 1 < tries:
                     time.sleep(2 ** attempt)
         if ok:
-            done += len(batch)
+            committed += len(batch)
             print("   SHEET COMMITTED %s batch=%d" % (tab, len(batch)))
         else:
+            failed += len(batch)
             _park_batch(tab, batch)
             if _DEDUPE_REPORT:
                 _DEDUPE_REPORT.failed_writes += len(batch)
-    return done
+    return committed, failed
 
 
 def replay_pending(sh, log=print):
@@ -3381,7 +3381,7 @@ def replay_pending(sh, log=print):
         except Exception as e:
             log("   (cannot replay %s: %s)" % (name, str(e)[:60]))
             continue
-        got = commit_rows(ws, blob["tab"], blob.get("rows") or [])
+        got, _ = commit_rows(ws, blob["tab"], blob.get("rows") or [])
         if got:
             total += got
             try:
@@ -3441,7 +3441,7 @@ def write_grey_dots(sh, records):
                      r.get("operator") or OPERATOR()])
     if not rows:
         return 0
-    written = commit_rows(ws, GREY_TAB, rows)
+    written, _ = commit_rows(ws, GREY_TAB, rows)
     for keys in staged[:written]:
         seen.update(keys)
     stage(grey_committed=written)
@@ -3491,7 +3491,7 @@ def write_unknown_dots(sh, records):
         seen[addr.upper()] = True
     if not rows:
         return 0
-    written = commit_rows(ws, UNKNOWN_TAB, rows)
+    written, _ = commit_rows(ws, UNKNOWN_TAB, rows)
     stage(unknown_committed=written)
     if written:
         print("   %d undecodable customer(s) -> '%s'" % (written, UNKNOWN_TAB))
@@ -3556,7 +3556,7 @@ def write_gold_recheck(sh, records):
                      r.get("operator") or OPERATOR()])
     if not rows:
         return 0
-    written = commit_rows(ws, RECHECK_TAB, rows)
+    written, _ = commit_rows(ws, RECHECK_TAB, rows)
     for keys in staged[:written]:
         seen.update(keys)            # only what actually landed
     if written:
@@ -3636,7 +3636,7 @@ def write_gold_dots(sh, records):
         return 0
 
     stage(gold_queued=len(rows), gold_attempted=len(rows))
-    written = commit_rows(gw, GOLD_TAB, rows)
+    written, _ = commit_rows(gw, GOLD_TAB, rows)
     stage(gold_committed=written, gold_seen=written,
           gold_pending=len(rows) - written)
     for keys in staged[:written]:
