@@ -2580,7 +2580,8 @@ class NetCapture:
             # Being in Precise Fiber now suppresses only the Precise Fiber ROW.
             # Classification still runs, and gold/grey/recheck still route --
             # each of those tabs carries its own dedupe, so nothing duplicates.
-            _already = key in seen
+            # TESTING: bypass already_scanned check to isolate classification.
+            _already = False  # key in seen  # DISABLED FOR TEST
             if not _already:
                 staged_keys.append(key)   # NOT seen until the write is ACKed
             dot_status = classify_lead(ld)
