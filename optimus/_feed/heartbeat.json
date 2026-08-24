@@ -1,71 +1,21 @@
 {
- "run_id": "20260823-202714",
+ "run_id": "20260823-202953",
  "operator": "Patrick",
  "machine": "LAPTOP-FJEEPATI",
  "build_fingerprint": "18688412",
  "mode": "",
- "updated_at": "2026-08-23 20:35:11",
- "last_phase": "pass_done",
+ "updated_at": "2026-08-23 20:50:28",
+ "last_phase": "exit",
  "phases": [
   [
-   "playwright_up",
-   "20:27:47",
+   "start",
+   "20:29:53",
    0.0
   ],
   [
-   "chromium_up",
-   "20:27:56",
-   8.6
-  ],
-  [
-   "browser_up",
-   "20:28:00",
-   12.8
-  ],
-  [
-   "page_loaded",
-   "20:28:07",
-   19.4
-  ],
-  [
-   "LOGGED_OUT",
-   "20:28:13",
-   26.2
-  ],
-  [
-   "logged_in",
-   "20:28:59",
-   71.7
-  ],
-  [
-   "sheet_open",
-   "20:29:18",
-   90.4
-  ],
-  [
-   "resume_loaded",
-   "20:29:31",
-   104.3
-  ],
-  [
-   "wait_done",
-   "20:29:52",
-   124.9
-  ],
-  [
-   "diag_done",
-   "20:29:59",
-   131.5
-  ],
-  [
-   "sweep_start",
-   "20:30:06",
-   139.3
-  ],
-  [
-   "pass_done",
-   "20:35:11",
-   443.4
+   "exit",
+   "20:50:28",
+   1235.1
   ]
  ]
 }
