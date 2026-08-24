@@ -1917,6 +1917,11 @@ class NetCapture:
                         return
                 except Exception:
                     return
+                # An image is not a failed payload. Running one through the
+                # JSON parser produced pages of "NOT JSON -- \x89PNG" noise and
+                # buried the one reply that mattered.
+                if _FEED and _FEED.is_binary(body):
+                    return
                 try:
                     data = json.loads(body)
                 except Exception:

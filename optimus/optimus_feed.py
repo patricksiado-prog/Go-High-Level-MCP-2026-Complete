@@ -73,8 +73,29 @@ def note(address, lat, lng, ban, build_code, classification, color):
 
 
 _EMPTY = []
-EMPTY_CAP = 3             # specimens kept
+EMPTY_CAP = 6             # specimens kept
 EMPTY_BYTES = 4000        # per specimen
+
+# Binary bodies are not failed JSON, they are images. Running them through the
+# parser produced "NOT JSON -- First 120 chars: \x89PNG" noise that FILLED the
+# evidence buffer, so the one specimen that mattered -- a 200 carrying real JSON
+# that yielded zero leads -- was dropped before it could be read. Seen live
+# 2026-08-23 on the first run that ever reached delivery=DATA_OK.
+_BINARY_MAGIC = (b"\x89PNG", b"\xff\xd8\xff", b"GIF8", b"RIFF", b"\x00\x00\x01\x00",
+                 b"%PDF", b"wOFF", b"wOF2", b"\x1f\x8b")
+
+
+def is_binary(body):
+    """True for an image/font/archive body -- never a failed JSON payload."""
+    try:
+        if isinstance(body, str):
+            body = body.encode("utf-8", "ignore")
+        head = (body or b"")[:8]
+        if any(head.startswith(m) for m in _BINARY_MAGIC):
+            return True
+        return b"\x00" in (body or b"")[:512]      # NUL bytes: not text
+    except Exception:
+        return False
 
 
 def note_empty(url, content_type, body):
@@ -83,10 +104,25 @@ def note_empty(url, content_type, body):
     This is the failure that has cost the most time: AT&T answers, the bytes
     arrive, and nothing comes out. Without the body there is no way to tell an
     auth redirect from a changed payload shape from an empty viewport.
+
+    Specimens are NOT first-come. A short redirect notice is nearly worthless;
+    a 200 carrying JSON that yielded no leads is the whole answer. When the
+    buffer is full, a valuable specimen evicts a worthless one.
     """
     try:
+        if is_binary(body):
+            return                    # an image is not a failed payload
+        valuable = ("HTTP " not in str(body or "")[:8]
+                    and len(str(body or "")) > 200)
         if len(_EMPTY) >= EMPTY_CAP:
-            return
+            if not valuable:
+                return
+            for i, e in enumerate(_EMPTY):
+                if e.get("total_bytes", 0) <= 200:
+                    _EMPTY.pop(i)     # drop a redirect notice for real evidence
+                    break
+            else:
+                return
         if isinstance(body, bytes):
             body = body.decode("utf-8", "replace")
         body = str(body or "")
