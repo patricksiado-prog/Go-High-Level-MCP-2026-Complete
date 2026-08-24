@@ -88,6 +88,7 @@ import os, sys, time, argparse, re
 import json
 import threading
 
+from backend_classifier import classify_lead as backend_classify_lead
 from optimus_dot_detect import (GREEN_MIN, GREEN_MAX, GOLD_MIN, GOLD_MAX,
                                 GRAY_MIN, GRAY_MAX, classify_status,
                                 is_customer_ban,
@@ -114,6 +115,8 @@ OUT_TAB = "TEST-Green-2026-08-24"
 GOLD_TAB = "TEST-Gold-2026-08-24"         # EVERY gold (copper-upgrade) dot address -- all of
                                # them, not just business matches. For analysis +
                                # calling the upgrades first (Patrick, 2026-08-18).
+GREY_TAB = "TEST-Grey-2026-08-24"        # existing fiber customers
+UNKNOWN_TAB = "TEST-Unknown-2026-08-24"  # customer, undecodable build code
 STATUS_TAB = "Hunter Status"   # live "what it's doing" log, on Drive in the same sheet
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
           "https://www.googleapis.com/auth/drive"]
@@ -633,10 +636,36 @@ def classify_wire(status, ban, raw):
 
 
 def classify_lead(ld):
-    """Build-code-aware classification for a captured lead dict."""
-    return classify_wire(
-        ld.get("status") if isinstance(ld.get("status"), str) else None,
-        ld.get("ban"), ld.get("raw"))
+    """Unified classifier: backend_classifier + wire-status override.
+
+    Uses backend_classifier.classify_lead() as the single source of truth.
+    Overrides only when status explicitly says "copper customer".
+
+    Returns dot_status values for use throughout the code:
+    - "lead" (GREEN): non-customer, fiber eligible
+    - "copper_upgrade" (ORANGE): copper customer, fiber eligible (upgrade)
+    - "customer" (GREY): fiber customer, skip
+    - "unknown_customer" (UNKNOWN): customer, undecodable build code
+    """
+    # First check if status explicitly names this a copper customer
+    status_text = (ld.get("status") or "").lower() if isinstance(ld.get("status"), str) else ""
+    if "copper" in status_text:
+        return "copper_upgrade"
+
+    # Otherwise use backend_classifier as sole source of truth
+    backend_result = backend_classify_lead(ld)
+
+    # Map backend classifier results to dot_status values
+    if backend_result == "GREEN":
+        return "lead"
+    elif backend_result == "GOLD":
+        return "copper_upgrade"
+    elif backend_result == "GREY":
+        return "customer"
+    elif backend_result == "CUSTOMER":
+        return "unknown_customer"
+    else:  # SKIP or anything unexpected
+        return "skip"
 POPUP_POLL_INTERVAL = 0.12    # poll the popup instead of fixed sleeps
 POPUP_POLL_TIMEOUT = 2.0      # per click attempt
 CLICK_OFFSETS = [(0, 0), (3, 0), (-3, 0), (0, 3), (0, -3)]   # retry spiral
@@ -2566,8 +2595,9 @@ class NetCapture:
             # the uploader process ships them. A write CANNOT pause a pan.
             return self.flush_local(seen, area_label, dry)
         self.seen = seen
-        new_rows, new_records, staged_keys, grey_records = [], [], [], []
+        new_rows, new_records, staged_keys, grey_records, unknown_records = [], [], [], [], []
         grey_ct = 0                        # existing fiber customers in this batch
+        unknown_ct = 0                     # undecodable customer build codes
         while self.pending:
             ld = self.pending.pop()
             addr = (ld.get("address") or "").strip()
@@ -2651,6 +2681,16 @@ class NetCapture:
                 # it as evidence. The old row is left untouched.
                 _note_verification(ld, addr, "GOLD", "GREY")
                 continue   # GREY = existing fiber customer -> leave out
+            if dot_color(dot_status) == "UNKNOWN":
+                unknown_ct += 1
+                unknown_records.append({
+                    "address": addr, "lat": ld.get("lat"), "lng": ld.get("lng"),
+                    "build_code": _code,
+                    "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "city": ld.get("city") or "", "state": ld.get("state") or "",
+                    "zip": ld.get("zip") or "", "run_id": RUN_ID,
+                    "operator": OPERATOR()})
+                continue   # UNKNOWN = undecodable code -> separate tab
             ts = time.strftime("%Y-%m-%d %H:%M:%S")
             # clean columns + the business merged inline when the address matches a
             # scraped business: Address | Dot Color | Captured At | Business | Phone.
@@ -2768,6 +2808,12 @@ class NetCapture:
                 write_grey_dots(ws.spreadsheet, grey_records)
             except Exception as e:
                 print("   (grey dots skipped: %s)" % str(e)[:80])
+        # UNKNOWN DOTS: write undecodable customer build codes independently
+        if unknown_records and not (dry or ws is None):
+            try:
+                write_unknown_dots(ws.spreadsheet, unknown_records)
+            except Exception as e:
+                print("   (unknown dots skipped: %s)" % str(e)[:80])
         # COMBO: match these just-captured leads against the scraped businesses and
         # write any hits to the green/gold business tabs -- live, as we sweep.
         try:
@@ -3401,6 +3447,54 @@ def write_grey_dots(sh, records):
     stage(grey_committed=written)
     if written:
         print("   %d existing fiber customer(s) -> '%s'" % (written, GREY_TAB))
+    return written
+
+
+def write_unknown_dots(sh, records):
+    """Customers with undecodable build codes -> their own tab for analysis.
+
+    These should NOT go to the call list (gold) or be skipped (grey). They
+    are visible, auditable, and reviewable until their build code is confirmed.
+    """
+    sh = _as_spreadsheet(sh)
+    if sh is None or not records:
+        return 0
+    try:
+        try:
+            ws = sh.worksheet(UNKNOWN_TAB)
+        except Exception:
+            ws = sh.add_worksheet(title=UNKNOWN_TAB, rows="5000",
+                                  cols="10")
+            ws.append_row(["Address", "Captured At", "Lat", "Lng", "Build Code",
+                          "City", "State", "ZIP", "Run ID", "Operator"])
+            print("   created '%s' tab (undecodable customer build codes)" % UNKNOWN_TAB)
+    except Exception as e:
+        print("   (UNKNOWN TAB FAILED: %s)" % str(e)[:110])
+        return 0
+
+    seen, rows, staged = {}, [], []
+    for r in records:
+        addr = (r.get("address") or "").strip()
+        if not addr:
+            continue
+        if addr.upper() in seen:
+            continue
+        staged.append(addr.upper())
+        rows.append([addr, r.get("ts") or "",
+                     r.get("lat") if r.get("lat") is not None else "",
+                     r.get("lng") if r.get("lng") is not None else "",
+                     (r.get("build_code") or "").upper(),
+                     r.get("city") or "", r.get("state") or "",
+                     r.get("zip") or "",
+                     r.get("run_id") or RUN_ID,
+                     r.get("operator") or OPERATOR()])
+        seen[addr.upper()] = True
+    if not rows:
+        return 0
+    written = commit_rows(ws, UNKNOWN_TAB, rows)
+    stage(unknown_committed=written)
+    if written:
+        print("   %d undecodable customer(s) -> '%s'" % (written, UNKNOWN_TAB))
     return written
 
 
