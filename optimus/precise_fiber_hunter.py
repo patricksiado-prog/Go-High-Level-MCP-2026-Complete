@@ -2685,74 +2685,76 @@ class NetCapture:
                                 # Gold tab records a verdict and destroys the
                                 # evidence for it.
                                 "build_code": _code})
-        if not new_rows:
-            return 0
-        # GOLD CLUSTER ALERT: gold = copper-to-fiber UPGRADE prospects (hottest
-        # leads). If an unusually dense pocket shows up in one viewport, call it
-        # out loudly + log it to the status sheet + Drive so it's easy to work.
-        _golds = [r[0] for r in new_rows if r[1] in ("GOLD", "ORANGE")]
-        if len(_golds) >= GOLD_CLUSTER_ALERT:
-            print("\n" + "*" * 60)
-            print("  ** GOLD CLUSTER: %d gold (upgrade) dots in ONE view **" % len(_golds))
-            print("     e.g. " + " | ".join(_golds[:4]))
-            print("*" * 60 + "\n")
-            try:
-                drive_log("GOLD-CLUSTER %d in one view (area %s): %s" % (
-                    len(_golds), area_label, " | ".join(_golds[:6])))
+        # ROUTING: each destination (Green/Precise, Gold, Grey) writes independently.
+        # No destination depends on another having rows. This prevents early return
+        # from blocking writes.
+        if new_rows and not (dry or ws is None):
+            # GOLD CLUSTER ALERT: gold = copper-to-fiber UPGRADE prospects (hottest
+            # leads). If an unusually dense pocket shows up in one viewport, call it
+            # out loudly + log it to the status sheet + Drive so it's easy to work.
+            _golds = [r[0] for r in new_rows if r[1] in ("GOLD", "ORANGE")]
+            if len(_golds) >= GOLD_CLUSTER_ALERT:
+                print("\n" + "*" * 60)
+                print("  ** GOLD CLUSTER: %d gold (upgrade) dots in ONE view **" % len(_golds))
+                print("     e.g. " + " | ".join(_golds[:4]))
+                print("*" * 60 + "\n")
+                try:
+                    drive_log("GOLD-CLUSTER %d in one view (area %s): %s" % (
+                        len(_golds), area_label, " | ".join(_golds[:6])))
+                except Exception:
+                    pass
+                try:
+                    report_status(ws, area_label, "GOLD CLUSTER", found=len(_golds),
+                                  note="%d gold upgrade dots in one viewport" % len(_golds))
+                except Exception:
+                    pass
+            # NEW-FIBER CLUSTER ALERT: a viewport that is mostly GREEN (fiber eligible /
+            # NON-customer) with hardly any grey (existing customers) = a just-lit
+            # neighborhood. Logged to the 'New Fiber Alerts' tab so a phone alert can fire.
+            _greens = [r[0] for r in new_rows if r[1] == "GREEN"]
+            if len(_greens) >= NEW_FIBER_ALERT and len(_greens) >= 4 * grey_ct:
+                print("\n" + "=" * 60)
+                print("  >> NEW FIBER: %d green (eligible, NON-customer) dots, only %d "
+                      "existing customers -- looks freshly lit <<" % (len(_greens), grey_ct))
+                print("     e.g. " + " | ".join(_greens[:4]))
+                print("=" * 60 + "\n")
+                try:
+                    drive_log("NEW-FIBER %d green / %d grey (area %s): %s" % (
+                        len(_greens), grey_ct, area_label, " | ".join(_greens[:6])))
+                except Exception:
+                    pass
+                try:
+                    _log_new_fiber_alert(ws, area_label, _greens, grey_ct)
+                except Exception:
+                    pass
+        # GREEN / PRECISE FIBER: write eligible addresses
+        if new_rows:
+            for rec in new_records:        # local backup (no quota)
+                append_jsonl(rec)
+            try:    # sample addresses to the Drive log so Claude can verify accuracy
+                drive_log("ADDRS +%d e.g.: %s" % (
+                    len(new_rows), " | ".join(r[0] for r in new_rows[:4])))
             except Exception:
                 pass
-            try:
-                report_status(ws, area_label, "GOLD CLUSTER", found=len(_golds),
-                              note="%d gold upgrade dots in one viewport" % len(_golds))
-            except Exception:
-                pass
-        # NEW-FIBER CLUSTER ALERT: a viewport that is mostly GREEN (fiber eligible /
-        # NON-customer) with hardly any grey (existing customers) = a just-lit
-        # neighborhood. Logged to the 'New Fiber Alerts' tab so a phone alert can fire.
-        _greens = [r[0] for r in new_rows if r[1] == "GREEN"]
-        if len(_greens) >= NEW_FIBER_ALERT and len(_greens) >= 4 * grey_ct:
-            print("\n" + "=" * 60)
-            print("  >> NEW FIBER: %d green (eligible, NON-customer) dots, only %d "
-                  "existing customers -- looks freshly lit <<" % (len(_greens), grey_ct))
-            print("     e.g. " + " | ".join(_greens[:4]))
-            print("=" * 60 + "\n")
-            try:
-                drive_log("NEW-FIBER %d green / %d grey (area %s): %s" % (
-                    len(_greens), grey_ct, area_label, " | ".join(_greens[:6])))
-            except Exception:
-                pass
-            try:
-                _log_new_fiber_alert(ws, area_label, _greens, grey_ct)
-            except Exception:
-                pass
-        for rec in new_records:        # local backup (no quota)
-            append_jsonl(rec)
-        try:    # sample addresses to the Drive log so Claude can verify accuracy
-            drive_log("ADDRS +%d e.g.: %s" % (
-                len(new_rows), " | ".join(r[0] for r in new_rows[:4])))
-        except Exception:
-            pass
-        if dry or ws is None:
-            for r in new_rows[:20]:
-                print("   + %s | %s" % (r[0], r[1]))
-        else:
-            _n = commit_rows(ws, "Precise Fiber", new_rows)
-            for _k in staged_keys[:_n]:
-                seen.add(_k)          # only what Google actually acknowledged
-            _greens = sum(1 for r in new_rows if r[1] == "GREEN")
-            stage(green_queued=_greens,
-                  green_committed=int(_greens * _n / max(1, len(new_rows))))
-            if _n < len(new_rows):
-                print("   %d of %d row(s) did NOT commit -- parked for retry, "
-                      "and NOT marked seen, so the next sweep picks them up."
-                      % (len(new_rows) - _n, len(new_rows)))
-        # GOLD DOTS: write EVERY gold (copper-upgrade) dot to its own tab -- all
-        # of them, not just business matches. Upgrade leads are the easiest call.
-        if not (dry or ws is None):
+            if dry or ws is None:
+                for r in new_rows[:20]:
+                    print("   + %s | %s" % (r[0], r[1]))
+            else:
+                _n = commit_rows(ws, "Precise Fiber", new_rows)
+                for _k in staged_keys[:_n]:
+                    seen.add(_k)          # only what Google actually acknowledged
+                _greens = sum(1 for r in new_rows if r[1] == "GREEN")
+                stage(green_queued=_greens,
+                      green_committed=int(_greens * _n / max(1, len(new_rows))))
+                if _n < len(new_rows):
+                    print("   %d of %d row(s) did NOT commit -- parked for retry, "
+                          "and NOT marked seen, so the next sweep picks them up."
+                          % (len(new_rows) - _n, len(new_rows)))
+        # GOLD DOTS: write EVERY gold (copper-upgrade) dot to its own tab independently
+        if new_records and not (dry or ws is None):
             try:
                 ng = write_gold_dots(ws.spreadsheet, new_records)
                 write_gold_recheck(ws.spreadsheet, new_records)
-                write_grey_dots(ws.spreadsheet, grey_records)
                 if ng:
                     print("   + %d gold (upgrade) dots -> '%s' tab" % (ng, GOLD_TAB))
                 # Evidence from this batch: dots we had already called gold that
@@ -2760,6 +2762,12 @@ class NetCapture:
                 _flush_verification(ws.spreadsheet)
             except Exception as e:
                 print("   (gold dots skipped: %s)" % str(e)[:80])
+        # GREY DOTS: write existing fiber customers independently
+        if grey_records and not (dry or ws is None):
+            try:
+                write_grey_dots(ws.spreadsheet, grey_records)
+            except Exception as e:
+                print("   (grey dots skipped: %s)" % str(e)[:80])
         # COMBO: match these just-captured leads against the scraped businesses and
         # write any hits to the green/gold business tabs -- live, as we sweep.
         try:
@@ -2786,9 +2794,13 @@ class NetCapture:
             if not addr:
                 continue
             key = addr.upper()
-            if key in seen:
-                continue
-            seen.add(key)
+            # DEDUPE: For test mode, disable seen check so all records are
+            # classified. Permanently, mark seen only after successful uploader
+            # persistence (seen ⊆ committed rule). Currently dedupe is OFF to
+            # allow GOLD/GREY reclassification during test.
+            # if key in seen:
+            #     continue
+            # seen.add(key)
             dot_status = classify_lead(ld)
             # Split mode must not drop GREY like the old code did. Production path
             # routes GREY to the Grey Dots tab; split-mode uploader respects
