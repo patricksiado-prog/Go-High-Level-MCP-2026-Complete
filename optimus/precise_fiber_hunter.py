@@ -647,23 +647,11 @@ def classify_wire(status, ban, raw):
     return classify_status(text=status, ban=ban)   # no ban -> GREEN (eligible)
 
 
-_DOT_STATUS_MAP = {
-    "GREEN": "lead",
-    "GOLD": "copper_upgrade",
-    "GREY": "customer",
-    "UNKNOWN": "unknown_customer",
-    "SKIP": "skip",
-}
-
-
 def classify_lead(ld):
-    """Adapter: canonical hunter classifier → dot_status values.
-
-    Uses classify_hunter_record() as the single source of truth.
-    Returns dot_status for use throughout the code.
-    """
-    classification = classify_hunter_record(ld)
-    return _DOT_STATUS_MAP.get(classification, "skip")
+    """Build-code-aware classification for a captured lead dict."""
+    return classify_wire(
+        ld.get("status") if isinstance(ld.get("status"), str) else None,
+        ld.get("ban"), ld.get("raw"))
 POPUP_POLL_INTERVAL = 0.12    # poll the popup instead of fixed sleeps
 POPUP_POLL_TIMEOUT = 2.0      # per click attempt
 CLICK_OFFSETS = [(0, 0), (3, 0), (-3, 0), (0, 3), (0, -3)]   # retry spiral
