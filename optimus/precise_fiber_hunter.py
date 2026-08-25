@@ -7195,6 +7195,38 @@ def _wait_for_start(secs):
     return False
 
 
+def _mark_profile_clean(profile_dir):
+    """Stop Chromium's "Restore pages?" bubble coming back every launch.
+
+    We cause it ourselves: Ctrl+Shift+K is os._exit, so Chromium never gets to
+    write a clean shutdown, and the next launch opens with a restore bubble
+    sitting over the map. It can cover the very dots we are about to read, and
+    on a bad day it eats the first click. Chromium decides this from two keys in
+    the profile's Preferences, so set them before launch. Best-effort: a missing
+    or unreadable Preferences file just means a first run.
+    """
+    for name in ("Default", ""):
+        pref = os.path.join(profile_dir, name, "Preferences") if name else \
+            os.path.join(profile_dir, "Preferences")
+        if not os.path.exists(pref):
+            continue
+        try:
+            with open(pref, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            prof = data.setdefault("profile", {})
+            if (prof.get("exit_type") == "Normal"
+                    and prof.get("exited_cleanly") is True):
+                continue                       # already clean, don't rewrite
+            prof["exit_type"] = "Normal"
+            prof["exited_cleanly"] = True
+            tmp = pref + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+            os.replace(tmp, pref)              # atomic: never half a Preferences
+        except Exception:
+            pass
+
+
 def main():
     self_update()
     # Configured FIRST so every later milestone can be pushed live. A run that
@@ -7388,6 +7420,7 @@ def main():
             print("  Optimus Fiber Hunter window is already open, CLOSE THIS ONE")
             print("  -- two hunters cannot share one browser profile, and the")
             print("  second to start will die immediately.")
+        _mark_profile_clean(PROFILE_DIR)
         ctx = pw.chromium.launch_persistent_context(
             PROFILE_DIR, headless=False,
             viewport=VIEWPORT,
@@ -7397,6 +7430,12 @@ def main():
             # (Chrome otherwise throttles or discards it, dropping the GL context),
             # and don't let the tab be memory-saver-discarded mid-run.
             args=["--start-maximized",
+                  # belt and braces with _mark_profile_clean(): no restore
+                  # bubble, no session-restore prompt over the map
+                  "--hide-crash-restore-bubble",
+                  "--disable-session-crashed-bubble",
+                  "--no-first-run",
+                  "--no-default-browser-check",
                   "--disable-background-timer-throttling",
                   "--disable-renderer-backgrounding",
                   "--disable-backgrounding-occluded-windows",
