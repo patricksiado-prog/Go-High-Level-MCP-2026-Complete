@@ -445,9 +445,10 @@ def open_sheet():
         try:
             ws = sh.worksheet(SHEET_TAB)
         except Exception:
-            ws = sh.add_worksheet(title=SHEET_TAB, rows="20000", cols="5")
+            ws = sh.add_worksheet(title=SHEET_TAB, rows="20000", cols="7")
         if not ws.get_all_values():
-            ws.append_row(["Name", "Address", "Phone", "Website", "Category"])
+            ws.append_row(["Name", "Address", "Phone", "Website", "Category",
+                           "Resi?", "Cell?"])
         seen = set()
         try:
             for r in ws.get_all_values()[1:]:
@@ -474,7 +475,8 @@ def open_sheet():
 # ---------------------------------------------------------------------------
 GREEN_BIZ_TAB = "Fiber Green Biz"
 ORANGE_BIZ_TAB = "Upgrade Orange Biz"
-BIZ_HEADER = ["Business Name", "Phone", "Address", "Website", "Category"]
+BIZ_HEADER = ["Business Name", "Phone", "Address", "Website", "Category",
+              "Resi?", "Cell?"]
 _SUF = {"ST": "ST", "STREET": "ST", "AVE": "AVE", "AV": "AVE", "AVENUE": "AVE",
         "RD": "RD", "ROAD": "RD", "DR": "DR", "DRIVE": "DR", "LN": "LN", "LANE": "LN",
         "BLVD": "BLVD", "BOULEVARD": "BLVD", "CT": "CT", "COURT": "CT", "PL": "PL",
@@ -508,11 +510,62 @@ def _norm_addr(a):
     return "%s|%s" % (h, " ".join(rest))
 
 
+# ---- RESI / CELL INDICATORS (Patrick, 2026-08-25) -------------------------
+# A scraped "business" run out of a house is BOTH a business lead and a resi
+# fiber lead, and the two get pitched differently. Street type carries that
+# signal reliably; suite/floor markers carry the opposite one.
+_RESI_ST = ("LN", "LANE", "CT", "COURT", "CIR", "CIRCLE", "PL", "PLACE",
+            "DR", "DRIVE", "WAY", "TRL", "TRAIL", "CV", "COVE", "TER",
+            "TERRACE", "LOOP", "BND", "BEND", "RUN", "HOLLOW", "MEADOW")
+_BIZ_ST = ("HWY", "HIGHWAY", "FWY", "FREEWAY", "BLVD", "BOULEVARD", "PKWY",
+           "PARKWAY", "PLZ", "PLAZA", "EXPY", "EXPRESSWAY")
+_UNIT_BIZ = ("STE", "SUITE", "FL ", "FLOOR", "BLDG", "BUILDING", "RM ", "ROOM")
+
+
+def resi_hint(address):
+    """RESI / BIZ / "?" from the shape of the address. A hint, not a verdict --
+    it is here so a rep can see at a glance which rows are houses."""
+    a = " " + (address or "").upper().replace(",", " ") + " "
+    if any(m in a for m in _UNIT_BIZ):
+        return "BIZ"
+    if " APT " in a or "#" in a:
+        return "RESI"
+    toks = a.split()
+    for t in reversed(toks):
+        t = t.strip(".")
+        if t in _BIZ_ST:
+            return "BIZ"
+        if t in _RESI_ST:
+            return "RESI"
+    return "?"
+
+
+_TOLL_FREE = ("800", "888", "877", "866", "855", "844", "833", "822")
+
+
+def cell_hint(phone):
+    """Can we TEXT this number?
+
+    Honest by design. Toll-free is a definite no. Everything else needs a real
+    carrier lookup (DealMachine) -- about 12% of these come back landline-only,
+    and texting a landline is Twilio 30006 against our own sending number. So
+    unknown says LOOKUP, never a guess dressed up as an answer.
+    """
+    d = re.sub(r"[^0-9]", "", str(phone or ""))
+    if len(d) == 11 and d.startswith("1"):
+        d = d[1:]
+    if len(d) != 10:
+        return ""
+    if d[:3] in _TOLL_FREE:
+        return "NO toll-free"
+    return "LOOKUP"
+
+
 def _ensure_match_tab(sh, title):
     try:
         ws = sh.worksheet(title)
     except Exception:
-        ws = sh.add_worksheet(title=title, rows="200", cols="5")
+        ws = sh.add_worksheet(title=title, rows="200", cols="7")
     if not ws.get_all_values():
         ws.append_row(BIZ_HEADER)
     return ws
@@ -571,7 +624,7 @@ def _match_new(new):
             continue
         au = (addr or "").strip().upper()
         pu = (phone or "").strip().upper()   # dedupe by PHONE too (dialer-ready)
-        row = [name, phone, addr, web, cat]
+        row = [name, phone, addr, web, cat, resi_hint(addr), cell_hint(phone)]
         if color == "ORANGE":
             if (au and au in _MATCH["orange_seen"]) or (pu and pu in _MATCH["orange_ph"]):
                 continue
@@ -878,8 +931,10 @@ def append_sheet(ws, rows, sheet_seen):
         if key in sheet_seen:
             continue
         sheet_seen.add(key)
-        new.append([r.get("name") or "", r.get("address") or "", r.get("phone") or "",
-                    r.get("website") or "", r.get("category") or ""])
+        _a, _p = r.get("address") or "", r.get("phone") or ""
+        new.append([r.get("name") or "", _a, _p,
+                    r.get("website") or "", r.get("category") or "",
+                    resi_hint(_a), cell_hint(_p)])
     if not new:
         return 0
     try:

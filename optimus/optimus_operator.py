@@ -72,7 +72,10 @@ def _tidy(name):
     # Title-case lowercase input and leave mixed-case alone, so "McGrew" keeps
     # its shape. SHORT all-caps is left alone too -- "JD" is a name here
     # (JD Dunn) and "Jd" is just wrong.
-    if s.islower() or (s.isupper() and len(s) > 3):
+    # Initials are short all-caps ON PURPOSE (Patrick, 2026-08-25: operators
+    # type initials now, they do not pick from a menu). "PS" and "PSJR" must
+    # survive; only a shouted full name gets title-cased.
+    if s.islower() or (s.isupper() and len(s) > 5):
         s = s.title()
     return s
 
@@ -114,37 +117,43 @@ def _can_prompt(auto=False):
 
 
 def _ask():
-    """The numbered menu. Returns "" if the person just hits Enter or the
-    console can't be read -- the caller falls back to the hostname."""
+    """Ask for INITIALS and return them. "" if the person just hits Enter or
+    the console can't be read -- the caller falls back to the hostname.
+
+    Was a numbered menu of six known names. Patrick, 2026-08-25: type initials,
+    don't pick. A menu goes stale the moment somebody new picks up a laptop, and
+    a stamp is for telling sweeps apart, not for looking pretty.
+    """
     print("")
     print("=" * 68)
     print("  WHO IS RUNNING THIS SCAN?")
     print("=" * 68)
-    print("  Every address you capture gets stamped with your name, so we can")
-    print("  see whose sweeps are working. You only have to answer this once.")
+    print("  Type your INITIALS. Every address you capture is stamped with")
+    print("  them, so we can see whose sweeps are working.")
+    print("  Asked once on this PC -- it remembers after that.")
     print("")
-    for i, nm in enumerate(KNOWN_OPERATORS, 1):
-        print("    %d) %s" % (i, nm))
-    print("    or just type your name")
-    print("")
-    try:
-        raw = input("  Name or number: ").strip()
-    except Exception:
-        return ""
-    if not raw:
-        return ""
-    if raw.isdigit():
-        i = int(raw)
-        if 1 <= i <= len(KNOWN_OPERATORS):
-            return KNOWN_OPERATORS[i - 1]
-        # A number outside the menu is a typo, not a name. Asking again beats
-        # silently saving "7" as somebody's identity for the next six months.
-        print("  (%s isn't on the list -- type your name instead)" % raw)
+    for attempt in (1, 2):
         try:
-            raw = input("  Name: ").strip()
+            raw = input("  Initials (2-5 letters): ").strip()
         except Exception:
             return ""
-    return _tidy(raw)
+        if not raw:
+            return ""
+        # Keep letters only: "p.s." and "P S" are both PS. A digit in a stamp
+        # is a typo we would be reading in the sheet for months.
+        clean = re.sub(r"[^A-Za-z]", "", raw)
+        if 1 <= len(clean) <= 5:
+            return clean.upper()
+        if len(clean) > 5:
+            # They typed a name. Take the initials off it rather than reject
+            # somebody who answered a reasonable question reasonably.
+            parts = [w for w in re.split(r"[^A-Za-z]+", raw) if w]
+            if len(parts) > 1:
+                return "".join(w[0] for w in parts[:4]).upper()
+            return clean[:2].upper()
+        if attempt == 1:
+            print("  (letters only, 2-5 of them -- e.g. PS)")
+    return ""
 
 
 def resolve(cli_value=None, auto=False, force_ask=False):

@@ -889,6 +889,10 @@ _STOP = [False]
 # re-aim was to kill the program and relaunch, which costs a browser start, a
 # login, and the run's dedupe memory.
 _PAUSE = [False]
+# Ctrl+G means GO in two situations: resume from a pause, and skip the opening
+# countdown. One flag for the second, so the countdown never waits on a key it
+# cannot see.
+_GO_NOW = [False]
 _PAUSE_FLAG = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            "PAUSED.flag")
 
@@ -929,6 +933,47 @@ def pause_gate(page=None):
     return True
 
 
+def countdown_to_start(secs=10):
+    """Hold before the FIRST pan so the map can be aimed by hand.
+
+    The map opens wherever the ZIP search put it (or wherever the last session
+    left it) and the hunter used to start dragging immediately -- if that view
+    was wrong, the first cells were already the wrong streets. Ten seconds is
+    enough to look at it. Every control works during the hold, and Ctrl+G cuts
+    it short. Skipped when nobody is at the keyboard.
+    """
+    if _STOP[0]:
+        return
+    try:
+        if not (sys.stdin and sys.stdin.isatty()):
+            return
+    except Exception:
+        return
+    _GO_NOW[0] = False
+    print("")
+    print("  Map is up. Sweep starts in %d seconds." % secs)
+    print("  Ctrl+G = go NOW    Ctrl+Shift+Pause = hold    Ctrl+Shift+S = stop")
+    for i in range(secs, 0, -1):
+        if _STOP[0] or _GO_NOW[0]:
+            break
+        if _PAUSE[0]:
+            pause_gate()
+            break
+        try:
+            sys.stdout.write("\r   starting in %2d ... " % i)
+            sys.stdout.flush()
+        except Exception:
+            pass
+        time.sleep(1)
+    try:
+        sys.stdout.write("\r" + " " * 32 + "\r")
+        sys.stdout.flush()
+    except Exception:
+        pass
+    if not _STOP[0]:
+        print("  GO.\n")
+
+
 def _start_stop_watcher():
     """Background watcher: if the mouse sits in the extreme top-left corner for
     ~1 second, set _STOP so the sweep ends cleanly (closes the browser, no auto-
@@ -967,8 +1012,10 @@ def _start_stop_watcher():
                 if _down(0x11) and _down(0x10) and (_down(0x13) or _down(0x50)):
                     if not _PAUSE[0]:
                         _set_paused(True)
-                # GO AGAIN: Ctrl+G -> resume from the CURRENT view. G=0x47.
+                # GO AGAIN: Ctrl+G -> resume from the CURRENT view, and skip
+                # the opening countdown. G=0x47.
                 if _down(0x11) and _down(0x47):
+                    _GO_NOW[0] = True
                     if _PAUSE[0]:
                         _set_paused(False)
                 # GENTLE STOP (keyboard): Ctrl+Shift+S -> finish this cell, close
@@ -7653,6 +7700,7 @@ def main():
             print("\n  WATCHING: pan the map by hand to new areas -- it grabs each "
                   "one off the server every %ds. Close the browser to stop.\n" % loop_secs)
         _start_stop_watcher()          # slam mouse to top-left corner to stop
+        countdown_to_start(10)         # aim the map by hand before it moves
         _phase("sweep_start")
         passno = 0
         while True:
