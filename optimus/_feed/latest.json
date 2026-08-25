@@ -1,18 +1,27 @@
 {
- "generated_at": "2026-08-25 02:01:44",
- "run_id": "20260825-015019",
+ "generated_at": "2026-08-25 02:32:37",
+ "run_id": "20260825-020742",
  "operator": "Patrick",
  "machine": "LAPTOP-FJEEPATI",
  "area": "",
- "build_fingerprint": "cc925241",
+ "build_fingerprint": "3b8259e8",
  "counts": {
-  "green": 0,
-  "fiber": 0,
-  "copper": 0,
-  "unknown": 0,
+  "green": 65208,
+  "fiber": 43624,
+  "copper": 322,
+  "unknown": 60,
   "no_code": 0
  },
- "undecoded_codes": {},
+ "undecoded_codes": {
+  "ip-co": {
+   "count": 108,
+   "sample_address": "700 N PEARL ST UNIT N202"
+  },
+  "fttb-c": {
+   "count": 12,
+   "sample_address": "1955 MARKET CENTER BLVD UNIT 1425"
+  }
+ },
  "dedupe": {
   "seen": 0,
   "written": 0,
@@ -29,65 +38,93 @@
  "phases": [
   [
    "start",
-   "01:50:54",
+   "02:07:47",
    0.0
   ],
   [
    "playwright_up",
-   "01:51:14",
-   19.6
+   "02:08:18",
+   30.4
   ],
   [
    "chromium_up",
-   "01:51:20",
-   26.2
+   "02:08:23",
+   36.4
   ],
   [
    "browser_up",
-   "01:51:23",
-   29.1
+   "02:08:26",
+   38.5
   ],
   [
    "page_loaded",
-   "01:51:28",
-   34.0
+   "02:08:30",
+   42.4
   ],
   [
    "LOGGED_OUT",
-   "01:51:34",
-   40.1
+   "02:08:32",
+   44.8
   ],
   [
-   "LOGIN_TIMEOUT",
-   "02:01:38",
-   644.0
+   "logged_in",
+   "02:09:36",
+   109.3
   ],
   [
-   "exit",
-   "02:01:42",
-   647.5
+   "sheet_open",
+   "02:09:48",
+   120.8
+  ],
+  [
+   "resume_loaded",
+   "02:09:57",
+   129.8
+  ],
+  [
+   "wait_done",
+   "02:11:29",
+   221.7
+  ],
+  [
+   "diag_done",
+   "02:11:34",
+   226.9
+  ],
+  [
+   "sweep_start",
+   "02:11:41",
+   234.1
+  ],
+  [
+   "pass_done",
+   "02:32:33",
+   1486.1
   ]
  ],
- "last_phase": "exit",
+ "last_phase": "pass_done",
  "stage_counters": {
   "auth_expired": 5,
-  "classified_green": 0,
-  "classified_gold": 0,
-  "classified_grey": 0,
-  "classified_unknown": 0
+  "parse_error": 2,
+  "serviceability_replies": 233,
+  "invalid_zero": 1,
+  "classified_green": 65208,
+  "classified_gold": 322,
+  "classified_grey": 43624,
+  "classified_unknown": 60
  },
  "crash": {},
  "wire_audit_records": 0,
  "wire_audit_by_colour": {},
  "capture_truth": {
-  "delivery": "AUTH_EXPIRED",
-  "raw_features": 0,
+  "delivery": "DATA_OK",
+  "raw_features": 109214,
   "rendered": null,
-  "classified": 0,
+  "classified": 109214,
   "written": 0,
-  "auth_ok": false,
-  "map_ok": null,
-  "zoom_ok": null,
+  "auth_ok": true,
+  "map_ok": false,
+  "zoom_ok": false,
   "notes": [
    "HTTP 301 REDIRECTED TO LOGIN -- not logged in, nothing lands",
    "HTTP 302 redirected -- session likely expired",
@@ -95,25 +132,22 @@
    "HTTP 302 redirected -- session likely expired",
    "SESSION EXPIRED -- AT&T sent a login page, not data. Log OUT of youachieve.att.com, close the browser, log back in, then re-run.",
    "access chooser, not the map",
-   "capture: NO serviceability responses seen -- the map isn't loading fiber data (check you're LOGGED IN and dots are visible)"
+   "NOT JSON -- AT&T sent something this parser cannot read. First 120 chars: <!DOCTYPE html> <html lang=\"en\">     <head>         <!-- The following 3 met",
+   "NOT JSON -- AT&T sent something this parser cannot read. First 120 chars: <!DOCTYPE html> <html lang=\"en\">     <head>         <!-- The following 3 met",
+   "mapbox MAP_NOT_READY / INVALID_ZERO",
+   "capture: OK: 233 serviceability responses -> 109214 leads"
   ]
  },
- "first_failure": "delivery",
+ "first_failure": "written",
  "capture_diagnostic": {
-  "serviceability_responses": 0,
-  "leads_decoded": 0,
-  "empty_payload_top_keys": null,
-  "capture_reason": "NO serviceability responses seen -- the map isn't loading fiber data (check you're LOGGED IN and dots are visible)"
+  "serviceability_responses": 233,
+  "leads_decoded": 109214,
+  "empty_payload_top_keys": "success,isSuspended,error",
+  "capture_reason": "OK: 233 serviceability responses -> 109214 leads"
  },
  "customer_specimens": [],
  "customer_specimen_count": 0,
  "zero_lead_responses": [
-  {
-   "url": "https://youachieve.att.com/yourefer/fiber",
-   "content_type": "text/html; charset=UTF-8",
-   "total_bytes": 63,
-   "body_head": "HTTP 301 -- REDIRECTED TO LOGIN -- not logged in, nothing lands"
-  },
   {
    "url": "https://youachieve.att.com/yourefer/fiber/",
    "content_type": "text/html;charset=UTF-8",
@@ -136,10 +170,22 @@
    "url": "https://oidc.idp.elogin.att.com/lrr/attLRR/LrrController?TAM_OP=token_login&USERNAME=unauthenticated&ERROR_CODE=0x00000000&ERROR_TEXT=HPDBA0521I%20%20%20Successful%20completion&METHOD=GET&URL=%2Fmga%2Fsps%2Foauth%2Foauth20%2Fauthorize%3Fresponse_mode%3Dform_post%26SAMLPartner%3Dhttps%253A%252F%252Fy",
    "content_type": "text/html;charset=utf-8",
    "total_bytes": 122111,
-   "body_head": "<!DOCTYPE html>\n\n\n\n\n\n\n\n\n\n<html id=\"html\" lang=\"en\">\n  <head>\n    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n    \n    \n    \n    \n    \n    \n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no\" >\n    <meta http-equiv=\"Content-Type\"  content=\"text/html; charset=utf-8\">\n    <title>AT&amp;T Security Server: Login</title>\n    <base href='/lrr/attLRR/'>\n    <link rel=\"stylesheet\" href=\"resources/static/styles/main.css?v16.1.21-20260612135918676\">\n    <link rel=\"stylesheet\" href=\"resources/static/styles/fonts.css?v16.1.21-20260612135918676\">\n    <link rel=\"stylesheet\" href=\"resources/static/styles/cato.css?v16.1.21-20260612135918676\">\n    <link rel=\"stylesheet\" href=\"resources/static/styles/checkbox.css?v16.1.21-20260612135918676\">\n    <script>\n      if ( typeof window.globals  === 'undefined')\n      {\n        window.globals={};\n      }\n    </script>\n    \n      \n        \n        <script>\n          globals.attUID = false;\n        </script>\n      \n      \n    \n\n    <!--[if lte IE 9]> <link rel=\"stylesheet\" type=\"text/css\" href=\"resources/static/styles/ie.css?v16.1.21-20260612135918676\" /> <![endif]-->\n    <script src=\"resources/v1/js/jquery-3.7.1.min.js\"></script>\n    <script src=\"resources/v1/js/jquery.blockUI.js\"></script>\n    <script src=\"resources/v1/js/haloeamSpinner.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/mk.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/utilities.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/static/scripts/script.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/static/scripts/backEndFunctions.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/ie7.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/passkey.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/frontEndLogging.js?v16.1.21-20260612135918676\"></script>\n\n    <script>\n      function getFaqLink( params )\n      {\n         var url = \"https://oidc.idp.elogin.att.com/faq/eiam/static/v2/resources/html/faq/FAQs_en.html?aa=prod\";\n         if ( params != null )\n         {\n             url = url + \"&\" + params;\n         }\n         window.open(url, \"_faq\");\n      }\n\n      globals = Object.assign({},globals, {\n  \"cspAReqLnk\": \"%2Fmga%2Fsps%2Foauth%2Foauth20%2Fauthorize%3Fresponse_mode%3Dform_post%26SAMLPartner%3Dhttps%253A%252F%252Fyouachieve.att.com%26claims%3D%257B%2522id_token%2522%253A%257B%2522authenticationTypes%2522%253A%257B%2522essential%2522%253Afalse%257D%257D%257D%26scope%3Dopenid%26Target%3Dhttps%253A%252F%252Fsaml.e-access.att.com%252Fisam%252Fsps%252Fattsamlidp_mfaia%252Fsaml20%252Flogininitial%253FRequestBinding%253DHTTPPost%2526PartnerId%253Dhttps%253A%252F%252Fyouachieve.att.com%2526RelayState%253Dhttps%253A%252F%252Fyouachieve.att.com%252Fyourefer%252Ffiber%252Findex.cfm%253F%2526CFID%253D4876658%2526CFTOKEN%253Dca0d0e7dcba4810b-CA820D4B-BEEE-A0E3-BBBB796E77204C41%26state%3DA39cabWmYw%26client_id%3DPassword-SAML-IDP%26nonce%3Df6aijsk8Ub%26redirect_uri%3Dhttps%253A%252F%252Fsaml.e-access.att.com%252Fisam%252Fsps%252Foidc%252Frp%252FSAML-IDP%252Fredirect%252FSAML-IDP-Password%26acr_values%3DMFAIA%26response_type%3Did_token\",\n  \"legacyCricketFlag\": false,\n  \"mkNativeLogoutUrl\": \"/pkmslogout?localLogout=true&retURL=\",\n  \"enableKeyBindings\": true,\n  \"winAuthAlways\": false,\n  \"defaultAuthenticationType\": \"lrrsecurityKey\",\n  \"ajaxStatusHandlerInfo\": {\n    \"0\": {\n      \"max_retries\": 10,\n      \"delayMS\": 1000\n    },\n    \"503\": {\n      \"max_retries\": 2,\n      \"delayMS\": 1000\n    }\n  },\n  \"referenceId\": \"naHxDZuBOQ7uw2jTkta72LKGXECcVB82uQx3jLcYCM\",\n  \"tokenLogin\": false,\n  \"protocol\": \"https\",\n  \"hostname\": \"oidc.idp.elogin.att.com\",\n  \"phase2LoginFormTypes\": {\n    \"auth\": \"passAuth\",\n    \"GlobalLoginPassword\": \"passAuth\",\n    \"GlobalLoginPasswordVerification\": \"passAuth\",\n    \"mobileKey\": \"mkpush\",\n    \"mobileKeyOTP"
+   "body_head": "<!DOCTYPE html>\n\n\n\n\n\n\n\n\n\n<html id=\"html\" lang=\"en\">\n  <head>\n    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n    \n    \n    \n    \n    \n    \n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no\" >\n    <meta http-equiv=\"Content-Type\"  content=\"text/html; charset=utf-8\">\n    <title>AT&amp;T Security Server: Login</title>\n    <base href='/lrr/attLRR/'>\n    <link rel=\"stylesheet\" href=\"resources/static/styles/main.css?v16.1.21-20260612135918676\">\n    <link rel=\"stylesheet\" href=\"resources/static/styles/fonts.css?v16.1.21-20260612135918676\">\n    <link rel=\"stylesheet\" href=\"resources/static/styles/cato.css?v16.1.21-20260612135918676\">\n    <link rel=\"stylesheet\" href=\"resources/static/styles/checkbox.css?v16.1.21-20260612135918676\">\n    <script>\n      if ( typeof window.globals  === 'undefined')\n      {\n        window.globals={};\n      }\n    </script>\n    \n      \n        \n        <script>\n          globals.attUID = false;\n        </script>\n      \n      \n    \n\n    <!--[if lte IE 9]> <link rel=\"stylesheet\" type=\"text/css\" href=\"resources/static/styles/ie.css?v16.1.21-20260612135918676\" /> <![endif]-->\n    <script src=\"resources/v1/js/jquery-3.7.1.min.js\"></script>\n    <script src=\"resources/v1/js/jquery.blockUI.js\"></script>\n    <script src=\"resources/v1/js/haloeamSpinner.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/mk.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/utilities.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/static/scripts/script.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/static/scripts/backEndFunctions.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/ie7.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/passkey.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/frontEndLogging.js?v16.1.21-20260612135918676\"></script>\n\n    <script>\n      function getFaqLink( params )\n      {\n         var url = \"https://oidc.idp.elogin.att.com/faq/eiam/static/v2/resources/html/faq/FAQs_en.html?aa=prod\";\n         if ( params != null )\n         {\n             url = url + \"&\" + params;\n         }\n         window.open(url, \"_faq\");\n      }\n\n      globals = Object.assign({},globals, {\n  \"cspAReqLnk\": \"%2Fmga%2Fsps%2Foauth%2Foauth20%2Fauthorize%3Fresponse_mode%3Dform_post%26SAMLPartner%3Dhttps%253A%252F%252Fyouachieve.att.com%26claims%3D%257B%2522id_token%2522%253A%257B%2522authenticationTypes%2522%253A%257B%2522essential%2522%253Afalse%257D%257D%257D%26scope%3Dopenid%26Target%3Dhttps%253A%252F%252Fsaml.e-access.att.com%252Fisam%252Fsps%252Fattsamlidp_mfaia%252Fsaml20%252Flogininitial%253FRequestBinding%253DHTTPPost%2526PartnerId%253Dhttps%253A%252F%252Fyouachieve.att.com%2526RelayState%253Dhttps%253A%252F%252Fyouachieve.att.com%252Fyourefer%252Ffiber%252Findex.cfm%253F%2526CFID%253D4876658%2526CFTOKEN%253Dca0d0e7dcba4810b-CA820D4B-BEEE-A0E3-BBBB796E77204C41%26state%3DQ8imYyH5QB%26client_id%3DPassword-SAML-IDP%26nonce%3DSnu2CmTy9d%26redirect_uri%3Dhttps%253A%252F%252Fsaml.e-access.att.com%252Fisam%252Fsps%252Foidc%252Frp%252FSAML-IDP%252Fredirect%252FSAML-IDP-Password%26acr_values%3DMFAIA%26response_type%3Did_token\",\n  \"legacyCricketFlag\": false,\n  \"mkNativeLogoutUrl\": \"/pkmslogout?localLogout=true&retURL=\",\n  \"enableKeyBindings\": true,\n  \"winAuthAlways\": false,\n  \"defaultAuthenticationType\": \"lrrsecurityKey\",\n  \"ajaxStatusHandlerInfo\": {\n    \"0\": {\n      \"max_retries\": 10,\n      \"delayMS\": 1000\n    },\n    \"503\": {\n      \"max_retries\": 2,\n      \"delayMS\": 1000\n    }\n  },\n  \"referenceId\": \"G1OyIfraIDlBZ5rs43CMcewmCXicVA79AdPorEAVY\",\n  \"tokenLogin\": false,\n  \"protocol\": \"https\",\n  \"hostname\": \"oidc.idp.elogin.att.com\",\n  \"phase2LoginFormTypes\": {\n    \"auth\": \"passAuth\",\n    \"GlobalLoginPassword\": \"passAuth\",\n    \"GlobalLoginPasswordVerification\": \"passAuth\",\n    \"mobileKey\": \"mkpush\",\n    \"mobileKeyOTP\""
+  },
+  {
+   "url": "https://youachieve.att.com/yourefer/fiber/index.cfm?",
+   "content_type": "text/html;charset=UTF-8",
+   "total_bytes": 18547,
+   "body_head": "\n\n<!DOCTYPE html>\n<html lang=\"en\">\n    <head>\n        <!-- The following 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->\n        <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge,chrome=1\" />\n        <meta charset=\"utf-8\" />\n        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n\n        \n                <link rel=\"icon\" type=\"image/png\" href=\"../../ui/img/YouRefer_rgb_pos.png\" />\n                \n\n        <!-- Additional Meta Tags -->\n        <meta name=\"description\" content=\"Example File\"> <META HTTP-EQUIV=\"Pragma\" CONTENT=\"no-cache\"> <META HTTP-EQUIV=\"Expires\" CONTENT=\"-1\"> \n\n        <!-- Site CSS Files -->\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/jquery/jquery-ui-1_14_1/jquery-ui.min.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/bootstrap.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/font-awesome.min.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/indexV2.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/you-perform.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/jquery/ui/tinymce/fonts.css\" />\n        \n\n        <!-- Page CSS Files -->\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"../../ui/css/jquery-ui.css\" />\n        \n\n        <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->\n        <!--[if lt IE 12]>\n          <script src=\"https://cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv.min.js\" integrity=\"sha512-UDJtJXfzfsiPPgnI5S1000FPLBHMhvzAMX15I+qG2E2OAzC9P1JzUwJOfnypXiOH7MRPaqzhPbBGDNNj7zBfoA==\" crossorigin=\"anonymous\" referrerpolicy=\"no-referrer\"></script>\n          <script src=\"https://cdnjs.cloudflare.com/ajax/libs/respond.js/1.4.2/respond.min.js\" integrity=\"sha512-qWVvreMuH9i0DrugcOtifxdtZVBBL0X75r9YweXsdCHtXUidlctw7NXg5KVP3ITPtqZ2S575A0wFkvgS2anqSA==\" crossorigin=\"anonymous\" referrerpolicy=\"no-referrer\"></script>\n        <![endif]-->\n\n        <title>you Refer - Submit Referral</title>\n    <script type=\"text/javascript\" src=\"https://youachieve.att.com/resources/4742a524ea328741d98ac6233c9dc954522001624dcc5\"  ></script></head>\n\n    <body style=\"background-color: #FFF;\">\n        <div id=\"appWrapper\">\n            \n            \n            \n            <div id=\"sidebar-wrapper-left\">\n                <ul class=\"sidebar-nav-left\">\n                    <li style=\"line-height: 56px; text-align:right;\"><button type=\"button\" class=\"btn btn-outline-blue menuLeftToggle\" style=\"margin-bottom: 8px; margin-top:8px; margin-right: 10px;\">Close Menu <i class=\"fa fa-remove\"></i></button></li>\n\n                    \n                                    <li><a href=\"https://youachieve.att.com\"><i class=\"fa fa-chevron-right\"></i> <em>you</em> Achieve</a> </li>\n                                \n                                    <li><a href=\"/youdocs/\"><i class=\"fa fa-chevron-right\"></i> <em>you</em> Docs</a> </li>\n                                \n                                    <li><a href=\"/youearn/\"><i class=\"fa fa-chevron-right\"></i> <em>you</em> Earn</a> </li>\n                                \n                                    <li><a href=\"/youdeserve/\"><i class=\"fa fa-chevron-right\"></i> <em>you</em> Deserve</a> </li>\n                                \n                                    <li><a href=\"/myrewards/\"><i class=\"fa fa-chevron-right\"></i> <em>my</em> Rewards</a> </li>\n                                \n                </ul>\n            </div>\n            \n            \n            \n            <div id=\"sidebar-wrapper-right\">\n                <ul class=\"sidebar-nav\">\n                    <li style=\"line-height: 56px; text-align:right;\">\n                        <button type=\"button\" class=\"btn btn-outline-blue menuRightToggle\" style=\"margin-bottom: 8px; margin-top:8px; margin-right: 10px;\">Close Me"
+  },
+  {
+   "url": "https://youachieve.att.com/yourefer/fiber/api/UserSuspensionMainForm.cfc?method=isUserCurrentlySuspended&csrfToken=47F2BAFF30F9F583E09F262A4B9DE6CCDEDD9223",
+   "content_type": "text/html;charset=UTF-8",
+   "total_bytes": 17759,
+   "body_head": "\n\n<!DOCTYPE html>\n<html lang=\"en\">\n    <head>\n        <!-- The following 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->\n        <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge,chrome=1\" />\n        <meta charset=\"utf-8\" />\n        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n\n        \n                <link rel=\"icon\" type=\"image/png\" href=\"resources/img/apple-touch-icon.png\" />\n                \n                        <link rel=\"apple-touch-icon\" sizes=\"150x150\" href=\"resources/img/apple-touch-icon.png\" />\n                    \n\n        <!-- Additional Meta Tags -->\n        <meta name=\"description\" content=\"you Refer Module\" /> \n\n        <!-- Site CSS Files -->\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/jquery/jquery-ui-1_14_1/jquery-ui.min.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/bootstrap.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/font-awesome.min.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/indexV2.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/you-perform.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/jquery/ui/tinymce/fonts.css\" />\n        \n\n        <!-- Page CSS Files -->\n        \n\n        <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->\n        <!--[if lt IE 12]>\n          <script src=\"https://cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv.min.js\" integrity=\"sha512-UDJtJXfzfsiPPgnI5S1000FPLBHMhvzAMX15I+qG2E2OAzC9P1JzUwJOfnypXiOH7MRPaqzhPbBGDNNj7zBfoA==\" crossorigin=\"anonymous\" referrerpolicy=\"no-referrer\"></script>\n          <script src=\"https://cdnjs.cloudflare.com/ajax/libs/respond.js/1.4.2/respond.min.js\" integrity=\"sha512-qWVvreMuH9i0DrugcOtifxdtZVBBL0X75r9YweXsdCHtXUidlctw7NXg5KVP3ITPtqZ2S575A0wFkvgS2anqSA==\" crossorigin=\"anonymous\" referrerpolicy=\"no-referrer\"></script>\n        <![endif]-->\n\n        <title>AT&amp;T | you Refer</title>\n    <script type=\"text/javascript\" src=\"https://youachieve.att.com/resources/4742a524ea328741d98ac6233c9dc954522001624dcc5\"  ></script></head>\n\n    <body style=\"background-color: #FFF;\">\n        <div id=\"appWrapper\">\n            \n            \n            \n            <div id=\"sidebar-wrapper-left\">\n                <ul class=\"sidebar-nav-left\">\n                    <li style=\"line-height: 56px; text-align:right;\"><button type=\"button\" class=\"btn btn-outline-blue menuLeftToggle\" style=\"margin-bottom: 8px; margin-top:8px; margin-right: 10px;\">Close Menu <i class=\"fa fa-remove\"></i></button></li>\n\n                    \n                                    <li><a href=\"https://youachieve.att.com\"><i class=\"fa fa-chevron-right\"></i> <em>you</em> Achieve</a> </li>\n                                \n                                    <li><a href=\"/youdocs/\"><i class=\"fa fa-chevron-right\"></i> <em>you</em> Docs</a> </li>\n                                \n                                    <li><a href=\"/youearn/\"><i class=\"fa fa-chevron-right\"></i> <em>you</em> Earn</a> </li>\n                                \n                                    <li><a href=\"/youdeserve/\"><i class=\"fa fa-chevron-right\"></i> <em>you</em> Deserve</a> </li>\n                                \n                                    <li><a href=\"/myrewards/\"><i class=\"fa fa-chevron-right\"></i> <em>my</em> Rewards</a> </li>\n                                \n                </ul>\n            </div>\n            \n            \n            \n            <div id=\"sidebar-wrapper-right\">\n                <ul class=\"sidebar-nav\">\n                    <li style=\"line-height: 56px; text-align:right;\">\n                        <button type=\"button\" class=\"btn btn-outline-blue menuRightToggle\" style=\"margin-bottom: 8px; margin-top:8px; margin-right: 10px;\">Close Menu <i class=\"fa fa-remove\"></i></button>\n        "
   }
  ],
  "sample_count": 0,
  "samples": [],
- "note": ""
+ "note": "manual"
 }
