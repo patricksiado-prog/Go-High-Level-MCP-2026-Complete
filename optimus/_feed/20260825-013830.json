@@ -1,0 +1,145 @@
+{
+ "generated_at": "2026-08-25 01:49:19",
+ "run_id": "20260825-013830",
+ "operator": "Patrick",
+ "machine": "LAPTOP-FJEEPATI",
+ "area": "",
+ "build_fingerprint": "cc925241",
+ "counts": {
+  "green": 0,
+  "fiber": 0,
+  "copper": 0,
+  "unknown": 0,
+  "no_code": 0
+ },
+ "undecoded_codes": {},
+ "dedupe": {
+  "seen": 0,
+  "written": 0,
+  "duplicates": 0,
+  "unchanged": 0,
+  "gold_to_grey": 0,
+  "grey_to_gold": 0,
+  "unknown": 0,
+  "failed_writes": 0,
+  "history_rows": 0,
+  "history_failed": 0
+ },
+ "mode": "",
+ "phases": [
+  [
+   "start",
+   "01:38:35",
+   0.0
+  ],
+  [
+   "playwright_up",
+   "01:38:51",
+   15.8
+  ],
+  [
+   "chromium_up",
+   "01:38:57",
+   22.2
+  ],
+  [
+   "browser_up",
+   "01:39:00",
+   25.4
+  ],
+  [
+   "page_loaded",
+   "01:39:06",
+   31.4
+  ],
+  [
+   "LOGGED_OUT",
+   "01:39:09",
+   34.2
+  ],
+  [
+   "LOGIN_TIMEOUT",
+   "01:49:13",
+   638.0
+  ],
+  [
+   "exit",
+   "01:49:16",
+   641.3
+  ]
+ ],
+ "last_phase": "exit",
+ "stage_counters": {
+  "auth_expired": 5,
+  "classified_green": 0,
+  "classified_gold": 0,
+  "classified_grey": 0,
+  "classified_unknown": 0
+ },
+ "crash": {},
+ "wire_audit_records": 0,
+ "wire_audit_by_colour": {},
+ "capture_truth": {
+  "delivery": "AUTH_EXPIRED",
+  "raw_features": 0,
+  "rendered": null,
+  "classified": 0,
+  "written": 0,
+  "auth_ok": false,
+  "map_ok": null,
+  "zoom_ok": null,
+  "notes": [
+   "HTTP 301 REDIRECTED TO LOGIN -- not logged in, nothing lands",
+   "HTTP 302 redirected -- session likely expired",
+   "HTTP 302 redirected -- session likely expired",
+   "HTTP 302 redirected -- session likely expired",
+   "SESSION EXPIRED -- AT&T sent a login page, not data. Log OUT of youachieve.att.com, close the browser, log back in, then re-run.",
+   "access chooser, not the map",
+   "capture: NO serviceability responses seen -- the map isn't loading fiber data (check you're LOGGED IN and dots are visible)"
+  ]
+ },
+ "first_failure": "delivery",
+ "capture_diagnostic": {
+  "serviceability_responses": 0,
+  "leads_decoded": 0,
+  "empty_payload_top_keys": null,
+  "capture_reason": "NO serviceability responses seen -- the map isn't loading fiber data (check you're LOGGED IN and dots are visible)"
+ },
+ "customer_specimens": [],
+ "customer_specimen_count": 0,
+ "zero_lead_responses": [
+  {
+   "url": "https://youachieve.att.com/yourefer/fiber",
+   "content_type": "text/html; charset=UTF-8",
+   "total_bytes": 63,
+   "body_head": "HTTP 301 -- REDIRECTED TO LOGIN -- not logged in, nothing lands"
+  },
+  {
+   "url": "https://youachieve.att.com/yourefer/fiber/",
+   "content_type": "text/html;charset=UTF-8",
+   "total_bytes": 48,
+   "body_head": "HTTP 302 -- redirected -- session likely expired"
+  },
+  {
+   "url": "https://saml.e-access.att.com/isam/sps/oidc/rp/SAML-IDP/kickoff/SAML-IDP-Password?Target=https%3A%2F%2Fsaml.e-access.att.com%2Fisam%2Fsps%2Fattsamlidp_mfaia%2Fsaml20%2Flogininitial%3FRequestBinding%3DHTTPPost%26PartnerId%3Dhttps%3A%2F%2Fyouachieve.att.com%26RelayState%3Dhttps%3A%2F%2Fyouachieve.att.",
+   "content_type": "",
+   "total_bytes": 48,
+   "body_head": "HTTP 302 -- redirected -- session likely expired"
+  },
+  {
+   "url": "https://oidc.idp.elogin.att.com/mga/sps/oauth/oauth20/authorize?response_mode=form_post&SAMLPartner=https%3A%2F%2Fyouachieve.att.com&claims=%7B%22id_token%22%3A%7B%22authenticationTypes%22%3A%7B%22essential%22%3Afalse%7D%7D%7D&scope=openid&Target=https%3A%2F%2Fsaml.e-access.att.com%2Fisam%2Fsps%2Fat",
+   "content_type": "text/html",
+   "total_bytes": 48,
+   "body_head": "HTTP 302 -- redirected -- session likely expired"
+  },
+  {
+   "url": "https://oidc.idp.elogin.att.com/lrr/attLRR/LrrController?TAM_OP=token_login&USERNAME=unauthenticated&ERROR_CODE=0x00000000&ERROR_TEXT=HPDBA0521I%20%20%20Successful%20completion&METHOD=GET&URL=%2Fmga%2Fsps%2Foauth%2Foauth20%2Fauthorize%3Fresponse_mode%3Dform_post%26SAMLPartner%3Dhttps%253A%252F%252Fy",
+   "content_type": "text/html;charset=utf-8",
+   "total_bytes": 122111,
+   "body_head": "<!DOCTYPE html>\n\n\n\n\n\n\n\n\n\n<html id=\"html\" lang=\"en\">\n  <head>\n    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n    \n    \n    \n    \n    \n    \n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no\" >\n    <meta http-equiv=\"Content-Type\"  content=\"text/html; charset=utf-8\">\n    <title>AT&amp;T Security Server: Login</title>\n    <base href='/lrr/attLRR/'>\n    <link rel=\"stylesheet\" href=\"resources/static/styles/main.css?v16.1.21-20260612135918676\">\n    <link rel=\"stylesheet\" href=\"resources/static/styles/fonts.css?v16.1.21-20260612135918676\">\n    <link rel=\"stylesheet\" href=\"resources/static/styles/cato.css?v16.1.21-20260612135918676\">\n    <link rel=\"stylesheet\" href=\"resources/static/styles/checkbox.css?v16.1.21-20260612135918676\">\n    <script>\n      if ( typeof window.globals  === 'undefined')\n      {\n        window.globals={};\n      }\n    </script>\n    \n      \n        \n        <script>\n          globals.attUID = false;\n        </script>\n      \n      \n    \n\n    <!--[if lte IE 9]> <link rel=\"stylesheet\" type=\"text/css\" href=\"resources/static/styles/ie.css?v16.1.21-20260612135918676\" /> <![endif]-->\n    <script src=\"resources/v1/js/jquery-3.7.1.min.js\"></script>\n    <script src=\"resources/v1/js/jquery.blockUI.js\"></script>\n    <script src=\"resources/v1/js/haloeamSpinner.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/mk.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/utilities.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/static/scripts/script.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/static/scripts/backEndFunctions.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/ie7.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/passkey.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/frontEndLogging.js?v16.1.21-20260612135918676\"></script>\n\n    <script>\n      function getFaqLink( params )\n      {\n         var url = \"https://oidc.idp.elogin.att.com/faq/eiam/static/v2/resources/html/faq/FAQs_en.html?aa=prod\";\n         if ( params != null )\n         {\n             url = url + \"&\" + params;\n         }\n         window.open(url, \"_faq\");\n      }\n\n      globals = Object.assign({},globals, {\n  \"cspAReqLnk\": \"%2Fmga%2Fsps%2Foauth%2Foauth20%2Fauthorize%3Fresponse_mode%3Dform_post%26SAMLPartner%3Dhttps%253A%252F%252Fyouachieve.att.com%26claims%3D%257B%2522id_token%2522%253A%257B%2522authenticationTypes%2522%253A%257B%2522essential%2522%253Afalse%257D%257D%257D%26scope%3Dopenid%26Target%3Dhttps%253A%252F%252Fsaml.e-access.att.com%252Fisam%252Fsps%252Fattsamlidp_mfaia%252Fsaml20%252Flogininitial%253FRequestBinding%253DHTTPPost%2526PartnerId%253Dhttps%253A%252F%252Fyouachieve.att.com%2526RelayState%253Dhttps%253A%252F%252Fyouachieve.att.com%252Fyourefer%252Ffiber%252Findex.cfm%253F%2526CFID%253D4876658%2526CFTOKEN%253Dca0d0e7dcba4810b-CA820D4B-BEEE-A0E3-BBBB796E77204C41%26state%3DAIrk3lMRaA%26client_id%3DPassword-SAML-IDP%26nonce%3DOBVThMHchV%26redirect_uri%3Dhttps%253A%252F%252Fsaml.e-access.att.com%252Fisam%252Fsps%252Foidc%252Frp%252FSAML-IDP%252Fredirect%252FSAML-IDP-Password%26acr_values%3DMFAIA%26response_type%3Did_token\",\n  \"legacyCricketFlag\": false,\n  \"mkNativeLogoutUrl\": \"/pkmslogout?localLogout=true&retURL=\",\n  \"enableKeyBindings\": true,\n  \"winAuthAlways\": false,\n  \"defaultAuthenticationType\": \"lrrsecurityKey\",\n  \"ajaxStatusHandlerInfo\": {\n    \"0\": {\n      \"max_retries\": 10,\n      \"delayMS\": 1000\n    },\n    \"503\": {\n      \"max_retries\": 2,\n      \"delayMS\": 1000\n    }\n  },\n  \"referenceId\": \"5p16Zmz9vNUJKcB10KOnD5Fhnws2mCROizYORXx8o8\",\n  \"tokenLogin\": false,\n  \"protocol\": \"https\",\n  \"hostname\": \"oidc.idp.elogin.att.com\",\n  \"phase2LoginFormTypes\": {\n    \"auth\": \"passAuth\",\n    \"GlobalLoginPassword\": \"passAuth\",\n    \"GlobalLoginPasswordVerification\": \"passAuth\",\n    \"mobileKey\": \"mkpush\",\n    \"mobileKeyOTP"
+  }
+ ],
+ "sample_count": 0,
+ "samples": [],
+ "note": ""
+}
