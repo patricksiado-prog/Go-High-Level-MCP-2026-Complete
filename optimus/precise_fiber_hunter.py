@@ -853,11 +853,57 @@ def flush_backend(ws):
 # cursor in the corner itself, so this can only be triggered by you.
 _STOP = [False]
 
+# PAUSE/RESUME (Patrick, 2026-08-25): freeze the motion so the map can be moved
+# BY HAND -- pan, zoom, type a new address, click Search this area -- and then
+# pick the hunt back up from wherever it now sits. Without this the only way to
+# re-aim was to kill the program and relaunch, which costs a browser start, a
+# login, and the run's dedupe memory.
+_PAUSE = [False]
+_PAUSE_FLAG = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "PAUSED.flag")
+
+
+def _set_paused(on):
+    """Flip the pause state AND leave a flag file. The uploader is a SEPARATE
+    process -- it cannot see this flag in memory, and its 15-minute idle
+    shutdown would otherwise quit mid-pause and stop writing."""
+    _PAUSE[0] = bool(on)
+    try:
+        if on:
+            with open(_PAUSE_FLAG, "w") as f:
+                f.write(time.strftime("%Y-%m-%d %H:%M:%S"))
+        elif os.path.exists(_PAUSE_FLAG):
+            os.remove(_PAUSE_FLAG)
+    except OSError:
+        pass
+
+
+def pause_gate(page=None):
+    """Block here while paused. Returns True if we WERE paused, which tells the
+    caller the map may have been moved by hand and it should re-aim rather than
+    resume its old spiral. Never raises."""
+    if not _PAUSE[0]:
+        return False
+    print("\n" + "=" * 58)
+    print("  PAUSED -- the hunter has let go of the map.")
+    print("  Move it however you like: pan, zoom, search a new address.")
+    print("  Press Ctrl+G to GO again from wherever you leave it.")
+    print("=" * 58 + "\n")
+    while _PAUSE[0] and not _STOP[0]:
+        time.sleep(0.25)
+    if _STOP[0]:
+        return True
+    print("\n" + "=" * 58)
+    print("  RESUMED -- sweeping outward from the CURRENT view.")
+    print("=" * 58 + "\n")
+    return True
+
 
 def _start_stop_watcher():
     """Background watcher: if the mouse sits in the extreme top-left corner for
     ~1 second, set _STOP so the sweep ends cleanly (closes the browser, no auto-
     restart). Windows only; a harmless no-op elsewhere."""
+    _set_paused(False)      # clear a flag left behind by a run that died paused
     if os.name != "nt":
         return
     import threading
@@ -884,6 +930,17 @@ def _start_stop_watcher():
                     print("  KILL SWITCH (Ctrl+Shift+K): force-quitting now.")
                     print("#" * 58 + "\n")
                     os._exit(0)          # immediate; launcher sees 0 = no restart
+                # PAUSE: Ctrl+Shift+Pause -> let go of the map so it can be moved
+                # by hand. Ctrl+Shift+P does the same, because Pause/Break is an
+                # Fn-layer key on most HP laptops and a hotkey you cannot press
+                # is not a hotkey. Pause=0x13 P=0x50.
+                if _down(0x11) and _down(0x10) and (_down(0x13) or _down(0x50)):
+                    if not _PAUSE[0]:
+                        _set_paused(True)
+                # GO AGAIN: Ctrl+G -> resume from the CURRENT view. G=0x47.
+                if _down(0x11) and _down(0x47):
+                    if _PAUSE[0]:
+                        _set_paused(False)
                 # GENTLE STOP (keyboard): Ctrl+Shift+S -> finish this cell, close
                 # the browser cleanly, no restart. Keyboard beats the corner
                 # gesture because the hunter OWNS the mouse (it moves the cursor
@@ -923,6 +980,22 @@ def _start_stop_watcher():
                 pass
             _t.sleep(0.15)
     threading.Thread(target=_watch, daemon=True).start()
+
+    # Windows turns Ctrl+Pause into a BREAK signal that kills the process when
+    # the console has focus -- which would make the pause hotkey a quit button.
+    # Catch it and pause instead. (Ctrl+Shift+K remains the way to force-quit.)
+    try:
+        import signal
+        if hasattr(signal, "SIGBREAK"):
+            def _on_break(_sig, _frm):
+                _set_paused(not _PAUSE[0])
+            signal.signal(signal.SIGBREAK, _on_break)
+    except Exception:
+        pass
+
+    print("  PAUSE the map: Ctrl+Shift+Pause  (or Ctrl+Shift+P)")
+    print("     -> motion stops, you move/zoom/search the map by hand.")
+    print("  GO again:      Ctrl+G  -> sweeps outward from the NEW view.")
     print("  STOP (reliable): press Ctrl+Shift+S -- finishes the cell, closes clean.")
     print("  STOP (mouse): jam the pointer into any screen CORNER, hold ~1s.")
     print("  FORCE-QUIT (even if frozen): press Ctrl+Shift+K.")
@@ -4604,6 +4677,9 @@ def sweep_backend(page, ws, seen, area_label, dry, cols, rows, capture):
         for c in range(cols):
             if _STOP[0]:                       # gentle stop -> quit within a cell
                 return total
+            pause_gate(page)                   # Ctrl+Shift+Pause / Ctrl+G
+            if _STOP[0]:
+                return total
             if on_map(page):
                 search_this_area(page)        # belt+suspenders fetch trigger
             time.sleep(SEARCH_SETTLE)
@@ -4636,6 +4712,9 @@ def sweep_grid(page, ws, seen, area_label, dry, capture):
             return               # already scanned -> just passing through, fast
         done.add(key)
         if _STOP[0]:                 # gentle stop -> quit within a cell
+            return
+        pause_gate(page)             # Ctrl+Shift+Pause / Ctrl+G
+        if _STOP[0]:
             return
         if _map_frozen(page):        # WebGL freeze -> alert + stop cleanly
             _handle_frozen_map(ws, area_label)
@@ -4856,10 +4935,22 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
     print("Continuous sweep -- panning outward until you close the browser.\n")
     try:
         while True:
+            reaim = False
             for _arm in range(2):           # spiral: 2 arms per run-length, then grow
+                if reaim:
+                    break
                 for _ in range(run):
                     if _STOP[0]:                # gentle stop -> quit within a cell
                         return total
+                    # PAUSED -> hands off the map until Ctrl+G. On resume the
+                    # map is wherever Patrick left it, so the old spiral is
+                    # meaningless: start a fresh one from the CURRENT view
+                    # instead of panning back toward the old center.
+                    if pause_gate(page):
+                        if _STOP[0]:
+                            return total
+                        di, run, reaim = 0, 1, True
+                        break
                     if _map_frozen(page):       # WebGL freeze -> alert + stop
                         _handle_frozen_map(ws, area_label)
                         return total
@@ -4881,7 +4972,10 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                         report_status(ws, area_label, "watching", found=total, note=note)
                     if not mouse_drag(page, dirs[di]):
                         return total        # canvas gone -> stop
-                di = (di + 1) % 4
+                if not reaim:
+                    di = (di + 1) % 4
+            if reaim:
+                continue        # re-aimed by hand: spiral afresh, don't grow the old one
             run += 1
     except Exception as e:
         msg = str(e).lower()
@@ -5757,6 +5851,11 @@ def uploader_main():
                 f.write(str(os.getpid()))
         except OSError:
             pass
+        # A PAUSE is not an idle hunt. The uploader is its own process, so it
+        # reads the flag FILE the hunter drops -- without this, pausing to move
+        # the map for 15 minutes quietly killed the writer.
+        if os.path.exists(_PAUSE_FLAG):
+            idle_since = time.time()
         if not main_sheet_rows and time.time() - idle_since > 900:
             _ulog("hunter silent 15 min and everything shipped -- uploader done")
             try:
