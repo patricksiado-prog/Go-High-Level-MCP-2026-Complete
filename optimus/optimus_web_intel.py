@@ -57,6 +57,13 @@ ZIP_RE = re.compile(r"\b(7[5-9]\d{3})\b")
 OUTAGE_Q = ('"AT&T" (outage OR "fiber cut" OR "service interruption" OR '
             '"internet down") (Houston OR Beaumont OR Texas)')
 
+# CABLE outages are the OPPOSITE of an AT&T outage: the competitor's customers
+# are sitting in the dark and we are the fix. Same territory rule as our own
+# outages -- it is only work where a rep can stand on the street today.
+CABLE_Q = ('("Comcast" OR "Xfinity" OR "Spectrum" OR "Charter") '
+           '(outage OR "internet down" OR "service interruption" OR "no service") '
+           '(Houston OR Beaumont OR Texas)')
+
 # NEW BUILDS go NATIONWIDE across the AT&T footprint. This is the one that
 # answers "where do we point the scanner next", and the answer is not confined
 # to where we happen to have already scanned. Patrick, 2026-08-22.
@@ -149,6 +156,8 @@ SOURCES = [
     ("google-news", "build",  _news_rss(BUILD_Q), "rss"),
     ("bing-news",   "build",  _bing_rss(BUILD_Q), "rss"),
     ("reddit-att",  "build",  _reddit("fiber available OR new build Texas"), "reddit"),
+    ("google-news", "cable",  _news_rss(CABLE_Q), "rss"),
+    ("bing-news",   "cable",  _bing_rss(CABLE_Q), "rss"),
 ]
 
 
@@ -222,6 +231,10 @@ BUILD_WORDS = ("now available", "expansion", "expands", "expanding", "new market
                "rolls out", "bringing fiber", "build", "builds", "coming to")
 
 
+CABLE_BRANDS = ("comcast", "xfinity", "spectrum", "charter", "cox",
+                "optimum", "suddenlink", "altice")
+
+
 def classify(title):
     """Which bucket an item BELONGS in, judged on its own words.
 
@@ -232,6 +245,10 @@ def classify(title):
     """
     t = " " + title.lower() + " "
     if any(w in t for w in OUTAGE_WORDS):
+        # Whose outage decides what it MEANS. Ours is a problem; the cable
+        # company's is a selling event on streets we already cover.
+        if any(b in t for b in CABLE_BRANDS):
+            return "cable"
         return "outage"
     if any(w in t for w in BUILD_WORDS):
         return "build"
@@ -286,6 +303,8 @@ def gather(budget_s=6.0, per_source_s=3.0, cache_path=None, ttl_s=21600,
             with open(cache_path) as fh:
                 c = json.load(fh)
             age = now - float(c.get("fetched_at") or 0)
+            if "cable" not in c:
+                age = ttl_s + 1        # pre-cable cache: refetch, don't hide it
             if age < ttl_s:
                 c["cached"], c["age_s"] = True, int(age)
                 return c
@@ -294,7 +313,7 @@ def gather(budget_s=6.0, per_source_s=3.0, cache_path=None, ttl_s=21600,
         except Exception:
             pass
 
-    res = {"outage": [], "build": [], "zips": [], "notes": [],
+    res = {"outage": [], "build": [], "cable": [], "zips": [], "notes": [],
            "cached": False, "age_s": 0}
     started = time.time()
     for name, kind, url, ptype in SOURCES:
@@ -330,7 +349,7 @@ def gather(budget_s=6.0, per_source_s=3.0, cache_path=None, ttl_s=21600,
                             % (name, kind, len(raw), len(items), len(kept),
                                (", %d refiled by content" % misfiled) if misfiled else ""))
 
-    for kind in ("outage", "build"):
+    for kind in ("outage", "build", "cable"):
         seen, dedup = set(), []
         for it in res[kind]:
             k = it["title"].lower()[:70]
@@ -339,7 +358,7 @@ def gather(budget_s=6.0, per_source_s=3.0, cache_path=None, ttl_s=21600,
             seen.add(k)
             dedup.append(it)
         res[kind] = dedup
-    res["zips"] = sorted({z for k in ("outage", "build")
+    res["zips"] = sorted({z for k in ("outage", "build", "cable")
                           for it in res[k] for z in it.get("zips", [])})
     res["fetched_at"] = time.time()
 

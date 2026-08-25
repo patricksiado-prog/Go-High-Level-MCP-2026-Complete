@@ -366,16 +366,14 @@ def OPERATOR():
 
 RUN_ID = time.strftime("%Y%m%d-%H%M%S")
 _WRITTEN_AT, _FINGERPRINT = _file_stamp()
+# Build-code status as ONE line for the banner. This used to be three lines of
+# console every launch; the fact that matters is whether copper can be decoded.
 if _BLD_CODES["copper"]:
-    # visible proof-of-version: if this line prints, the gold fix is running.
-    print("CODE UPDATED %s -- GOLD CAPTURE ON: copper customers write as ORANGE "
-          "(%d copper / %d fiber build codes loaded)"
-          % (BUILD_DATE, len(_BLD_CODES["copper"]), len(_BLD_CODES["fiber"])))
-    print("  gold = CONFIRMED copper only; a customer we cannot decode is GREY "
-          "(override: OPTIMUS_UNKNOWN_CUSTOMER=gold)")
+    _GOLD_STATUS = ("gold = CONFIRMED copper only   (%d copper / %d fiber codes)"
+                    % (len(_BLD_CODES["copper"]), len(_BLD_CODES["fiber"])))
 else:
-    print("CODE UPDATED %s -- (gold capture LIMITED: build_codes.json missing -- "
-          "copper customers will be skipped as GREY)" % BUILD_DATE)
+    _GOLD_STATUS = ("!! build_codes.json MISSING -- copper cannot be decoded, "
+                    "every customer files as UNKNOWN")
 
 def _git_commit():
     """Short commit of the checkout this file sits in, or a reason it is absent.
@@ -428,16 +426,13 @@ def print_identity():
     print("-" * 68)
 
 
-print_identity()
-
-
 def print_controls():
     """The stop/go keys, ON THE LAUNCH BANNER. They used to print only when the
     sweep started, by which point the browser was up and the line had scrolled.
     Patrick drives this from a truck: the controls have to be on screen before
     anything moves. Skipped for the uploader window, which has no browser to
     pause and must not advertise keys that do nothing there."""
-    print("=" * 68)
+    print("-" * 68)
     print("  CONTROLS -- work anywhere, even while Chrome has focus")
     print("")
     print("    Ctrl+Shift+Pause   PAUSE  the hunter lets go of the map;")
@@ -449,16 +444,29 @@ def print_controls():
     print("=" * 68)
 
 
-if "--uploader" not in sys.argv:
-    print_controls()
+def print_banner():
+    """ONE tight banner. Every line here is something to act on.
 
-# Derived, so it cannot disagree with the code the way BUILD_DATE did. Printed
-# outside the if/else because it is true either way.
-print("  THIS FILE : written %s   fingerprint %s   (derived -- cannot go stale)"
-      % (_WRITTEN_AT, _FINGERPRINT))
-print("  RUN ID    : %s   (stamped on every lead this run writes)" % RUN_ID)
-# every gold dot also lands in its own 'Gold Dots' tab for analysis + upgrade calls
-print("GOLD DOTS TAB ON: every gold (upgrade) dot address -> 'Gold Dots' tab")
+    What used to print: nine lines of provenance (file path, python path, repo,
+    branch, self-update URL, a warning about a different tool), three lines
+    about gold, and a Gold Dots tab notice pointing at a RETIRED tab. It scrolled
+    the controls off the screen every launch. The fingerprint is the fact that
+    actually settles 'which code is running', so that stays; the rest is behind
+    --identity (or OPTIMUS_VERBOSE=1) for when a version argument comes up.
+    Moving _git_commit() behind the flag also drops a subprocess call from every
+    startup.
+    """
+    print("=" * 68)
+    print("  OPTIMUS FIBER HUNTER    build %s   fp %s   run %s"
+          % (BUILD_DATE, _FINGERPRINT, RUN_ID))
+    print("  %s" % _GOLD_STATUS)
+
+
+if "--uploader" not in sys.argv:
+    print_banner()
+    print_controls()
+if "--identity" in sys.argv or os.environ.get("OPTIMUS_VERBOSE"):
+    print_identity()
 
 
 def _bld_code(raw):
@@ -6733,10 +6741,10 @@ def _web_intel():
     if _WEB is None:
         return None
     try:
-        return _WEB.gather(budget_s=6.0, per_source_s=3.0,
+        return _WEB.gather(budget_s=9.0, per_source_s=3.0,
                            cache_path=_web_cache_path(), ttl_s=21600)
     except Exception as e:
-        return {"outage": [], "build": [], "zips": [],
+        return {"outage": [], "build": [], "cable": [], "zips": [],
                 "notes": ["web intel failed: %s" % str(e)[:60]],
                 "cached": False, "age_s": 0}
 
@@ -6969,7 +6977,7 @@ def _print_web(web, kind, heading):
         else:
             age = "fresh"
         print("  %s (%s):" % (heading, age))
-        for it in items[:5]:
+        for it in items[:8]:
             print("     [%-12s] %-64s %s"
                   % (str(it.get("where"))[:12], str(it.get("title"))[:64],
                      str(it.get("when"))[:16]))
@@ -7007,7 +7015,14 @@ def intel_banner():
     else:
         print("  PRECISE FIBER CABLE OUTAGES (sheet): %s"
               % (_INTEL_WHY.get("outages") or "none logged"))
-    _print_web(web, "outage", "OUTAGE CHATTER ON THE WEB (our territory only)")
+    _print_web(web, "outage", "AT&T OUTAGES ON THE WEB (our territory)")
+    # Cable outages were never fetched, and build news was fetched every launch
+    # and never printed -- the query ran, the items were filtered and cached,
+    # and nothing ever put them on screen.
+    _print_web(web, "cable",
+               "CABLE OUTAGES -- SELL AGAINST THESE (our territory)")
+    _print_web(web, "build",
+               "AT&T BUILD-OUT NEWS (whole footprint -- where to point next)")
 
     if zips:
         print("  SUGGESTED NEW BUILD ZIPS (most new green first):")
