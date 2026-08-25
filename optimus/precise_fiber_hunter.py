@@ -2700,7 +2700,11 @@ class NetCapture:
                 new_rows.append([addr, dot_color(dot_status), ts,
                                  (_b or {}).get("name", ""),
                                  (_b or {}).get("phone", ""),
-                                 RUN_ID, OPERATOR()])
+                                 RUN_ID, OPERATOR(),
+                                 ld.get("lat") if ld.get("lat") is not None else "",
+                                 ld.get("lng") if ld.get("lng") is not None else "",
+                                 ld.get("city") or "", ld.get("state") or "",
+                                 ld.get("zip") or ""])
             new_records.append({"address": addr, "dot_status": dot_status,
                                 "run_id": RUN_ID, "operator": OPERATOR(),
                                 "zone_label": "WORKING", "popup_status": ld.get("status"),
@@ -5653,11 +5657,19 @@ def uploader_main():
                     # Captured At | Business | Phone (biz merged like the flush)
                     _bidx = _BIZ.get("index") or {}
                     _b = _bidx.get(_norm_addr(addr)) if _bidx else None
+                    # Complete address on every row (Patrick 2026-08-24):
+                    # City/State/ZIP ride along so enrichment never fails on a
+                    # missing ZIP, plus Lat/Lng. Columns H-L; old rows just
+                    # have blanks there, nothing downstream reads past G.
                     row = [addr, color, d.get("ts") or "",
                            (_b or {}).get("name", ""),
                            (_b or {}).get("phone", ""),
                            d.get("run_id") or RUN_ID,
-                           d.get("operator") or OPERATOR()]
+                           d.get("operator") or OPERATOR(),
+                           d.get("lat") if d.get("lat") is not None else "",
+                           d.get("lng") if d.get("lng") is not None else "",
+                           d.get("city") or "", d.get("state") or "",
+                           d.get("zip") or ""]
                     d["biz_name"] = (_b or {}).get("name", "")
                     d["biz_phone"] = (_b or {}).get("phone", "")
                     # Route to appropriate bucket BEFORE main sheet write
