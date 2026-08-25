@@ -5207,7 +5207,7 @@ _CORE_FILES = ("precise_fiber_hunter.py", "optimus_dedupe.py",
                "verify_gold_capture.py", "deploy_check.py",
                "test_durability.py", "decode_gold.py",
                "test_gold_predicate.py", "wire_diff.py",
-               "clean_sheet.py", "CLEAN_SHEET.bat")
+               "clean_sheet.py", "CLEAN_SHEET.bat", "sheet_feed.py")
 
 
 def _raw_refresh(here):
