@@ -1,6 +1,6 @@
 {
- "generated_at": "2026-08-25 01:49:19",
- "run_id": "20260825-013830",
+ "generated_at": "2026-08-25 02:01:44",
+ "run_id": "20260825-015019",
  "operator": "Patrick",
  "machine": "LAPTOP-FJEEPATI",
  "area": "",
@@ -29,43 +29,43 @@
  "phases": [
   [
    "start",
-   "01:38:35",
+   "01:50:54",
    0.0
   ],
   [
    "playwright_up",
-   "01:38:51",
-   15.8
+   "01:51:14",
+   19.6
   ],
   [
    "chromium_up",
-   "01:38:57",
-   22.2
+   "01:51:20",
+   26.2
   ],
   [
    "browser_up",
-   "01:39:00",
-   25.4
+   "01:51:23",
+   29.1
   ],
   [
    "page_loaded",
-   "01:39:06",
-   31.4
+   "01:51:28",
+   34.0
   ],
   [
    "LOGGED_OUT",
-   "01:39:09",
-   34.2
+   "01:51:34",
+   40.1
   ],
   [
    "LOGIN_TIMEOUT",
-   "01:49:13",
-   638.0
+   "02:01:38",
+   644.0
   ],
   [
    "exit",
-   "01:49:16",
-   641.3
+   "02:01:42",
+   647.5
   ]
  ],
  "last_phase": "exit",
@@ -136,7 +136,7 @@
    "url": "https://oidc.idp.elogin.att.com/lrr/attLRR/LrrController?TAM_OP=token_login&USERNAME=unauthenticated&ERROR_CODE=0x00000000&ERROR_TEXT=HPDBA0521I%20%20%20Successful%20completion&METHOD=GET&URL=%2Fmga%2Fsps%2Foauth%2Foauth20%2Fauthorize%3Fresponse_mode%3Dform_post%26SAMLPartner%3Dhttps%253A%252F%252Fy",
    "content_type": "text/html;charset=utf-8",
    "total_bytes": 122111,
-   "body_head": "<!DOCTYPE html>\n\n\n\n\n\n\n\n\n\n<html id=\"html\" lang=\"en\">\n  <head>\n    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n    \n    \n    \n    \n    \n    \n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no\" >\n    <meta http-equiv=\"Content-Type\"  content=\"text/html; charset=utf-8\">\n    <title>AT&amp;T Security Server: Login</title>\n    <base href='/lrr/attLRR/'>\n    <link rel=\"stylesheet\" href=\"resources/static/styles/main.css?v16.1.21-20260612135918676\">\n    <link rel=\"stylesheet\" href=\"resources/static/styles/fonts.css?v16.1.21-20260612135918676\">\n    <link rel=\"stylesheet\" href=\"resources/static/styles/cato.css?v16.1.21-20260612135918676\">\n    <link rel=\"stylesheet\" href=\"resources/static/styles/checkbox.css?v16.1.21-20260612135918676\">\n    <script>\n      if ( typeof window.globals  === 'undefined')\n      {\n        window.globals={};\n      }\n    </script>\n    \n      \n        \n        <script>\n          globals.attUID = false;\n        </script>\n      \n      \n    \n\n    <!--[if lte IE 9]> <link rel=\"stylesheet\" type=\"text/css\" href=\"resources/static/styles/ie.css?v16.1.21-20260612135918676\" /> <![endif]-->\n    <script src=\"resources/v1/js/jquery-3.7.1.min.js\"></script>\n    <script src=\"resources/v1/js/jquery.blockUI.js\"></script>\n    <script src=\"resources/v1/js/haloeamSpinner.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/mk.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/utilities.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/static/scripts/script.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/static/scripts/backEndFunctions.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/ie7.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/passkey.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/frontEndLogging.js?v16.1.21-20260612135918676\"></script>\n\n    <script>\n      function getFaqLink( params )\n      {\n         var url = \"https://oidc.idp.elogin.att.com/faq/eiam/static/v2/resources/html/faq/FAQs_en.html?aa=prod\";\n         if ( params != null )\n         {\n             url = url + \"&\" + params;\n         }\n         window.open(url, \"_faq\");\n      }\n\n      globals = Object.assign({},globals, {\n  \"cspAReqLnk\": \"%2Fmga%2Fsps%2Foauth%2Foauth20%2Fauthorize%3Fresponse_mode%3Dform_post%26SAMLPartner%3Dhttps%253A%252F%252Fyouachieve.att.com%26claims%3D%257B%2522id_token%2522%253A%257B%2522authenticationTypes%2522%253A%257B%2522essential%2522%253Afalse%257D%257D%257D%26scope%3Dopenid%26Target%3Dhttps%253A%252F%252Fsaml.e-access.att.com%252Fisam%252Fsps%252Fattsamlidp_mfaia%252Fsaml20%252Flogininitial%253FRequestBinding%253DHTTPPost%2526PartnerId%253Dhttps%253A%252F%252Fyouachieve.att.com%2526RelayState%253Dhttps%253A%252F%252Fyouachieve.att.com%252Fyourefer%252Ffiber%252Findex.cfm%253F%2526CFID%253D4876658%2526CFTOKEN%253Dca0d0e7dcba4810b-CA820D4B-BEEE-A0E3-BBBB796E77204C41%26state%3DAIrk3lMRaA%26client_id%3DPassword-SAML-IDP%26nonce%3DOBVThMHchV%26redirect_uri%3Dhttps%253A%252F%252Fsaml.e-access.att.com%252Fisam%252Fsps%252Foidc%252Frp%252FSAML-IDP%252Fredirect%252FSAML-IDP-Password%26acr_values%3DMFAIA%26response_type%3Did_token\",\n  \"legacyCricketFlag\": false,\n  \"mkNativeLogoutUrl\": \"/pkmslogout?localLogout=true&retURL=\",\n  \"enableKeyBindings\": true,\n  \"winAuthAlways\": false,\n  \"defaultAuthenticationType\": \"lrrsecurityKey\",\n  \"ajaxStatusHandlerInfo\": {\n    \"0\": {\n      \"max_retries\": 10,\n      \"delayMS\": 1000\n    },\n    \"503\": {\n      \"max_retries\": 2,\n      \"delayMS\": 1000\n    }\n  },\n  \"referenceId\": \"5p16Zmz9vNUJKcB10KOnD5Fhnws2mCROizYORXx8o8\",\n  \"tokenLogin\": false,\n  \"protocol\": \"https\",\n  \"hostname\": \"oidc.idp.elogin.att.com\",\n  \"phase2LoginFormTypes\": {\n    \"auth\": \"passAuth\",\n    \"GlobalLoginPassword\": \"passAuth\",\n    \"GlobalLoginPasswordVerification\": \"passAuth\",\n    \"mobileKey\": \"mkpush\",\n    \"mobileKeyOTP"
+   "body_head": "<!DOCTYPE html>\n\n\n\n\n\n\n\n\n\n<html id=\"html\" lang=\"en\">\n  <head>\n    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n    \n    \n    \n    \n    \n    \n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no\" >\n    <meta http-equiv=\"Content-Type\"  content=\"text/html; charset=utf-8\">\n    <title>AT&amp;T Security Server: Login</title>\n    <base href='/lrr/attLRR/'>\n    <link rel=\"stylesheet\" href=\"resources/static/styles/main.css?v16.1.21-20260612135918676\">\n    <link rel=\"stylesheet\" href=\"resources/static/styles/fonts.css?v16.1.21-20260612135918676\">\n    <link rel=\"stylesheet\" href=\"resources/static/styles/cato.css?v16.1.21-20260612135918676\">\n    <link rel=\"stylesheet\" href=\"resources/static/styles/checkbox.css?v16.1.21-20260612135918676\">\n    <script>\n      if ( typeof window.globals  === 'undefined')\n      {\n        window.globals={};\n      }\n    </script>\n    \n      \n        \n        <script>\n          globals.attUID = false;\n        </script>\n      \n      \n    \n\n    <!--[if lte IE 9]> <link rel=\"stylesheet\" type=\"text/css\" href=\"resources/static/styles/ie.css?v16.1.21-20260612135918676\" /> <![endif]-->\n    <script src=\"resources/v1/js/jquery-3.7.1.min.js\"></script>\n    <script src=\"resources/v1/js/jquery.blockUI.js\"></script>\n    <script src=\"resources/v1/js/haloeamSpinner.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/mk.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/utilities.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/static/scripts/script.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/static/scripts/backEndFunctions.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/ie7.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/passkey.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/frontEndLogging.js?v16.1.21-20260612135918676\"></script>\n\n    <script>\n      function getFaqLink( params )\n      {\n         var url = \"https://oidc.idp.elogin.att.com/faq/eiam/static/v2/resources/html/faq/FAQs_en.html?aa=prod\";\n         if ( params != null )\n         {\n             url = url + \"&\" + params;\n         }\n         window.open(url, \"_faq\");\n      }\n\n      globals = Object.assign({},globals, {\n  \"cspAReqLnk\": \"%2Fmga%2Fsps%2Foauth%2Foauth20%2Fauthorize%3Fresponse_mode%3Dform_post%26SAMLPartner%3Dhttps%253A%252F%252Fyouachieve.att.com%26claims%3D%257B%2522id_token%2522%253A%257B%2522authenticationTypes%2522%253A%257B%2522essential%2522%253Afalse%257D%257D%257D%26scope%3Dopenid%26Target%3Dhttps%253A%252F%252Fsaml.e-access.att.com%252Fisam%252Fsps%252Fattsamlidp_mfaia%252Fsaml20%252Flogininitial%253FRequestBinding%253DHTTPPost%2526PartnerId%253Dhttps%253A%252F%252Fyouachieve.att.com%2526RelayState%253Dhttps%253A%252F%252Fyouachieve.att.com%252Fyourefer%252Ffiber%252Findex.cfm%253F%2526CFID%253D4876658%2526CFTOKEN%253Dca0d0e7dcba4810b-CA820D4B-BEEE-A0E3-BBBB796E77204C41%26state%3DA39cabWmYw%26client_id%3DPassword-SAML-IDP%26nonce%3Df6aijsk8Ub%26redirect_uri%3Dhttps%253A%252F%252Fsaml.e-access.att.com%252Fisam%252Fsps%252Foidc%252Frp%252FSAML-IDP%252Fredirect%252FSAML-IDP-Password%26acr_values%3DMFAIA%26response_type%3Did_token\",\n  \"legacyCricketFlag\": false,\n  \"mkNativeLogoutUrl\": \"/pkmslogout?localLogout=true&retURL=\",\n  \"enableKeyBindings\": true,\n  \"winAuthAlways\": false,\n  \"defaultAuthenticationType\": \"lrrsecurityKey\",\n  \"ajaxStatusHandlerInfo\": {\n    \"0\": {\n      \"max_retries\": 10,\n      \"delayMS\": 1000\n    },\n    \"503\": {\n      \"max_retries\": 2,\n      \"delayMS\": 1000\n    }\n  },\n  \"referenceId\": \"naHxDZuBOQ7uw2jTkta72LKGXECcVB82uQx3jLcYCM\",\n  \"tokenLogin\": false,\n  \"protocol\": \"https\",\n  \"hostname\": \"oidc.idp.elogin.att.com\",\n  \"phase2LoginFormTypes\": {\n    \"auth\": \"passAuth\",\n    \"GlobalLoginPassword\": \"passAuth\",\n    \"GlobalLoginPasswordVerification\": \"passAuth\",\n    \"mobileKey\": \"mkpush\",\n    \"mobileKeyOTP"
   }
  ],
  "sample_count": 0,
