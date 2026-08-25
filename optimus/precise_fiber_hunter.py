@@ -430,6 +430,28 @@ def print_identity():
 
 print_identity()
 
+
+def print_controls():
+    """The stop/go keys, ON THE LAUNCH BANNER. They used to print only when the
+    sweep started, by which point the browser was up and the line had scrolled.
+    Patrick drives this from a truck: the controls have to be on screen before
+    anything moves. Skipped for the uploader window, which has no browser to
+    pause and must not advertise keys that do nothing there."""
+    print("=" * 68)
+    print("  CONTROLS -- work anywhere, even while Chrome has focus")
+    print("")
+    print("    Ctrl+Shift+Pause   PAUSE  the hunter lets go of the map;")
+    print("      (or Ctrl+Shift+P)       pan / zoom / search it by hand")
+    print("    Ctrl+G             GO     resume from the CURRENT view")
+    print("")
+    print("    Ctrl+Shift+S       STOP   finish this cell, close clean")
+    print("    Ctrl+Shift+K       KILL   force-quit, even if frozen")
+    print("=" * 68)
+
+
+if "--uploader" not in sys.argv:
+    print_controls()
+
 # Derived, so it cannot disagree with the code the way BUILD_DATE did. Printed
 # outside the if/else because it is true either way.
 print("  THIS FILE : written %s   fingerprint %s   (derived -- cannot go stale)"
@@ -993,12 +1015,11 @@ def _start_stop_watcher():
     except Exception:
         pass
 
-    print("  PAUSE the map: Ctrl+Shift+Pause  (or Ctrl+Shift+P)")
-    print("     -> motion stops, you move/zoom/search the map by hand.")
-    print("  GO again:      Ctrl+G  -> sweeps outward from the NEW view.")
-    print("  STOP (reliable): press Ctrl+Shift+S -- finishes the cell, closes clean.")
-    print("  STOP (mouse): jam the pointer into any screen CORNER, hold ~1s.")
-    print("  FORCE-QUIT (even if frozen): press Ctrl+Shift+K.")
+    # Compact reminder right as motion begins -- the full block is on the
+    # launch banner (print_controls). The corner gesture lives only here.
+    print("  KEYS: Ctrl+Shift+Pause = PAUSE   Ctrl+G = GO   "
+          "Ctrl+Shift+S = stop   Ctrl+Shift+K = kill")
+    print("  (mouse stop: jam the pointer into any screen CORNER, hold ~1s)")
 _NET_CAPTURE = [None]    # the always-on network capture (set in main)
 
 JSONL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
