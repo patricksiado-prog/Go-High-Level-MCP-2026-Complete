@@ -197,6 +197,71 @@ def _dedupe_precise_rewrite(ss, bdir, do_it):
               % tmp_title)
 
 
+# ---- PRETTY PASS: header band color per tab (matches the dot legend) ------
+PRETTY = {
+    "Precise Fiber":        {"bg": (0x18, 0x80, 0x38), "fg": "white"},  # green
+    "Gold Confirmed":       {"bg": (0xF9, 0xAB, 0x00), "fg": "black"},  # gold
+    "Grey Fiber Customers": {"bg": (0x5F, 0x63, 0x68), "fg": "white"},  # grey
+    "Unknown Customers":    {"bg": (0x9A, 0xA0, 0xA6), "fg": "black"},
+    "Gold Recheck":         {"bg": (0xFD, 0xD6, 0x63), "fg": "black"},
+    "Maps Businesses":      {"bg": (0x1A, 0x73, 0xE8), "fg": "white"},  # blue
+    "Fiber Green Biz":      {"bg": (0x34, 0xA8, 0x53), "fg": "white"},
+    "Upgrade Orange Biz":   {"bg": (0xE8, 0x71, 0x0A), "fg": "white"},
+}
+MAIN_HEADER = ["Address", "Dot Color", "Captured At", "Business", "Phone",
+               "Run ID", "Operator", "Lat", "Lng", "City", "State", "ZIP"]
+
+
+def _prettify(ss, do_it):
+    """Bold colored frozen header + sized columns on every pipeline tab.
+    Precise Fiber gets a header row inserted if it has none (the scraper
+    filters on the Dot Color column, so a header row is invisible to it)."""
+    print("\n-- PRETTY PASS --")
+    for title, style in PRETTY.items():
+        try:
+            ws = ss.worksheet(title)
+        except Exception:
+            continue
+        if not do_it:
+            print("   would format %s (colored bold frozen header, sized columns)"
+                  % title)
+            continue
+        try:
+            if title == PRECISE_TAB:
+                a1 = (ws.acell("A1").value or "").strip().lower()
+                if a1 != "address":
+                    ws.insert_row(MAIN_HEADER, 1)
+            r, g, b = [c / 255.0 for c in style["bg"]]
+            fg = ({"red": 1, "green": 1, "blue": 1} if style["fg"] == "white"
+                  else {"red": 0, "green": 0, "blue": 0})
+            sid = ws.id
+            ss.batch_update({"requests": [
+                {"repeatCell": {
+                    "range": {"sheetId": sid, "startRowIndex": 0, "endRowIndex": 1},
+                    "cell": {"userEnteredFormat": {
+                        "backgroundColor": {"red": r, "green": g, "blue": b},
+                        "textFormat": {"bold": True, "foregroundColor": fg},
+                        "horizontalAlignment": "CENTER"}},
+                    "fields": ("userEnteredFormat(backgroundColor,"
+                               "textFormat,horizontalAlignment)")}},
+                {"updateSheetProperties": {
+                    "properties": {"sheetId": sid,
+                                   "gridProperties": {"frozenRowCount": 1}},
+                    "fields": "gridProperties.frozenRowCount"}},
+                {"updateDimensionProperties": {
+                    "range": {"sheetId": sid, "dimension": "COLUMNS",
+                              "startIndex": 0, "endIndex": 1},
+                    "properties": {"pixelSize": 230}, "fields": "pixelSize"}},
+                {"updateDimensionProperties": {
+                    "range": {"sheetId": sid, "dimension": "COLUMNS",
+                              "startIndex": 1, "endIndex": 13},
+                    "properties": {"pixelSize": 118}, "fields": "pixelSize"}},
+            ]})
+            print("   formatted %s" % title)
+        except Exception as e:
+            print("   (format skipped for %s: %s)" % (title, str(e)[:60]))
+
+
 def main():
     do_it = "--yes" in sys.argv
     sh = open_sheet()
@@ -246,8 +311,9 @@ def main():
 
     # 3) delete the junk
     if not do_it:
-        print("\nDRY RUN. Re-run with --yes to migrate, dedupe, back up, and "
-              "delete the %d tabs above." % len(kill))
+        _prettify(ss, False)
+        print("\nDRY RUN. Re-run with --yes to migrate, dedupe, back up, "
+              "delete the %d tabs above, and format the keepers." % len(kill))
         return
     print("\n-- DELETING (%d tabs) --" % len(kill))
     for ws in kill:
@@ -258,6 +324,9 @@ def main():
             print("   deleted: %s" % ws.title)
         except Exception as e:
             print("   could not delete %s: %s" % (ws.title, str(e)[:60]))
+
+    # 4) make the survivors pretty
+    _prettify(ss, True)
     print("\nDone. Backups in %s" % bdir)
 
 
