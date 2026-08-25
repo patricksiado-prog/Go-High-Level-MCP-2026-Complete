@@ -5757,7 +5757,7 @@ def uploader_main():
                 f.write(str(os.getpid()))
         except OSError:
             pass
-        if not queued_rows and time.time() - idle_since > 900:
+        if not main_sheet_rows and time.time() - idle_since > 900:
             _ulog("hunter silent 15 min and everything shipped -- uploader done")
             try:
                 os.remove(UPLOADER_LOCK)
