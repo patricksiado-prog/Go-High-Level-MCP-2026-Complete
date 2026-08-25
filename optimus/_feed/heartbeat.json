@@ -1,21 +1,16 @@
 {
- "run_id": "20260825-112705",
+ "run_id": "20260825-144505",
  "operator": "Patrick",
  "machine": "LAPTOP-FJEEPATI",
- "build_fingerprint": "a063fd4c",
+ "build_fingerprint": "7d814355",
  "mode": "",
- "updated_at": "2026-08-25 13:37:43",
- "last_phase": "exit",
+ "updated_at": "2026-08-25 14:45:05",
+ "last_phase": "start",
  "phases": [
   [
    "start",
-   "11:27:06",
+   "14:45:05",
    0.0
-  ],
-  [
-   "exit",
-   "13:37:43",
-   7837.2
   ]
  ]
 }
