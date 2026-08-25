@@ -4,13 +4,18 @@
  "machine": "LAPTOP-FJEEPATI",
  "build_fingerprint": "d845bb42",
  "mode": "",
- "updated_at": "2026-08-25 02:48:44",
- "last_phase": "start",
+ "updated_at": "2026-08-25 02:49:37",
+ "last_phase": "CRASHED",
  "phases": [
   [
    "start",
    "02:48:44",
    0.0
+  ],
+  [
+   "CRASHED",
+   "02:49:37",
+   52.5
   ]
  ]
 }
