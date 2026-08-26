@@ -7184,11 +7184,20 @@ def _print_web(web, kind, heading):
 
 
 def intel_banner():
-    """Outages + suggested new build ZIPs, printed at every opening."""
+    """Outages + suggested new build ZIPs, printed at every opening.
+
+    WHERE TO SCAN NEXT goes FIRST and needs no sheet -- it comes off the web
+    news feed. It used to sit at the bottom, inside the part that returns early
+    when the sheet is unreachable, so the one line telling the operator where to
+    point the machine was the first thing lost when anything else broke.
+    """
+    print("  ---- OPENING INTEL -----------------------------------------")
+    print_scan_targets()
     try:
         sh = open_sheet()
     except Exception as e:
-        print("  INTEL: sheet unreachable (%s) -- scanning anyway" % str(e)[:50])
+        print("  (sheet unreachable: %s -- scanning anyway)" % str(e)[:50])
+        print("  ------------------------------------------------------------")
         return
     try:
         outages = _intel_recent_outages(sh)
@@ -7201,7 +7210,6 @@ def intel_banner():
 
     web = _web_intel()
 
-    print("  ---- OPENING INTEL -----------------------------------------")
     if outages:
         print("  PRECISE FIBER CABLE OUTAGES (open):")
         for logged, zipc, signal, status in outages:
@@ -7246,7 +7254,6 @@ def intel_banner():
             if not (_INTEL_WHY.get("zips") or _INTEL_WHY.get("gold")):
                 print("     no zone scans and no gold dots yet")
     _print_dispatch(sh, web)
-    print_scan_targets()
     print("  ------------------------------------------------------------")
 
 
