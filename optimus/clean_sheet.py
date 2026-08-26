@@ -380,10 +380,20 @@ def _ensure_dashboard(ss, do_it):
     for t in counted:
         if t in have:
             rows.append([t, "=MAX(0,COUNTA('%s'!A:A)-1)" % t])
-    rows += [["", ""], ["DOT COLOR (Precise Fiber)", "COUNT"]]
-    if "Precise Fiber" in have:
-        for color in ("GREEN", "ORANGE", "GREY", "UNKNOWN"):
-            rows.append([color, "=COUNTIF('Precise Fiber'!B:B,\"%s\")" % color])
+    # Precise Fiber is GREEN-ONLY as of 2026-08-26, so counting dot colours
+    # inside it now just reports "all green". Each colour lives on its own tab,
+    # so the answer to "how many gold do I have" is a tab count -- and that is
+    # the question this dashboard exists to answer without opening anything.
+    rows += [["", ""], ["WHAT IT MEANS", "COUNT"]]
+    _by_tab = [
+        ("GREEN  — fiber live, NOT an AT&T customer  ($500)", "Precise Fiber"),
+        ("GOLD   — copper customer, fiber live  (upgrade, $140)", "Gold Confirmed"),
+        ("GREY   — existing AT&T fiber customer  (not a lead)", "Grey Fiber Customers"),
+        ("UNKNOWN — build code did not decode", "Unknown Customers"),
+    ]
+    for label, tab in _by_tab:
+        if tab in have:
+            rows.append([label, "=MAX(0,COUNTA('%s'!A:A)-1)" % tab])
     try:
         try:
             ws = ss.worksheet(DASH_TAB)

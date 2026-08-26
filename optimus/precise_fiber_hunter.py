@@ -2746,6 +2746,11 @@ class NetCapture:
             return self.flush_local(seen, area_label, dry)
         self.seen = seen
         new_rows, new_records, staged_keys, grey_records, unknown_records = [], [], [], [], []
+        # Keys for the GREEN rows only, index-aligned with new_rows. staged_keys
+        # is filled before the colour routing, so it holds grey and unknown too
+        # and cannot be sliced by a Precise Fiber commit count without marking
+        # the wrong addresses seen.
+        green_keys = []
         grey_ct = 0                        # existing fiber customers in this batch
         unknown_ct = 0                     # undecodable customer build codes
         while self.pending:
@@ -2850,9 +2855,13 @@ class NetCapture:
             # hold. A `continue` here would skip new_records too -- and
             # new_records is exactly what feeds write_gold_dots, so it would
             # re-create the bug this change exists to fix.
+            # PRECISE FIBER IS GREEN ONLY (Patrick 2026-08-26). Gold has
+            # GOLD_TAB and is written below from new_records, so it loses
+            # nothing by leaving this list.
             if _already:
                 stage(revisited=1)
-            else:
+            elif dot_color(dot_status) == "GREEN":
+                green_keys.append(key)
                 new_rows.append([addr, dot_color(dot_status), ts,
                                  (_b or {}).get("name", ""),
                                  (_b or {}).get("phone", ""),
@@ -2882,11 +2891,15 @@ class NetCapture:
         # ROUTING: each destination (Green/Precise, Gold, Grey) writes independently.
         # No destination depends on another having rows. This prevents early return
         # from blocking writes.
-        if new_rows and not (dry or ws is None):
+        # Gated on new_records, not new_rows: Precise Fiber is green-only now, so
+        # a viewport that is ALL gold leaves new_rows empty -- and a dense gold
+        # pocket is exactly the viewport this alert exists to shout about.
+        if new_records and not (dry or ws is None):
             # GOLD CLUSTER ALERT: gold = copper-to-fiber UPGRADE prospects (hottest
             # leads). If an unusually dense pocket shows up in one viewport, call it
             # out loudly + log it to the status sheet + Drive so it's easy to work.
-            _golds = [r[0] for r in new_rows if r[1] in ("GOLD", "ORANGE")]
+            _golds = [(r.get("address") or "") for r in new_records
+                      if dot_color(r.get("dot_status")) in ("GOLD", "ORANGE")]
             if len(_golds) >= GOLD_CLUSTER_ALERT:
                 print("\n" + "*" * 60)
                 print("  ** GOLD CLUSTER: %d gold (upgrade) dots in ONE view **" % len(_golds))
@@ -2905,7 +2918,7 @@ class NetCapture:
             # NEW-FIBER CLUSTER ALERT: a viewport that is mostly GREEN (fiber eligible /
             # NON-customer) with hardly any grey (existing customers) = a just-lit
             # neighborhood. Logged to the 'New Fiber Alerts' tab so a phone alert can fire.
-            _greens = [r[0] for r in new_rows if r[1] == "GREEN"]
+            _greens = [r[0] for r in new_rows]   # new_rows is green-only now
             if len(_greens) >= NEW_FIBER_ALERT and len(_greens) >= 4 * grey_ct:
                 print("\n" + "=" * 60)
                 print("  >> NEW FIBER: %d green (eligible, NON-customer) dots, only %d "
@@ -2935,11 +2948,10 @@ class NetCapture:
                     print("   + %s | %s" % (r[0], r[1]))
             else:
                 _n, _failed = commit_rows(ws, "Precise Fiber", new_rows)
-                for _k in staged_keys[:_n]:
+                for _k in green_keys[:_n]:
                     seen.add(_k)          # only what Google actually acknowledged
-                _greens = sum(1 for r in new_rows if r[1] == "GREEN")
-                stage(green_queued=_greens,
-                      green_committed=int(_greens * _n / max(1, len(new_rows))))
+                _greens = len(new_rows)              # green-only queue
+                stage(green_queued=_greens, green_committed=_n)
                 if _n < len(new_rows):
                     print("   %d of %d row(s) did NOT commit -- parked for retry, "
                           "and NOT marked seen, so the next sweep picks them up."
@@ -3561,7 +3573,11 @@ def replay_pending(sh, log=print):
 # classified dot lands on a tab.
 GREY_TAB = "Grey Fiber Customers"
 GREY_HEADER = ["Address", "Captured At", "Lat", "Lng", "Build Code",
-               "City", "State", "ZIP", "Run ID", "Operator"]
+               "City", "State", "ZIP", "Run ID", "Operator", "Status"]
+# Status is appended LAST on purpose: rows already in the tab keep their
+# columns and simply have a blank K. Every new row says what the dot means in
+# plain words, so nobody has to remember what "grey" was (Patrick 2026-08-26).
+GREY_STATUS = "Existing AT&T Customer"
 _GREY = {"seen": set()}
 
 
@@ -3598,7 +3614,8 @@ def write_grey_dots(sh, records):
                      r.get("city") or "", r.get("state") or "",
                      r.get("zip") or "",
                      r.get("run_id") or RUN_ID,
-                     r.get("operator") or OPERATOR()])
+                     r.get("operator") or OPERATOR(),
+                     GREY_STATUS])
     if not rows:
         return 0
     written, _ = commit_rows(ws, GREY_TAB, rows)
@@ -5537,7 +5554,8 @@ _CORE_FILES = ("precise_fiber_hunter.py", "optimus_dedupe.py",
                "verify_gold_capture.py", "deploy_check.py",
                "test_durability.py", "decode_gold.py",
                "test_gold_predicate.py", "wire_diff.py",
-               "clean_sheet.py", "CLEAN_SHEET.bat", "sheet_feed.py")
+               "clean_sheet.py", "CLEAN_SHEET.bat", "sheet_feed.py",
+               "COUNT_TABS.bat")
 
 
 def _raw_refresh(here):
@@ -5891,6 +5909,41 @@ def drive_log(msg):
         pass
 
 
+def publish_tab_counts(ss):
+    """Publish every tab's NAME and row count to the repo feed.
+
+    A remote Claude session reading the sheet through the Drive connector gets
+    the cell text with the tab names STRIPPED -- segments arrive anonymous, so
+    "how many gold dots" cannot be answered without guessing which block is
+    which tab. That guessing already produced one wrong answer. The counts are
+    cheap and the names are the whole point, so the hunter publishes both to
+    GitHub, where they are readable with no Google auth at all.
+
+    Called once when the uploader finishes: one col_values() per tab is fine at
+    run end, but would be wasteful on a loop against a 474k-row tab.
+    """
+    try:
+        tabs = []
+        for ws in ss.worksheets():
+            entry = {"tab": ws.title}
+            try:
+                entry["rows"] = max(0, len(ws.col_values(1)) - 1)   # minus header
+            except Exception as e:
+                entry["error"] = str(e)[:60]
+            tabs.append(entry)
+        payload = {"at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                   "run_id": RUN_ID, "tabs": tabs}
+        gh_put("optimus/_feed/sheet/tabs.json",
+               json.dumps(payload, ensure_ascii=False, indent=1))
+        _ulog("published tab counts (%d tabs) -> _feed/sheet/tabs.json"
+              % len(tabs))
+        for t in tabs:
+            if t.get("rows"):
+                _ulog("   %-26s %s rows" % (t["tab"], t["rows"]))
+    except Exception as e:
+        _ulog("tab count publish failed: %s" % str(e)[:70])
+
+
 def _ulog(msg):
     print("%s  %s" % (time.strftime("%H:%M:%S"), msg), flush=True)
 
@@ -5944,7 +5997,8 @@ def uploader_main():
     gold_records = []
     grey_records = []
     unknown_records = []
-    main_sheet_rows = []      # all colors route through here FIRST
+    main_sheet_rows = []      # GREEN ONLY -- this is the Precise Fiber queue
+    other_addrs = []          # gold/grey/unknown addrs awaiting their seen mark
     remainder = b""
     last_status = ""
     idle_since = time.time()
@@ -5998,22 +6052,37 @@ def uploader_main():
                            d.get("zip") or ""]
                     d["biz_name"] = (_b or {}).get("name", "")
                     d["biz_phone"] = (_b or {}).get("phone", "")
-                    # Route to appropriate bucket BEFORE main sheet write
+                    # PRECISE FIBER IS GREEN ONLY (Patrick 2026-08-26).
+                    # It used to take every colour, which buried the actual
+                    # call list under grey existing-customers nobody can sell.
+                    # Grey -> GREY_TAB, gold -> GOLD_TAB, unknown -> its own.
+                    #
+                    # Non-green addresses are collected in other_addrs and
+                    # marked seen only after THEIR tab write lands. Without
+                    # that they never enter `seen` (which used to be fed from
+                    # main_sheet_rows) and every grey dot re-queues every two
+                    # seconds, duplicating forever.
                     if color == "GREEN":
                         green_records.append(d)
-                    elif color in ("GOLD", "ORANGE"):
-                        gold_records.append(d)
-                    elif color == "GREY":
-                        grey_records.append(d)
+                        main_sheet_rows.append(row)
                     else:
-                        unknown_records.append(d)
-                    # Add to main sheet queue
-                    main_sheet_rows.append(row)
+                        if color in ("GOLD", "ORANGE"):
+                            gold_records.append(d)
+                        elif color == "GREY":
+                            grey_records.append(d)
+                        else:
+                            unknown_records.append(d)
+                        other_addrs.append(addr)
                     new_records.append(d)
         except Exception as e:
             _ulog("outbox read error: %s" % str(e)[:80])
-        if main_sheet_rows:
+        # Any pending colour counts as activity. Before Precise Fiber went
+        # green-only this could just watch main_sheet_rows, because every dot
+        # passed through it. Now a long grey stretch leaves it empty and the
+        # uploader would call itself idle and quit mid-run.
+        if main_sheet_rows or gold_records or grey_records or unknown_records:
             idle_since = time.time()
+        if main_sheet_rows:
             try:
                 for i in range(0, len(main_sheet_rows), 500):
                     ws.append_rows(main_sheet_rows[i:i + 500], value_input_option="RAW")
@@ -6054,6 +6123,13 @@ def uploader_main():
                         for _r in gold_records:
                             if gold_tier(_r.get("dot_status")) == TIER_VERIFIED:
                                 _ulog("   GOLD -> %s" % (_r.get("address") or "?"))
+                    # Non-green addresses enter `seen` only here, once their
+                    # own tab has the row. Green is marked in the main-sheet
+                    # block above. Miss this and grey re-queues every cycle.
+                    for _a in other_addrs:
+                        if _a:
+                            seen.add(_a.upper())
+                    other_addrs = []
                     gold_records = []
                     grey_records = []
                     unknown_records = []
@@ -6088,8 +6164,13 @@ def uploader_main():
         # the map for 15 minutes quietly killed the writer.
         if os.path.exists(_PAUSE_FLAG):
             idle_since = time.time()
-        if not main_sheet_rows and time.time() - idle_since > 900:
+        if not (main_sheet_rows or gold_records or grey_records
+                or unknown_records) and time.time() - idle_since > 900:
             _ulog("hunter silent 15 min and everything shipped -- uploader done")
+            try:
+                publish_tab_counts(ws.spreadsheet)
+            except Exception:
+                pass
             try:
                 os.remove(UPLOADER_LOCK)
             except OSError:
