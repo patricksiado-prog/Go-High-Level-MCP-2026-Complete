@@ -75,7 +75,8 @@ BUILD_Q = ('"AT&T Fiber" ("now available" OR expansion OR "new market" OR '
 
 # The AT&T fiber footprint. A headline naming a state outside it is somebody
 # else's build.
-STATES = {
+# The 21 legacy ILEC states -- where AT&T has always been the phone company.
+ILEC_STATES = {
     "alabama": "AL", "arkansas": "AR", "california": "CA", "florida": "FL",
     "georgia": "GA", "illinois": "IL", "indiana": "IN", "kansas": "KS",
     "kentucky": "KY", "louisiana": "LA", "michigan": "MI", "mississippi": "MS",
@@ -83,6 +84,27 @@ STATES = {
     "oklahoma": "OK", "south carolina": "SC", "tennessee": "TN", "texas": "TX",
     "wisconsin": "WI",
 }
+# LUMEN, closed February 2026: AT&T bought substantially all of Lumen's Mass
+# Markets fiber business -- 4M+ locations, 1M+ subscribers -- and AT&T Fiber
+# now sells in 32 states, not 21. New metros include Denver, Seattle, Portland,
+# Salt Lake City, Minneapolis-St. Paul and Phoenix.
+#
+# This list held only the 21 ILEC states, so every build-out headline naming
+# Denver or Seattle was discarded as "somebody else's build". Those are the
+# NEWEST markets AT&T owns, which makes them the least-worked green on the
+# board -- exactly the ones worth pointing the scanner at.
+#
+# A filter that drops real leads is worse than one that lets an extra state
+# through, so these are IN. They are tracked separately because they are not
+# door-knock territory for this crew -- they are phone and text plays, and
+# _relevant() still flags LOCAL so ranking stays honest.
+LUMEN_STATES = {
+    "arizona": "AZ", "colorado": "CO", "idaho": "ID", "iowa": "IA",
+    "minnesota": "MN", "montana": "MT", "nebraska": "NE", "new mexico": "NM",
+    "oregon": "OR", "utah": "UT", "washington": "WA",
+}
+STATES = dict(ILEC_STATES)
+STATES.update(LUMEN_STATES)
 ABBR = set(STATES.values())
 
 _CITY_ST = re.compile(r"\b([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){0,2}),\s*"
