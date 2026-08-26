@@ -3478,12 +3478,20 @@ def _pending_dir():
     return d
 
 
+_PARK_SEQ = [0]
+
+
 def _park_batch(tab, rows):
     """Persist a batch we could not commit, so it is replayed, not lost."""
     try:
-        path = os.path.join(_pending_dir(), "%s__%s__%s.json"
+        # The name used to be tab + run + ROW COUNT, so two failed batches of
+        # the same size in one run wrote the same filename and the second
+        # silently destroyed the first. A per-run sequence makes it unique --
+        # this function exists precisely so rows are never lost.
+        _PARK_SEQ[0] += 1
+        path = os.path.join(_pending_dir(), "%s__%s__%04d__%s.json"
                             % (re.sub(r"[^A-Za-z0-9]+", "_", tab), RUN_ID,
-                               len(rows)))
+                               _PARK_SEQ[0], len(rows)))
         with open(path, "w") as f:
             json.dump({"tab": tab, "run_id": RUN_ID, "rows": rows}, f)
         print("   PRESERVED FOR RETRY: %d row(s) parked at %s"
@@ -3496,7 +3504,48 @@ def _park_batch(tab, rows):
         return False
 
 
-def commit_rows(ws, tab, rows, tries=3):
+# Google gives a spreadsheet 10,000,000 cells and about 60 writes per minute
+# per user. Both ceilings were being hit and neither was being recognised: the
+# old retry slept 1s then 2s (a per-MINUTE quota cannot clear in 3 seconds) and
+# it retried the cell-limit error three times even though that one can never
+# succeed. The result was a console full of failures and rows parked to disk
+# that no replay could ever land.
+_SHEET_FULL = {"hit": False}
+_WRITE_STAMPS = []          # times of recent append calls, for the throttle
+
+
+def _err_kind(e):
+    """QUOTA = wait and retry. FULL = the workbook is out of cells, never
+    retry. OTHER = transient, worth a couple of goes."""
+    t = str(e)
+    if ("above the limit of" in t or "increase the number of cells" in t
+            or "exceeds the maximum" in t):
+        return "FULL"
+    if ("[429]" in t or "Quota exceeded" in t or "RATE_LIMIT" in t
+            or "rateLimitExceeded" in t or "userRateLimit" in t):
+        return "QUOTA"
+    return "OTHER"
+
+
+def _sheet_throttle(max_per_min=50):
+    """Stay under the write quota instead of discovering it with a 429.
+
+    Google's window is rolling and per minute, so this holds the 51st write of
+    any 60 seconds until the oldest one ages out. Cheaper than the retry storm
+    it replaces.
+    """
+    now = time.time()
+    _WRITE_STAMPS[:] = [t for t in _WRITE_STAMPS if now - t < 60]
+    if len(_WRITE_STAMPS) >= max_per_min:
+        wait = max(1, int(60 - (now - _WRITE_STAMPS[0]) + 1))
+        print("   (write quota reached -- holding %ds so nothing is lost)" % wait)
+        time.sleep(wait)
+        now = time.time()
+        _WRITE_STAMPS[:] = [t for t in _WRITE_STAMPS if now - t < 60]
+    _WRITE_STAMPS.append(time.time())
+
+
+def commit_rows(ws, tab, rows, tries=4):
     """Append rows and return (committed_count, failed_count). Never raises.
 
     Rows that cannot be committed are parked on disk. The caller must not treat
@@ -3506,19 +3555,47 @@ def commit_rows(ws, tab, rows, tries=3):
         return 0, 0
     committed = 0
     failed = 0
+    # Backoff that actually outlives a per-minute quota window.
+    waits = [15, 35, 65, 65]
     for i in range(0, len(rows), 500):
         batch = rows[i:i + 500]
+        # Once the workbook is full every further append fails the same way.
+        # Park straight away rather than burning a minute per batch proving it.
+        if _SHEET_FULL["hit"]:
+            failed += len(batch)
+            _park_batch(tab, batch)
+            if _DEDUPE_REPORT:
+                _DEDUPE_REPORT.failed_writes += len(batch)
+            continue
         ok = False
         for attempt in range(tries):
             try:
+                _sheet_throttle()
                 ws.append_rows(batch, value_input_option="RAW")
                 ok = True
                 break
             except Exception as e:
+                kind = _err_kind(e)
+                if kind == "FULL":
+                    _SHEET_FULL["hit"] = True
+                    print("\n" + "!" * 64)
+                    print("  THE SPREADSHEET IS FULL -- 10,000,000 cell limit.")
+                    print("  Nothing more can be written to THIS file, by any tool,")
+                    print("  until room is made. Rows are being parked to disk and")
+                    print("  will replay automatically once there is space.")
+                    print("  Fix: archive 'Precise Fiber' to its own spreadsheet,")
+                    print("       or delete the frozen TEST-*-2026-08-24 tabs.")
+                    print("!" * 64 + "\n")
+                    break
                 print("   SHEET COMMIT FAILED %s batch=%d attempt=%d/%d: %s"
                       % (tab, len(batch), attempt + 1, tries, str(e)[:80]))
                 if attempt + 1 < tries:
-                    time.sleep(2 ** attempt)
+                    w = waits[min(attempt, len(waits) - 1)]
+                    if kind == "QUOTA":
+                        print("   (quota -- waiting %ds for the window to clear)" % w)
+                        time.sleep(w)
+                    else:
+                        time.sleep(min(8, 2 ** attempt))
         if ok:
             committed += len(batch)
             print("   SHEET COMMITTED %s batch=%d" % (tab, len(batch)))
@@ -5555,7 +5632,7 @@ _CORE_FILES = ("precise_fiber_hunter.py", "optimus_dedupe.py",
                "test_durability.py", "decode_gold.py",
                "test_gold_predicate.py", "wire_diff.py",
                "clean_sheet.py", "CLEAN_SHEET.bat", "sheet_feed.py",
-               "COUNT_TABS.bat")
+               "COUNT_TABS.bat", "free_space.py", "FREE_SPACE.bat")
 
 
 def _raw_refresh(here):
