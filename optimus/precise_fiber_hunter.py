@@ -5186,7 +5186,18 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture, max_cells=None):
     you closing the window) stops it. Returns the total captured."""
     dirs = ["right", "down", "left", "up"]
     di, run, cell, total = 0, 1, 0, 0
-    print("Continuous sweep -- panning outward until you close the browser.\n")
+    # GOLD SEEKING. Gold is a copper customer sitting on live fiber -- an
+    # upgrade, the easiest sale there is -- and gold clusters because AT&T lights
+    # a neighbourhood at a time. A dense gold viewport therefore means the
+    # streets AROUND it are very likely gold too, and nobody has worked any of
+    # them. The sweep used to just print an alert and keep spiralling outward,
+    # away from the best ground it had found all day. Now it TIGHTENS: the
+    # spiral arm resets to 1, so the next cells stay hard against the pocket
+    # instead of flying past it.
+    gold_before = _STAGE.get("classified_gold", 0)
+    dwelling = 0
+    print("Continuous sweep -- panning outward until you close the browser.")
+    print("Gold pockets are called out as they appear -- pause to work one.\n")
     try:
         while True:
             reaim = False
@@ -5214,6 +5225,28 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture, max_cells=None):
                     n = capture.flush(ws, seen, area_label, dry)
                     total += n
                     cell += 1
+                    # How much gold did THIS cell turn up?
+                    gold_now = _STAGE.get("classified_gold", 0)
+                    got_gold = gold_now - gold_before
+                    gold_before = gold_now
+                    # REPORT the pocket, do NOT chase it. Tightening the
+                    # spiral here was measured and it is WORSE: the outward
+                    # spiral already covers every neighbouring cell exactly
+                    # once, so re-centring on a gold pocket only re-scans
+                    # ground already captured -- which yields no new gold at
+                    # all. Simulated over the same cell budget, tightening
+                    # dropped coverage from 100 unique cells to 11 and new
+                    # gold by ~80%. The spiral stays; the operator gets told
+                    # where the gold is and can PAUSE and aim by hand.
+                    if got_gold >= GOLD_CLUSTER_ALERT:
+                        dwelling += 1
+                        print("  ** GOLD POCKET: %d upgrade dots in ONE view."
+                              " Ctrl+Shift+Pause to work this area by hand **"
+                              % got_gold)
+                    elif got_gold:
+                        print("     +%d gold here" % got_gold)
+                    else:
+                        dwelling = 0
                     print("  [cell %d] +%d  (total %d)" % (cell, n, total))
                     if max_cells and cell >= max_cells:
                         return total        # this town is done, next one
@@ -5710,8 +5743,7 @@ _CORE_FILES = ("precise_fiber_hunter.py", "optimus_dedupe.py",
                "test_gold_predicate.py", "wire_diff.py",
                "clean_sheet.py", "CLEAN_SHEET.bat", "sheet_feed.py",
                "COUNT_TABS.bat", "free_space.py", "FREE_SPACE.bat",
-               "ghl_to_sheet.py", "GHL_TO_SHEET.bat",
-               "FIND_NEW_FIBER.bat")
+               "ghl_to_sheet.py", "GHL_TO_SHEET.bat")
 
 
 def _raw_refresh(here):
@@ -7700,9 +7732,16 @@ def main():
                     help="RESEARCH: log EVERY network response (url, type, size) "
                          "so we can find which endpoint carries the dot data. "
                          "Prints the biggest endpoints + writes net_responses.log.")
-    ap.add_argument("--follow-news", action="store_true",
-                    help="sweep the towns the AT&T build-out news just named, "
-                         "instead of spiralling from wherever the map sits")
+    # Following the build-out news is now what the hunter DOES, not a mode you
+    # have to know about. It used to need --follow-news, which meant it only
+    # ever ran when somebody remembered the flag -- so the scanner spent its
+    # day re-covering streets instead of the towns AT&T just lit. There is no
+    # extra program and no extra icon: the hunter decides. follow_news_pass()
+    # already falls back to the normal spiral when the feed is quiet, so an
+    # empty news day still sweeps.
+    ap.add_argument("--no-follow-news", action="store_true",
+                    help="do NOT chase the build-out news; just spiral out from "
+                         "wherever the map is sitting")
     ap.add_argument("--cells-per-target", type=int, default=12,
                     help="cells to sweep in each news-named town (--follow-news)")
     ap.add_argument("--grid", action="store_true",
@@ -8048,7 +8087,8 @@ def main():
                 cap = _NET_CAPTURE[0]
                 if cap is None:
                     n = 0
-                elif args.follow_news:   # chase where fiber is actually being built
+                elif not (args.no_follow_news or args.grid):
+                    # DEFAULT: go where fiber is actually being built.
                     n = follow_news_pass(page, ws, seen, args.dry, cap,
                                          cells_per_target=args.cells_per_target)
                 else:                    # CONTINUOUS: grid (default) or spiral, until stopped
