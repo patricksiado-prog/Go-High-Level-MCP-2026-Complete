@@ -42,6 +42,21 @@ KEEP = {
     # NOT hunter-owned: the reps' tab. It carries DISPOSITION / SOLD? / rep
     # notes typed by hand, so deleting it destroys work no sweep can rebuild.
     "ghl worked leads",
+    # Created ON DEMAND by other tools in the suite. They were not on this list,
+    # so the cycle ran: tool creates tab -> CLEAN_SHEET deletes it -> tool
+    # recreates it next run. That churn is where duplicate-looking tabs and
+    # wasted cells come from on a workbook already at its ceiling.
+    "new fiber alerts",       # _log_new_fiber_alert() in the hunter
+    "enriched leads",         # enrich_phones.py, when given a sheet id
+    "outage signals",         # cable-outage buying windows
+    "backend capture",        # raw backend payloads (pipeline tab)
+    "backend analysis",       # decoded backend results
+    "gold verification",      # gold->grey evidence; the ONLY record of a
+                              # classifier call that later proved wrong
+    "territory claims",       # which machine is sweeping which area
+    # Deliberately NOT kept, so they stay deletable:
+    #   'AT&T Test'      -- a scratch tab
+    #   '_optimus_probe' -- a write-access probe, transient by design
 }
 # ...plus anything whose name CONTAINS one of these (Patrick's working tabs).
 KEEP_SUBSTR = ["campaign", "dialer", "devonwood", "commercial",

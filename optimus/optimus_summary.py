@@ -31,7 +31,9 @@ try:
     try:
         from precise_fiber_hunter import GOLD_TAB
     except Exception:
-        GOLD_TAB = "Gold Dots"
+        # 'Gold Dots' is RETIRED and contaminated with gold-by-default rows
+        # (BRAIN 22.14). Falling back to it reported bad gold as good.
+        GOLD_TAB = "Gold Confirmed"
 except Exception as _e:  # pragma: no cover - only if run outside the suite
     print("Could not import hunter helpers (%s). Run this from the optimus folder."
           % str(_e)[:120])
@@ -217,8 +219,9 @@ def collect_gold_addresses(client, cap=20000):
     -- a small slice (most dots are green) -- so Claude can see WHERE the gold is
     and spot new-fiber clusters. Returns (unique gold addresses, top gold streets).
     Reads two columns (Address + Dot Color); ORANGE = copper-upgrade = the tell.
-    PREFERS the dedicated 'Gold Dots' tab (small, address-only) when it exists;
-    falls back to scanning the big Precise Fiber tab for ORANGE rows."""
+    Reads the canonical gold tab (GOLD_TAB). It does NOT fall back to scanning
+    Precise Fiber: that tab is GREEN ONLY as of 2026-08-26, so an ORANGE scan
+    there matches nothing while reading two 474k-row columns to prove it."""
     sh = client.open_by_key(SHEET_ID)
     gold, seen = [], set()
     # fast path: the dedicated Gold Dots tab (every gold dot, already isolated)
@@ -234,24 +237,14 @@ def collect_gold_addresses(client, cap=20000):
                 break
     except Exception:
         gold = []
-    # fallback: scan Precise Fiber for ORANGE rows (before --backfill-gold is run)
+    # There is deliberately NO fallback to Precise Fiber. Every colour used to
+    # land there, so scanning it for ORANGE once made sense; since 2026-08-26 it
+    # is green-only and that scan can only ever return nothing -- after pulling
+    # roughly a million cells. If GOLD_TAB is empty, say so instead.
     if not gold:
-        ws = sh.worksheet(OUT_TAB)
-        header = ws.row_values(1)
-        ai = _col_idx(header, "Address") or 1
-        ci = _col_idx(header, "Dot Color") or 2
-        addrs = ws.col_values(ai)[1:]
-        colors = ws.col_values(ci)[1:]
-        for a, c in zip(addrs, colors):
-            if (c or "").strip().upper() != "ORANGE":
-                continue
-            a = (a or "").strip()
-            if not a or a.upper() in seen:
-                continue
-            seen.add(a.upper())
-            gold.append(a)
-            if len(gold) >= cap:
-                break
+        print("   (no gold found in %r -- gold lives only on that tab now; "
+              "if it looks empty, the sheet may be out of cells: run "
+              "FREE_SPACE.bat)" % GOLD_TAB)
     clusters = {}
     for a in gold:
         core = _street_core(a)

@@ -1,4 +1,4 @@
-"""gold_audit.py -- READ-ONLY audit of the 'Gold Dots' tab.
+"""gold_audit.py -- READ-ONLY audit of the canonical gold tab.
 
 WHY THIS EXISTS
     Autosheet ran out of credits and was the only path anyone had to the master
@@ -8,7 +8,7 @@ WHY THIS EXISTS
 
 RUN IT (one line, nothing to save first):
 
-    py -c "import urllib.request as u;exec(u.urlopen('https://raw.githubusercontent.com/patricksiado-prog/Go-High-Level-MCP-2026-Complete/claude/new-session-8z4pyb/optimus/gold_audit.py').read())"
+    py -c "import urllib.request as u;exec(u.urlopen('https://raw.githubusercontent.com/patricksiado-prog/Go-High-Level-MCP-2026-Complete/claude/optimus-map-tools-setup-6dcl6o/optimus/gold_audit.py').read())"
 
     ...or, with the file sitting next to the hunter:  py gold_audit.py
 
@@ -25,12 +25,20 @@ import os
 import sys
 
 SHEET_ID = "1FhO2BTMXGefm1tLwKbbMPXvzT1160882Auauzep7ooA"
-GOLD_TAB = "Gold Dots"
+# 'Gold Dots' is RETIRED: it is contaminated with gold-by-default rows
+# (BRAIN 22.14), so auditing it graded bad gold as good. The canonical tab is
+# 'Gold Confirmed' -- new-rule confirmed copper only. Import it from the hunter
+# when we can, so a future rename moves this too.
+try:
+    from precise_fiber_hunter import GOLD_TAB
+except Exception:
+    GOLD_TAB = "Gold Confirmed"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly",
           "https://www.googleapis.com/auth/drive.readonly"]
-# Row 1 counts as a header ONLY if it really matches. The live tab has no
-# header, and assuming one is exactly what made the hunter re-append row 1 on
-# every single run.
+# Row 1 counts as a header ONLY if it really matches. The retired 'Gold Dots'
+# tab had none and assuming one is what made the hunter re-append row 1 every
+# run; 'Gold Confirmed' DOES have one. Detecting it rather than assuming either
+# way is what lets this audit point at both.
 GOLD_HEADER0 = "address"
 
 
