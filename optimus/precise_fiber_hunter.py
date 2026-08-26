@@ -5001,7 +5001,7 @@ def recover_session(page, log=print):
     return ok
 
 
-def sweep_continuous(page, ws, seen, area_label, dry, capture):
+def sweep_continuous(page, ws, seen, area_label, dry, capture, max_cells=None):
     """Keep sweeping OUTWARD in a spiral, capturing each viewport off the
     backend, until the browser is closed -- no fixed grid. Set it on a spot/ZIP
     and it covers that area and keeps expanding past it until the computer (or
@@ -5037,6 +5037,8 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
                     total += n
                     cell += 1
                     print("  [cell %d] +%d  (total %d)" % (cell, n, total))
+                    if max_cells and cell >= max_cells:
+                        return total        # this town is done, next one
                     if cell % 15 == 0:
                         note = "continuous: %d cells, %d leads" % (cell, total)
                         if total == 0:
@@ -5060,6 +5062,83 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture):
         else:
             print("\nSweep stopped: %s" % str(e)[:100])
         return total
+
+
+def news_targets(limit=12):
+    """The towns the AT&T BUILD-OUT news just named, as map search queries.
+
+    Patrick, 2026-08-25: point the scanner where fiber is actually being built
+    instead of spiralling blind. The footprint is ~30M addresses and no fleet
+    sweeps that daily -- but the handful of towns AT&T lit this week is a list
+    one laptop finishes before lunch. The news feed already extracts city/state
+    (and sometimes a ZIP) from each headline; this turns those into somewhere
+    to fly the map.
+    """
+    if _WEB is None:
+        return []
+    try:
+        web = _web_intel() or {}
+    except Exception:
+        return []
+    out, seen_q = [], set()
+    for it in (web.get("build") or []):
+        zips = it.get("zips") or []
+        city = (it.get("city") or "").strip()
+        st = (it.get("state") or "").strip()
+        if zips:                       # a ZIP aims tighter than a city name
+            q, label = zips[0], ("%s %s" % (city, zips[0])).strip()
+        elif city and st:
+            q = label = "%s, %s" % (city, st)
+        else:
+            continue                   # a headline with no place is not a target
+        if q.upper() in seen_q:
+            continue
+        seen_q.add(q.upper())
+        out.append({"query": q, "label": label,
+                    "headline": (it.get("title") or "")[:96]})
+        if len(out) >= limit:
+            break
+    return out
+
+
+def follow_news_pass(page, ws, seen, dry, capture, cells_per_target=12):
+    """Fly to each town the build-out news named and sweep it, then move on.
+
+    Falls back to the normal spiral when there is no news -- an empty feed must
+    never mean an idle hunter.
+    """
+    targets = news_targets()
+    if not targets:
+        print("  (no build-out news targets right now -- sweeping where the "
+              "map sits instead)")
+        return sweep_continuous(page, ws, seen, "no-news", dry, capture)
+    print("")
+    print("  FOLLOWING THE BUILD-OUT NEWS -- %d town(s), %d cells each:"
+          % (len(targets), cells_per_target))
+    for t in targets:
+        print("     %-24s %s" % (t["label"][:24], t["headline"][:60]))
+    total = 0
+    for i, t in enumerate(targets, 1):
+        if _STOP[0]:
+            break
+        pause_gate(page)
+        if _STOP[0]:
+            break
+        print("\n  [NEWS TARGET %d/%d] %s" % (i, len(targets), t["label"]))
+        try:
+            if not search_zip(page, t["query"]):
+                print("     (could not fly the map there -- skipping)")
+                continue
+        except Exception as e:
+            print("     (search failed: %s -- skipping)" % str(e)[:60])
+            continue
+        time.sleep(SEARCH_SETTLE)
+        n = sweep_continuous(page, ws, seen, t["label"], dry, capture,
+                             max_cells=cells_per_target)
+        total += n
+        print("  [NEWS TARGET] %s -> +%d  (run total %d)"
+              % (t["label"], n, total))
+    return total
 
 
 def safe_goto(page, url):
@@ -7274,6 +7353,11 @@ def main():
                     help="RESEARCH: log EVERY network response (url, type, size) "
                          "so we can find which endpoint carries the dot data. "
                          "Prints the biggest endpoints + writes net_responses.log.")
+    ap.add_argument("--follow-news", action="store_true",
+                    help="sweep the towns the AT&T build-out news just named, "
+                         "instead of spiralling from wherever the map sits")
+    ap.add_argument("--cells-per-target", type=int, default=12,
+                    help="cells to sweep in each news-named town (--follow-news)")
     ap.add_argument("--grid", action="store_true",
                     help="pan in a sequential GRID (lawnmower, row by row) instead of "
                          "the default outward SPIRAL. Spiral is best for covering a "
@@ -7617,6 +7701,9 @@ def main():
                 cap = _NET_CAPTURE[0]
                 if cap is None:
                     n = 0
+                elif args.follow_news:   # chase where fiber is actually being built
+                    n = follow_news_pass(page, ws, seen, args.dry, cap,
+                                         cells_per_target=args.cells_per_target)
                 else:                    # CONTINUOUS: grid (default) or spiral, until stopped
                     _sweep = sweep_grid if args.grid else sweep_continuous
                     n = _sweep(page, ws, seen, area_label, args.dry, cap)
