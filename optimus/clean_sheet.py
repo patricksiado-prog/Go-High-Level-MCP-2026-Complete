@@ -39,10 +39,13 @@ KEEP = {
     "gold recheck",           # hunter's recheck queue
     "maps businesses", "fiber green biz", "upgrade orange biz",
     "backend comm", "hunter status", "_dedupe lock", "_dispatch",
+    # NOT hunter-owned: the reps' tab. It carries DISPOSITION / SOLD? / rep
+    # notes typed by hand, so deleting it destroys work no sweep can rebuild.
+    "ghl worked leads",
 }
 # ...plus anything whose name CONTAINS one of these (Patrick's working tabs).
 KEEP_SUBSTR = ["campaign", "dialer", "devonwood", "commercial",
-               "readme", "dashboard"]
+               "readme", "dashboard", "worked leads", "sold"]
 
 GOLD_TAB = "Gold Confirmed"
 PRECISE_TAB = "Precise Fiber"
