@@ -127,6 +127,25 @@ GOLD_TAB = "Gold Confirmed"    # EVERY confirmed copper-upgrade dot address -- a
 GREY_TAB = "Grey Fiber Customers"        # existing fiber customers
 UNKNOWN_TAB = "Unknown Customers"        # customer, undecodable build code
 STATUS_TAB = "Hunter Status"   # live "what it's doing" log, on Drive in the same sheet
+
+# WHAT EACH TAB MEANS -- in Patrick's words (2026-08-26). Written into a Status
+# column on EVERY row of the three lead tabs, so a rep, a VA or an AI reading
+# one row never has to remember what a colour meant. README and DASHBOARD quote
+# these same constants, so the sheet and the brain cannot drift apart: change
+# the wording here and it changes everywhere at once.
+# ASCII only -- these strings also reach a Windows console (cp1252).
+STATUS_GREEN = "Non-AT&T Customer - Can Get Fiber"
+STATUS_GOLD = "Upgrade Customer - On Copper, Fiber Available"
+STATUS_GREY = "Existing AT&T Customer"
+STATUS_UNKNOWN = "Build Code Not Decoded - Not A Lead"
+# colour -> (tab, status wording, what a rep does with it)
+TAB_MEANING = {
+    "GREEN":  (OUT_TAB, STATUS_GREEN, "CALL/TEXT - the $500 lead"),
+    "ORANGE": (GOLD_TAB, STATUS_GOLD, "CALL FIRST - $140 upgrade, closes fastest"),
+    "GOLD":   (GOLD_TAB, STATUS_GOLD, "CALL FIRST - $140 upgrade, closes fastest"),
+    "GREY":   (GREY_TAB, STATUS_GREY, "DO NOT PITCH FIBER - already has it"),
+    "UNKNOWN": (UNKNOWN_TAB, STATUS_UNKNOWN, "Do not call - parked for review"),
+}
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets",
           "https://www.googleapis.com/auth/drive"]
 
@@ -722,8 +741,12 @@ NEW_FIBER_TAB = "New Fiber Alerts"
 # flush() appended 6 values -- Run ID has been landing in an UNLABELLED column F
 # since 2026-08-20, and the uploader path wrote only 5, so rows were ragged
 # depending on which code path saved them. Both are normalised to this list.
+# Precise Fiber is GREEN only, so Status is the same on every row -- it is
+# there so one exported row still explains itself. This constant had drifted to
+# 7 columns while the writers emitted 12; both writers below match it exactly.
 OUT_HEADER = ["Address", "Dot Color", "Captured At", "Business", "Phone",
-              "Run ID", "Operator"]
+              "Run ID", "Operator", "Lat", "Lng", "City", "State", "ZIP",
+              "Status"]
 
 
 def _ensure_header(ws, header):
@@ -2869,7 +2892,7 @@ class NetCapture:
                                  ld.get("lat") if ld.get("lat") is not None else "",
                                  ld.get("lng") if ld.get("lng") is not None else "",
                                  ld.get("city") or "", ld.get("state") or "",
-                                 ld.get("zip") or ""])
+                                 ld.get("zip") or "", STATUS_GREEN])
             new_records.append({"address": addr, "dot_status": dot_status,
                                 "run_id": RUN_ID, "operator": OPERATOR(),
                                 "zone_label": "WORKING", "popup_status": ld.get("status"),
@@ -3195,7 +3218,7 @@ _GOLD = {"ws": None, "seen": None}
 # rows cannot be trusted: nothing records WHY a row was called gold.
 _GOLD_HEADER = ["Address", "Captured At", "Lat", "Lng", "Business", "Phone",
                 "Run ID", "Operator", "City", "State", "ZIP",
-                "Tier", "Build Code"]
+                "Tier", "Build Code", "Status"]
 
 # VERIFIED_GOLD  -- AT&T said copper, or the build code decodes to copper.
 #                   This is the call list. Dave works these.
@@ -3654,7 +3677,7 @@ GREY_HEADER = ["Address", "Captured At", "Lat", "Lng", "Build Code",
 # Status is appended LAST on purpose: rows already in the tab keep their
 # columns and simply have a blank K. Every new row says what the dot means in
 # plain words, so nobody has to remember what "grey" was (Patrick 2026-08-26).
-GREY_STATUS = "Existing AT&T Customer"
+GREY_STATUS = STATUS_GREY        # single source of truth, defined at the top
 _GREY = {"seen": set()}
 
 
@@ -3874,6 +3897,8 @@ def write_gold_dots(sh, records):
             "zip": r.get("zip") or "",
             "tier": gold_tier(r.get("dot_status")) or "",
             "build code": (r.get("build_code") or "").upper(),
+            # Plain words on every row so a rep never decodes a colour.
+            "status": STATUS_GOLD,
         }
         if layout is None:
             # Headerless: the four columns the tab has always meant. Anything
@@ -6126,7 +6151,7 @@ def uploader_main():
                            d.get("lat") if d.get("lat") is not None else "",
                            d.get("lng") if d.get("lng") is not None else "",
                            d.get("city") or "", d.get("state") or "",
-                           d.get("zip") or ""]
+                           d.get("zip") or "", STATUS_GREEN]
                     d["biz_name"] = (_b or {}).get("name", "")
                     d["biz_phone"] = (_b or {}).get("phone", "")
                     # PRECISE FIBER IS GREEN ONLY (Patrick 2026-08-26).

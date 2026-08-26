@@ -27,7 +27,8 @@ WHAT --yes DOES, IN ORDER
 """
 import sys
 
-from precise_fiber_hunter import open_sheet
+from precise_fiber_hunter import (open_sheet, STATUS_GREEN, STATUS_GOLD,
+                                  STATUS_GREY, STATUS_UNKNOWN)
 
 # ---- KEEP list: the pipeline. Exact titles, case-insensitive. -------------
 KEEP = {
@@ -210,7 +211,8 @@ PRETTY = {
     "Upgrade Orange Biz":   {"bg": (0xE8, 0x71, 0x0A), "fg": "white"},
 }
 MAIN_HEADER = ["Address", "Dot Color", "Captured At", "Business", "Phone",
-               "Run ID", "Operator", "Lat", "Lng", "City", "State", "ZIP"]
+               "Run ID", "Operator", "Lat", "Lng", "City", "State", "ZIP",
+               "Status"]
 
 
 def _prettify(ss, do_it):
@@ -280,28 +282,34 @@ README_ROWS = [
     ["DASHBOARD", "tiny",
      "Live counts for every tab below. Start here for 'how are we doing'."],
     ["Gold Confirmed", "small",
-     "THE CALL LIST. Confirmed copper customers on live fiber — the $140 "
-     "upgrade. Easiest sale we have: an upgrade, not a switch."],
+     "THE CALL LIST. GOLD ONLY — " + STATUS_GOLD + ". The $140 upgrade and the "
+     "easiest sale we have, because it is an upgrade and not a switch."],
     ["Fiber Green Biz", "small",
      "Businesses sitting on a GREEN dot — fiber live, not an AT&T customer."],
     ["Upgrade Orange Biz", "small",
      "Businesses sitting on a GOLD dot — copper customer, upgrade pitch."],
     ["Grey Fiber Customers", "medium",
-     "Already AT&T fiber customers. NOT leads — this is penetration data, and "
-     "the audience for wireless/bundle offers."],
+     "GREY ONLY — " + STATUS_GREY + ". Already on AT&T fiber, so never pitch "
+     "them fiber. Not rubbish either: this is penetration data and the best "
+     "list we have for wireless/bundle offers."],
     ["Unknown Customers", "small",
-     "Customers whose build code we cannot decode yet. Parked for review, "
-     "deliberately NOT on the call list."],
+     STATUS_UNKNOWN + ". A customer whose build code we cannot read yet. "
+     "Parked for review, deliberately NOT on the call list."],
     ["Maps Businesses", "medium", "Every business scraped off Google Maps."],
-    ["Precise Fiber", "HUGE — ARCHIVE",
-     "Every captured dot with its color. ~474,000 rows. Nobody calls from this "
-     "tab. Do NOT open it whole and do NOT feed it to an AI — ask for a "
-     "specific range or ZIP instead."],
+    ["Precise Fiber", "HUGE",
+     "GREEN ONLY — " + STATUS_GREEN + ". Fiber is live at the address and they "
+     "are not with AT&T. The $500 lead. ~474,000 rows: do NOT open it whole and "
+     "do NOT feed it to an AI — ask for a specific range, city or ZIP."],
     ["", "", ""],
-    ["THE DOT LEGEND", "WORTH", ""],
-    ["GREEN", "$500", "Fiber live, NOT an AT&T customer. The prize."],
-    ["GOLD / ORANGE", "$140", "Fiber live + AT&T customer still on copper."],
-    ["GREY", "—", "Already on AT&T fiber. Skip as a lead."],
+    ["THE DOT LEGEND — one colour, one tab, one meaning", "WORTH", ""],
+    ["GREEN  -> 'Precise Fiber'", "$500", STATUS_GREEN + ". The prize."],
+    ["GOLD   -> 'Gold Confirmed'", "$140", STATUS_GOLD + ". Work these first."],
+    ["GREY   -> 'Grey Fiber Customers'", "-",
+     STATUS_GREY + ". Not a fiber lead. Wireless/bundle audience."],
+    ["UNKNOWN -> 'Unknown Customers'", "-", STATUS_UNKNOWN + "."],
+    ["", "", ""],
+    ["Every row on those tabs carries this wording in its Status column, so a "
+     "single exported row still explains itself.", "", ""],
     ["", "", ""],
     ["RULES FOR EVERYONE", "", ""],
     ["View only", "",
@@ -386,10 +394,10 @@ def _ensure_dashboard(ss, do_it):
     # the question this dashboard exists to answer without opening anything.
     rows += [["", ""], ["WHAT IT MEANS", "COUNT"]]
     _by_tab = [
-        ("GREEN  — fiber live, NOT an AT&T customer  ($500)", "Precise Fiber"),
-        ("GOLD   — copper customer, fiber live  (upgrade, $140)", "Gold Confirmed"),
-        ("GREY   — existing AT&T fiber customer  (not a lead)", "Grey Fiber Customers"),
-        ("UNKNOWN — build code did not decode", "Unknown Customers"),
+        ("GREEN   $500  " + STATUS_GREEN, "Precise Fiber"),
+        ("GOLD    $140  " + STATUS_GOLD, "Gold Confirmed"),
+        ("GREY      -   " + STATUS_GREY, "Grey Fiber Customers"),
+        ("UNKNOWN   -   " + STATUS_UNKNOWN, "Unknown Customers"),
     ]
     for label, tab in _by_tab:
         if tab in have:
