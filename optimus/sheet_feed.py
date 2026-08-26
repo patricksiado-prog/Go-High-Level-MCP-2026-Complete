@@ -19,6 +19,11 @@ USAGE (from the hunter folder)
       _feed/sheet/chunk_001.json, chunk_002.json, ... capped at --max-rows
       (default 5000) so a fat tab can't blow up the push.
 
+  python sheet_feed.py --match "Beaumont,Angleton,La Porte,Devonwood"
+      Publish ONLY the rows whose address or city contains one of those,
+      newest first. Add --color GREEN for fiber-eligible non-customers only.
+      This is the one to run when Claude asks "what's new in <town>".
+
   python sheet_feed.py --tab "Precise Fiber" --start 12000 --n 500
       Publish one chunk: 500 rows starting at row 12000.
 
@@ -27,6 +32,7 @@ WHERE IT LANDS (Claude reads these off the repo)
   optimus/_feed/sheet/chunk_NNN.json       chunked tab reads
 """
 import json
+import re
 import sys
 import time
 
@@ -120,7 +126,57 @@ def chunk_tab(ss, title, start, n, max_rows):
               % (end_cap, total, end_cap + 1))
 
 
+def match_rows(ss, needles, color=None, newest=200):
+    """Pull just the rows whose ADDRESS or CITY contains one of `needles`.
+
+    This is the question Patrick actually asks -- "what's new in Beaumont,
+    Angleton, La Porte, near Devonwood" -- and it is unanswerable any other way
+    from here: Precise Fiber is ~474k rows and nothing can pull it whole. This
+    reads the columns once ON HIS PC, filters locally, sorts NEWEST FIRST by
+    Captured At, and publishes a small JSON that Claude can read off GitHub.
+
+    Precise Fiber layout: A=Address B=Dot Color C=Captured At D=Business
+    E=Phone F=Run ID G=Operator H=Lat I=Lng J=City K=State L=ZIP
+    """
+    try:
+        ws = ss.worksheet("Precise Fiber")
+    except Exception:
+        print("No 'Precise Fiber' tab."); return
+    print("   reading Precise Fiber (one pass, this can take a minute)...")
+    rows = ws.get_all_values()
+    if not rows:
+        print("   (empty)"); return
+    heads = [h.strip().lower() for h in rows[0]]
+    hit = []
+    lowered = [n.strip().lower() for n in needles if n.strip()]
+    for r in rows[1:]:
+        if not r or not r[0].strip():
+            continue
+        addr = r[0].lower()
+        city = r[9].lower() if len(r) > 9 else ""
+        if not any(n in addr or n in city for n in lowered):
+            continue
+        if color and (len(r) < 2 or r[1].strip().upper() != color.upper()):
+            continue
+        hit.append(r)
+    # NEWEST FIRST -- "newer fiber" is the whole point of the question
+    hit.sort(key=lambda r: (r[2] if len(r) > 2 else ""), reverse=True)
+    print("   %d row(s) matched %s%s"
+          % (len(hit), needles, (" color=" + color) if color else ""))
+    if not hit:
+        return
+    slug = "-".join(re.sub(r"[^a-z0-9]+", "", n.lower())[:12]
+                    for n in lowered)[:60] or "match"
+    _publish(FEED_DIR + "/match_%s.json" % slug,
+             {"at": time.strftime("%Y-%m-%d %H:%M:%S"),
+              "needles": needles, "color": color,
+              "total_matched": len(hit), "returned": min(len(hit), newest),
+              "header": rows[0], "rows": hit[:newest]})
+
+
 def main():
+    match = _arg("--match")        # e.g. --match "Beaumont,Angleton,La Porte"
+    color = _arg("--color")        # e.g. --color GREEN
     tab = _arg("--tab")
     start = _arg("--start")
     n = int(_arg("--n", CHUNK_DEFAULT))
@@ -131,7 +187,9 @@ def main():
         print("Could not open the sheet (check google_creds.json)."); return
     ss = getattr(sh, "spreadsheet", sh)
 
-    if tab:
+    if match:
+        match_rows(ss, [x for x in match.split(",") if x.strip()], color=color)
+    elif tab:
         chunk_tab(ss, tab, start, n, max_rows)
     else:
         snapshot(ss)
