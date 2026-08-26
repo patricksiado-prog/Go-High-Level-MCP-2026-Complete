@@ -978,27 +978,42 @@ def countdown_to_start(secs=10):
         return
     _GO_NOW[0] = False
     print("")
-    print("  Map is up. Sweep starts in %d seconds." % secs)
-    print("  Ctrl+Shift+Y = go NOW    Ctrl+Shift+Pause = hold/resume"
-          "    Ctrl+Shift+S = stop")
-    for i in range(secs, 0, -1):
+    print("  Map is up. Aim it now -- pan, zoom, search an address.")
+    # The keys ride on the ticking line itself. Printed once above the counter
+    # they scroll out of sight the moment anything else logs, and an operator
+    # staring at a countdown cannot be expected to remember three combos.
+    keys = "Ctrl+Shift+Y = GO now | Ctrl+Shift+Pause = hold | Ctrl+Shift+S = stop"
+    # Poll ~10x a second instead of sleeping a whole second between checks.
+    # The watcher reads the keyboard every 0.15s, but this loop only LOOKED
+    # once a second, so a press could sit unnoticed for up to a full second
+    # and the keys felt dead exactly when they matter most.
+    TICK = 0.1
+    ticks = int(secs / TICK)
+    for t in range(ticks, 0, -1):
         if _STOP[0] or _GO_NOW[0]:
             break
         if _PAUSE[0]:
+            # Hold here, then carry on counting from where we left off rather
+            # than launching the instant the hold is released.
             pause_gate()
-            break
+            if _STOP[0] or _GO_NOW[0]:
+                break
+            continue
         try:
-            sys.stdout.write("\r   starting in %2d ... " % i)
+            sys.stdout.write("\r   starting in %2d ...   %s "
+                             % (int(t * TICK) + 1, keys))
             sys.stdout.flush()
         except Exception:
             pass
-        time.sleep(1)
+        time.sleep(TICK)
     try:
-        sys.stdout.write("\r" + " " * 32 + "\r")
+        sys.stdout.write("\r" + " " * (len(keys) + 30) + "\r")
         sys.stdout.flush()
     except Exception:
         pass
-    if not _STOP[0]:
+    if _STOP[0]:
+        print("  STOPPED before the first pan.\n")
+    else:
         print("  GO.\n")
 
 
@@ -7339,7 +7354,27 @@ def _print_dispatch(sh, web):
     missing. Captured counts appear only as context on a claim.
     """
     me = OPERATOR()
-    cands = (web or {}).get("build") or []
+    # BOTH reasons to point the machine somewhere, not just one. This read
+    # web["build"] only, so every cable-outage story was fetched by
+    # optimus_web_intel and then silently dropped before it reached the banner
+    # -- the operator never saw the one signal with a clock on it.
+    #
+    #   NEW FIBER  -- a build-out headline named the town: fresh GREEN nobody
+    #                 has worked yet.
+    #   CABLE OUT  -- the competitor is down there right now. Their customers
+    #                 are in the dark and AT&T fiber is the fix. Perishable.
+    #
+    # LOCAL first: an outage where we have feet is a door-knock today; the same
+    # story three states away is still a phone and text play, just not a drive.
+    cands = []
+    for want_local in (True, False):
+        for bucket, why in (("cable", "CABLE OUT"), ("build", "NEW FIBER")):
+            for it in ((web or {}).get(bucket) or []):
+                if bool(it.get("local")) != want_local:
+                    continue
+                c = dict(it)
+                c["why"] = why + (" LOCAL" if want_local else "")
+                cands.append(c)
 
     if _TERR is None:
         print("  WHERE TO SCAN NEXT: optimus_territory.py not on this PC")
@@ -7353,16 +7388,21 @@ def _print_dispatch(sh, web):
 
     print("  WHERE TO SCAN NEXT -- %s, these are yours to take:" % me)
     if go:
+        print("     %-15s %-22s %-4s %-16s %s"
+              % ("WHY", "WHERE", "ST", "ZIP", "HEADLINE"))
         for c in go:
-            z = (", ".join(c.get("zips") or []))[:24]
-            print("     %-26s %-4s %-24s %s"
-                  % (str(c.get("where"))[:26], c.get("state") or "",
-                     z or "-", str(c.get("title"))[:44]))
+            z = (", ".join(c.get("zips") or []))[:16]
+            print("     %-15s %-22s %-4s %-16s %s"
+                  % (c.get("why", "NEW FIBER"),
+                     str(c.get("where") or c.get("city") or "")[:22],
+                     c.get("state") or "", z or "-",
+                     str(c.get("title"))[:40]))
         print("     claim one:  --claim \"%s\"" % (go[0].get("where") or ""))
+        print("     CABLE OUT is perishable -- work those before the fibre news.")
     elif cands:
         print("     nothing free -- every announced area is already claimed")
     else:
-        print("     no new-build announcements came back this launch")
+        print("     no new-fibre or cable-outage news came back this launch")
         for n in ((web or {}).get("notes") or [])[:3]:
             if " build" in n:
                 print("       " + n)
