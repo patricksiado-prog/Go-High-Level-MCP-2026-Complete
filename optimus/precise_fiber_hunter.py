@@ -454,10 +454,12 @@ def print_controls():
     print("-" * 68)
     print("  CONTROLS -- work anywhere, even while Chrome has focus")
     print("")
-    print("    Ctrl+Shift+Pause   PAUSE  the hunter lets go of the map;")
+    print("    Ctrl+Shift+Pause   PAUSE / RESUME -- same key both ways;")
     print("      (or Ctrl+Shift+P)       pan / zoom / search it by hand")
     print("    Ctrl+Shift+Y       GO     resume from the CURRENT view")
-    print("      (or F9)                 -- NOT Ctrl+G: Chrome steals that")
+    print("                              (F9 alone no longer works: a stray")
+    print("                               F9 used to un-pause by accident)")
+    print("                              -- NOT Ctrl+G: Chrome steals that")
     print("")
     print("    Ctrl+Shift+S       STOP   finish this cell, close clean")
     print("    Ctrl+Shift+K       KILL   force-quit, even if frozen")
@@ -945,7 +947,8 @@ def pause_gate(page=None):
     print("\n" + "=" * 58)
     print("  PAUSED -- the hunter has let go of the map.")
     print("  Move it however you like: pan, zoom, search a new address.")
-    print("  Press Ctrl+Shift+Y (or F9) to GO again from where you leave it.")
+    print("  Press Ctrl+Shift+Y to GO again from where you leave it,")
+    print("  or Ctrl+Shift+Pause again to un-pause.")
     print("=" * 58 + "\n")
     while _PAUSE[0] and not _STOP[0]:
         time.sleep(0.25)
@@ -976,7 +979,7 @@ def countdown_to_start(secs=10):
     _GO_NOW[0] = False
     print("")
     print("  Map is up. Sweep starts in %d seconds." % secs)
-    print("  Ctrl+Shift+Y (or F9) = go NOW    Ctrl+Shift+Pause = hold"
+    print("  Ctrl+Shift+Y = go NOW    Ctrl+Shift+Pause = hold/resume"
           "    Ctrl+Shift+S = stop")
     for i in range(secs, 0, -1):
         if _STOP[0] or _GO_NOW[0]:
@@ -1019,6 +1022,12 @@ def _start_stop_watcher():
         def _down(vk):
             return bool(user32.GetAsyncKeyState(vk) & 0x8000)
         held = 0
+        # EDGE DETECTION. GetAsyncKeyState reports the key as still down on
+        # every poll, so a combo held for one second used to fire ~7 times.
+        # Each combo now acts only on the moment it goes down, which is what
+        # makes PAUSE a real toggle instead of a fight between polls.
+        was = {"pause": False, "go": False}
+        last_pt = [-999, -999]     # for the "is the cursor actually still" test
         while True:
             try:
                 # HARD KILL SWITCH: Ctrl+Shift+K -> force-quit INSTANTLY, even if
@@ -1034,9 +1043,18 @@ def _start_stop_watcher():
                 # by hand. Ctrl+Shift+P does the same, because Pause/Break is an
                 # Fn-layer key on most HP laptops and a hotkey you cannot press
                 # is not a hotkey. Pause=0x13 P=0x50.
-                if _down(0x11) and _down(0x10) and (_down(0x13) or _down(0x50)):
-                    if not _PAUSE[0]:
-                        _set_paused(True)
+                pause_now = (_down(0x11) and _down(0x10)
+                             and (_down(0x13) or _down(0x50)))
+                if pause_now and not was["pause"]:
+                    # TOGGLE. It used to pause only, so pressing it again did
+                    # nothing and you had to remember a second, different key
+                    # to start again. One key is the whole point of a
+                    # start/stop.
+                    _set_paused(not _PAUSE[0])
+                    print("\n  %s (Ctrl+Shift+Pause)\n"
+                          % ("PAUSED -- the map is yours" if _PAUSE[0]
+                             else "RESUMED -- sweeping from the CURRENT view"))
+                was["pause"] = pause_now
                 # GO AGAIN: resume from the CURRENT view, and skip the opening
                 # countdown. Ctrl+Shift+Y (0x59) or F9 (0x78).
                 #
@@ -1044,10 +1062,21 @@ def _start_stop_watcher():
                 # search bar right on top of the map instead of resuming
                 # (Patrick, 2026-08-25). Anything the browser binds is unusable
                 # here, because the map always has focus while we sweep.
-                if (_down(0x11) and _down(0x10) and _down(0x59)) or _down(0x78):
+                # F9 USED TO WORK BARE, and that broke the one thing pause
+                # exists for. You pause to pan and zoom the map by hand; a
+                # stray F9 -- an Fn-layer key, a media key, another window --
+                # silently resumed the sweep and yanked the map back mid-edit,
+                # with nothing on screen to say why. GO now needs Ctrl+Shift
+                # like every other control here.
+                go_now = (_down(0x11) and _down(0x10)
+                          and (_down(0x59) or _down(0x78)))
+                if go_now and not was["go"]:
                     _GO_NOW[0] = True
                     if _PAUSE[0]:
                         _set_paused(False)
+                        print("\n  RESUMED (Ctrl+Shift+Y) -- sweeping from the "
+                              "CURRENT view\n")
+                was["go"] = go_now
                 # GENTLE STOP (keyboard): Ctrl+Shift+S -> finish this cell, close
                 # the browser cleanly, no restart. Keyboard beats the corner
                 # gesture because the hunter OWNS the mouse (it moves the cursor
@@ -1061,19 +1090,27 @@ def _start_stop_watcher():
                     print("  (If it's frozen, hit Ctrl+Shift+K to force-quit.)")
                     print("#" * 58 + "\n")
                     return
-                # GENTLE STOP (mouse): jam the pointer into ANY screen corner and
-                # hold ~0.6s. Wider 10px zone; works in the brief idle window
-                # between pans. If it won't catch (the hunter keeps grabbing the
-                # cursor), use Ctrl+Shift+S instead.
+                # GENTLE STOP (mouse): park the pointer in ANY screen corner and
+                # hold it STILL. If it won't catch, use Ctrl+Shift+S instead.
+                #
+                # It must be still, not merely in the corner. The hunter drives
+                # the cursor itself on every pan, so "in a corner for 0.45s" was
+                # something the software could do to itself between cells --
+                # ending the run with a message blaming the mouse. Requiring the
+                # pointer not to MOVE for ~1.2s is the difference between a hand
+                # resting there and a pan passing through.
                 pt = _PT()
                 user32.GetCursorPos(ctypes.byref(pt))
                 sw = user32.GetSystemMetrics(0); sh = user32.GetSystemMetrics(1)
                 near = 10
                 in_corner = ((pt.x <= near or pt.x >= sw - near) and
                              (pt.y <= near or pt.y >= sh - near))
-                if in_corner:
+                same_spot = (abs(pt.x - last_pt[0]) <= 2
+                             and abs(pt.y - last_pt[1]) <= 2)
+                last_pt[0], last_pt[1] = pt.x, pt.y
+                if in_corner and same_spot:
                     held += 1
-                    if held >= 3:                    # ~0.6s at 0.2s poll
+                    if held >= 8:                    # ~1.2s at the 0.15s poll
                         _STOP[0] = True
                         print("\n" + "#" * 58)
                         print("  STOP: mouse held in a screen CORNER.")
@@ -1102,7 +1139,7 @@ def _start_stop_watcher():
 
     # Compact reminder right as motion begins -- the full block is on the
     # launch banner (print_controls). The corner gesture lives only here.
-    print("  KEYS: Ctrl+Shift+Pause = PAUSE   Ctrl+Shift+Y or F9 = GO   "
+    print("  KEYS: Ctrl+Shift+Pause = PAUSE/RESUME   Ctrl+Shift+Y = GO   "
           "Ctrl+Shift+S = stop   Ctrl+Shift+K = kill")
     print("  (mouse stop: jam the pointer into any screen CORNER, hold ~1s)")
 _NET_CAPTURE = [None]    # the always-on network capture (set in main)
