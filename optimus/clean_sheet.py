@@ -40,7 +40,8 @@ KEEP = {
     "backend comm", "hunter status", "_dedupe lock", "_dispatch",
 }
 # ...plus anything whose name CONTAINS one of these (Patrick's working tabs).
-KEEP_SUBSTR = ["campaign", "dialer", "devonwood", "commercial"]
+KEEP_SUBSTR = ["campaign", "dialer", "devonwood", "commercial",
+               "readme", "dashboard"]
 
 GOLD_TAB = "Gold Confirmed"
 PRECISE_TAB = "Precise Fiber"
@@ -262,6 +263,175 @@ def _prettify(ss, do_it):
             print("   (format skipped for %s: %s)" % (title, str(e)[:60]))
 
 
+README_TAB = "README"
+DASH_TAB = "DASHBOARD"
+
+# Written for a HUMAN and for an AI that nobody here controls. Daniel's ChatGPT
+# and Nicole's Claude will open this file and read whatever is in front of them;
+# if the first thing they meet is a 474,000-row archive they choke on it. This
+# tab is the map that sends them somewhere small and useful instead. Cheapest
+# interop there is -- it works the same for every assistant, this year and next.
+README_ROWS = [
+    ["OPTIMUS — ATT FIBER LEADS", "", ""],
+    ["", "", ""],
+    ["READ THIS FIRST — what every tab is and which one you want.", "", ""],
+    ["", "", ""],
+    ["TAB", "SIZE", "WHAT IT IS / WHEN TO USE IT"],
+    ["DASHBOARD", "tiny",
+     "Live counts for every tab below. Start here for 'how are we doing'."],
+    ["Gold Confirmed", "small",
+     "THE CALL LIST. Confirmed copper customers on live fiber — the $140 "
+     "upgrade. Easiest sale we have: an upgrade, not a switch."],
+    ["Fiber Green Biz", "small",
+     "Businesses sitting on a GREEN dot — fiber live, not an AT&T customer."],
+    ["Upgrade Orange Biz", "small",
+     "Businesses sitting on a GOLD dot — copper customer, upgrade pitch."],
+    ["Grey Fiber Customers", "medium",
+     "Already AT&T fiber customers. NOT leads — this is penetration data, and "
+     "the audience for wireless/bundle offers."],
+    ["Unknown Customers", "small",
+     "Customers whose build code we cannot decode yet. Parked for review, "
+     "deliberately NOT on the call list."],
+    ["Maps Businesses", "medium", "Every business scraped off Google Maps."],
+    ["Precise Fiber", "HUGE — ARCHIVE",
+     "Every captured dot with its color. ~474,000 rows. Nobody calls from this "
+     "tab. Do NOT open it whole and do NOT feed it to an AI — ask for a "
+     "specific range or ZIP instead."],
+    ["", "", ""],
+    ["THE DOT LEGEND", "WORTH", ""],
+    ["GREEN", "$500", "Fiber live, NOT an AT&T customer. The prize."],
+    ["GOLD / ORANGE", "$140", "Fiber live + AT&T customer still on copper."],
+    ["GREY", "—", "Already on AT&T fiber. Skip as a lead."],
+    ["", "", ""],
+    ["RULES FOR EVERYONE", "", ""],
+    ["View only", "",
+     "The hunter software WRITES these tabs continuously. Do not sort, insert "
+     "or delete rows — it breaks the pipeline for everyone. Put call notes and "
+     "dispositions in GoHighLevel, not here."],
+    ["If you are an AI", "",
+     "Read DASHBOARD first, then the specific small tab you need. Never load "
+     "Precise Fiber in full."],
+]
+
+
+def _ensure_readme(ss, do_it):
+    """README in front position, rewritten every run so it cannot go stale."""
+    if not do_it:
+        print("   would write the %s tab (tab map + dot legend + rules)" % README_TAB)
+        return
+    try:
+        try:
+            ws = ss.worksheet(README_TAB)
+            ws.clear()
+        except Exception:
+            ws = ss.add_worksheet(title=README_TAB, rows="60", cols="3")
+        ws.update("A1", README_ROWS, value_input_option="RAW")
+        sid = ws.id
+        ss.batch_update({"requests": [
+            {"repeatCell": {
+                "range": {"sheetId": sid, "startRowIndex": 0, "endRowIndex": 1},
+                "cell": {"userEnteredFormat": {
+                    "backgroundColor": {"red": 0.05, "green": 0.32, "blue": 0.13},
+                    "textFormat": {"bold": True, "fontSize": 13,
+                                   "foregroundColor": {"red": 1, "green": 1, "blue": 1}}}},
+                "fields": "userEnteredFormat(backgroundColor,textFormat)"}},
+            {"repeatCell": {
+                "range": {"sheetId": sid, "startRowIndex": 4, "endRowIndex": 5},
+                "cell": {"userEnteredFormat": {
+                    "backgroundColor": {"red": 0.85, "green": 0.89, "blue": 0.85},
+                    "textFormat": {"bold": True}}},
+                "fields": "userEnteredFormat(backgroundColor,textFormat)"}},
+            {"updateDimensionProperties": {
+                "range": {"sheetId": sid, "dimension": "COLUMNS",
+                          "startIndex": 0, "endIndex": 1},
+                "properties": {"pixelSize": 200}, "fields": "pixelSize"}},
+            {"updateDimensionProperties": {
+                "range": {"sheetId": sid, "dimension": "COLUMNS",
+                          "startIndex": 1, "endIndex": 2},
+                "properties": {"pixelSize": 120}, "fields": "pixelSize"}},
+            {"updateDimensionProperties": {
+                "range": {"sheetId": sid, "dimension": "COLUMNS",
+                          "startIndex": 2, "endIndex": 3},
+                "properties": {"pixelSize": 620}, "fields": "pixelSize"}},
+        ]})
+        print("   wrote %s" % README_TAB)
+    except Exception as e:
+        print("   (README skipped: %s)" % str(e)[:70])
+
+
+def _ensure_dashboard(ss, do_it):
+    """Live counts. Formulas reference tabs in THIS file, so there is no
+    IMPORTRANGE and nothing to authorise -- it just works, for anyone."""
+    if not do_it:
+        print("   would write the %s tab (live counts, no IMPORTRANGE)" % DASH_TAB)
+        return
+    counted = ["Gold Confirmed", "Grey Fiber Customers", "Unknown Customers",
+               "Fiber Green Biz", "Upgrade Orange Biz", "Maps Businesses",
+               "Precise Fiber"]
+    have = set()
+    try:
+        have = set(w.title for w in ss.worksheets())
+    except Exception:
+        pass
+    rows = [["OPTIMUS DASHBOARD", ""],
+            ["Updated live by formula — no refresh needed.", ""],
+            ["", ""],
+            ["TAB", "ROWS"]]
+    for t in counted:
+        if t in have:
+            rows.append([t, "=MAX(0,COUNTA('%s'!A:A)-1)" % t])
+    rows += [["", ""], ["DOT COLOR (Precise Fiber)", "COUNT"]]
+    if "Precise Fiber" in have:
+        for color in ("GREEN", "ORANGE", "GREY", "UNKNOWN"):
+            rows.append([color, "=COUNTIF('Precise Fiber'!B:B,\"%s\")" % color])
+    try:
+        try:
+            ws = ss.worksheet(DASH_TAB)
+            ws.clear()
+        except Exception:
+            ws = ss.add_worksheet(title=DASH_TAB, rows="40", cols="2")
+        ws.update("A1", rows, value_input_option="USER_ENTERED")
+        sid = ws.id
+        ss.batch_update({"requests": [
+            {"repeatCell": {
+                "range": {"sheetId": sid, "startRowIndex": 0, "endRowIndex": 1},
+                "cell": {"userEnteredFormat": {
+                    "backgroundColor": {"red": 0.10, "green": 0.45, "blue": 0.82},
+                    "textFormat": {"bold": True, "fontSize": 13,
+                                   "foregroundColor": {"red": 1, "green": 1, "blue": 1}}}},
+                "fields": "userEnteredFormat(backgroundColor,textFormat)"}},
+            {"updateDimensionProperties": {
+                "range": {"sheetId": sid, "dimension": "COLUMNS",
+                          "startIndex": 0, "endIndex": 1},
+                "properties": {"pixelSize": 260}, "fields": "pixelSize"}},
+        ]})
+        print("   wrote %s" % DASH_TAB)
+    except Exception as e:
+        print("   (DASHBOARD skipped: %s)" % str(e)[:70])
+
+
+def _order_tabs(ss, do_it):
+    """README, DASHBOARD, then the call lists, with the 474k archive LAST.
+    Whoever opens this file -- person or AI -- should land on something small."""
+    front = [README_TAB, DASH_TAB, GOLD_TAB, "Fiber Green Biz",
+             "Upgrade Orange Biz", "Grey Fiber Customers", "Unknown Customers",
+             "Gold Recheck", "Maps Businesses"]
+    if not do_it:
+        print("   would put %s first and %s last" % (README_TAB, PRECISE_TAB))
+        return
+    try:
+        by_title = {w.title: w for w in ss.worksheets()}
+        ordered = [by_title[t] for t in front if t in by_title]
+        rest = [w for w in ss.worksheets()
+                if w.title not in front and w.title != PRECISE_TAB]
+        if PRECISE_TAB in by_title:
+            rest.append(by_title[PRECISE_TAB])       # archive goes last
+        ss.reorder_worksheets(ordered + rest)
+        print("   tab order set (%s first, %s last)" % (README_TAB, PRECISE_TAB))
+    except Exception as e:
+        print("   (tab order skipped: %s)" % str(e)[:70])
+
+
 def main():
     do_it = "--yes" in sys.argv
     sh = open_sheet()
@@ -311,6 +481,10 @@ def main():
 
     # 3) delete the junk
     if not do_it:
+        print("\n-- README / DASHBOARD --")
+        _ensure_readme(ss, False)
+        _ensure_dashboard(ss, False)
+        _order_tabs(ss, False)
         _prettify(ss, False)
         print("\nDRY RUN. Re-run with --yes to migrate, dedupe, back up, "
               "delete the %d tabs above, and format the keepers." % len(kill))
@@ -325,7 +499,11 @@ def main():
         except Exception as e:
             print("   could not delete %s: %s" % (ws.title, str(e)[:60]))
 
-    # 4) make the survivors pretty
+    # 4) the map and the numbers, then make the survivors pretty
+    print("\n-- README / DASHBOARD --")
+    _ensure_readme(ss, True)
+    _ensure_dashboard(ss, True)
+    _order_tabs(ss, True)
     _prettify(ss, True)
     print("\nDone. Backups in %s" % bdir)
 
