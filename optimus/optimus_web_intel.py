@@ -54,15 +54,18 @@ ZIP_RE = re.compile(r"\b(7[5-9]\d{3})\b")
 
 # OUTAGES stay local. An outage is a selling event where we already have reps
 # standing; a cut in Ohio is not our problem.
+# FOOTPRINT-WIDE, not Texas. Territory is all 21 AT&T states (CLAUDE.md,
+# Patrick 2026-08-25). An outage anywhere AT&T sells is a phone/text selling
+# event; only the door-knock needs boots nearby, and _relevant() flags which
+# is which rather than throwing the rest away.
 OUTAGE_Q = ('"AT&T" (outage OR "fiber cut" OR "service interruption" OR '
-            '"internet down") (Houston OR Beaumont OR Texas)')
+            '"internet down")')
 
 # CABLE outages are the OPPOSITE of an AT&T outage: the competitor's customers
 # are sitting in the dark and we are the fix. Same territory rule as our own
 # outages -- it is only work where a rep can stand on the street today.
-CABLE_Q = ('("Comcast" OR "Xfinity" OR "Spectrum" OR "Charter") '
-           '(outage OR "internet down" OR "service interruption" OR "no service") '
-           '(Houston OR Beaumont OR Texas)')
+CABLE_Q = ('("Comcast" OR "Xfinity" OR "Spectrum" OR "Charter" OR "Cox") '
+           '(outage OR "internet down" OR "service interruption" OR "no service")')
 
 # NEW BUILDS go NATIONWIDE across the AT&T footprint. This is the one that
 # answers "where do we point the scanner next", and the answer is not confined
@@ -256,32 +259,42 @@ def classify(title):
 
 
 def _relevant(item, kind):
-    """Outages are kept only for our own territory. New builds are kept for the
-    whole AT&T footprint -- that is the point of them: they say where to send
-    the scanner next, which is by definition somewhere we have not been."""
+    """Keep anything inside the AT&T footprint, and flag whether it is LOCAL.
+
+    Outages used to be Texas-only, which made sense when the territory was
+    Houston/Beaumont. It is the whole footprint now, so an outage in Ohio is
+    still a phone/text selling event -- it just is not a door-knock. Rather
+    than discard it, mark `local` and let the caller rank: boots-on-ground
+    towns first, the rest of the footprint after.
+    """
     title = item.get("title", "")
     blob = (title + " " + item.get("url", "")).lower()
     zips = sorted(set(ZIP_RE.findall(title)))
     item = dict(item)
     item["zips"] = zips
-
-    if kind == "build":
-        places = extract_places(title)
-        if not places:
-            return None
-        city, st = places[0]
-        item["places"] = places
-        item["state"] = st
-        item["city"] = city
-        item["where"] = ("%s, %s" % (city, st)) if city else st
-        return item
+    item["local"] = any(t in blob for t in TERRITORY)
 
     hit = [t for t in TERRITORY if t in blob]
-    if not hit and not zips:
+    if hit:                                  # a town where we have feet
+        item["where"] = hit[0].title()
+        item["city"] = hit[0].title()
+        item["state"] = "TX"
+        return item
+    if kind != "build" and zips:             # a Texas ZIP in an outage headline
+        item["where"] = zips[0]
+        item["city"] = ""
+        item["state"] = "TX"
+        item["local"] = True
+        return item
+
+    places = extract_places(title)            # anywhere else in the footprint
+    if not places:
         return None
-    item["where"] = hit[0].title() if hit else (zips[0] if zips else "")
-    item["state"] = "TX"
-    item["city"] = hit[0].title() if hit else ""
+    city, st = places[0]
+    item["places"] = places
+    item["state"] = st
+    item["city"] = city
+    item["where"] = ("%s, %s" % (city, st)) if city else st
     return item
 
 

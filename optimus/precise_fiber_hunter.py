@@ -5090,26 +5090,34 @@ def scan_targets(limit=12):
     except Exception:
         return []
     out, seen_q = [], set()
-    for kind, why in (("cable", "CABLE OUT"), ("build", "NEW FIBER")):
-        for it in (web.get(kind) or []):
-            zips = it.get("zips") or []
-            city = (it.get("city") or "").strip()
-            st = (it.get("state") or "").strip()
-            if zips:                   # a ZIP aims tighter than a city name
-                q, label = zips[0], ("%s %s" % (city, zips[0])).strip()
-            elif city and st:
-                q = label = "%s, %s" % (city, st)
-            elif city:
-                q = label = city
-            else:
-                continue               # a headline with no place is not a target
-            if q.upper() in seen_q:
-                continue
-            seen_q.add(q.upper())
-            out.append({"query": q, "label": label, "why": why,
-                        "headline": (it.get("title") or "")[:96]})
-            if len(out) >= limit:
-                return out
+    # Rank: local cable outage, local new fiber, then the rest of the footprint.
+    # A cable outage where we have feet can be door-knocked today; the same story
+    # three states away is still a phone/text play, just not a drive.
+    for want_local in (True, False):
+        for kind, why in (("cable", "CABLE OUT"), ("build", "NEW FIBER")):
+            for it in (web.get(kind) or []):
+                if bool(it.get("local")) != want_local:
+                    continue
+                zips = it.get("zips") or []
+                city = (it.get("city") or "").strip()
+                st = (it.get("state") or "").strip()
+                if zips:               # a ZIP aims tighter than a city name
+                    q, label = zips[0], ("%s %s" % (city, zips[0])).strip()
+                elif city and st:
+                    q = label = "%s, %s" % (city, st)
+                elif city:
+                    q = label = city
+                else:
+                    continue           # a headline with no place is not a target
+                if q.upper() in seen_q:
+                    continue
+                seen_q.add(q.upper())
+                out.append({"query": q, "label": label,
+                            "why": why + (" LOCAL" if want_local else ""),
+                            "local": want_local,
+                            "headline": (it.get("title") or "")[:96]})
+                if len(out) >= limit:
+                    return out
     return out
 
 
@@ -5124,8 +5132,8 @@ def print_scan_targets():
         print("      sweep where you are, or run --follow-news later)")
         return
     for i, x in enumerate(t, 1):
-        print("     %d. %-22s [%-9s] %s"
-              % (i, x["label"][:22], x["why"], x["headline"][:44]))
+        print("     %d. %-20s [%-15s] %s"
+              % (i, x["label"][:20], x["why"], x["headline"][:40]))
     print("")
     print("     Type one into the map search box, or launch with")
     print("     --follow-news to sweep them all automatically.")
@@ -5183,8 +5191,8 @@ def follow_news_pass(page, ws, seen, dry, capture, cells_per_target=12):
     print("  FOLLOWING THE BUILD-OUT NEWS -- %d town(s), %d cells each:"
           % (len(targets), cells_per_target))
     for t in targets:
-        print("     %-22s [%-9s] %s"
-              % (t["label"][:22], t["why"], t["headline"][:52]))
+        print("     %-20s [%-15s] %s"
+              % (t["label"][:20], t["why"], t["headline"][:48]))
     total = 0
     for i, t in enumerate(targets, 1):
         if _STOP[0]:
