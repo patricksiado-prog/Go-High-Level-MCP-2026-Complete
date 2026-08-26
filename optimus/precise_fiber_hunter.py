@@ -437,7 +437,8 @@ def print_controls():
     print("")
     print("    Ctrl+Shift+Pause   PAUSE  the hunter lets go of the map;")
     print("      (or Ctrl+Shift+P)       pan / zoom / search it by hand")
-    print("    Ctrl+G             GO     resume from the CURRENT view")
+    print("    Ctrl+Shift+Y       GO     resume from the CURRENT view")
+    print("      (or F9)                 -- NOT Ctrl+G: Chrome steals that")
     print("")
     print("    Ctrl+Shift+S       STOP   finish this cell, close clean")
     print("    Ctrl+Shift+K       KILL   force-quit, even if frozen")
@@ -889,7 +890,7 @@ _STOP = [False]
 # re-aim was to kill the program and relaunch, which costs a browser start, a
 # login, and the run's dedupe memory.
 _PAUSE = [False]
-# Ctrl+G means GO in two situations: resume from a pause, and skip the opening
+# GO means two things: resume from a pause, and skip the opening
 # countdown. One flag for the second, so the countdown never waits on a key it
 # cannot see.
 _GO_NOW = [False]
@@ -921,7 +922,7 @@ def pause_gate(page=None):
     print("\n" + "=" * 58)
     print("  PAUSED -- the hunter has let go of the map.")
     print("  Move it however you like: pan, zoom, search a new address.")
-    print("  Press Ctrl+G to GO again from wherever you leave it.")
+    print("  Press Ctrl+Shift+Y (or F9) to GO again from where you leave it.")
     print("=" * 58 + "\n")
     while _PAUSE[0] and not _STOP[0]:
         time.sleep(0.25)
@@ -939,7 +940,7 @@ def countdown_to_start(secs=10):
     The map opens wherever the ZIP search put it (or wherever the last session
     left it) and the hunter used to start dragging immediately -- if that view
     was wrong, the first cells were already the wrong streets. Ten seconds is
-    enough to look at it. Every control works during the hold, and Ctrl+G cuts
+    enough to look at it. Every control works during the hold, and GO cuts
     it short. Skipped when nobody is at the keyboard.
     """
     if _STOP[0]:
@@ -952,7 +953,8 @@ def countdown_to_start(secs=10):
     _GO_NOW[0] = False
     print("")
     print("  Map is up. Sweep starts in %d seconds." % secs)
-    print("  Ctrl+G = go NOW    Ctrl+Shift+Pause = hold    Ctrl+Shift+S = stop")
+    print("  Ctrl+Shift+Y (or F9) = go NOW    Ctrl+Shift+Pause = hold"
+          "    Ctrl+Shift+S = stop")
     for i in range(secs, 0, -1):
         if _STOP[0] or _GO_NOW[0]:
             break
@@ -1012,9 +1014,14 @@ def _start_stop_watcher():
                 if _down(0x11) and _down(0x10) and (_down(0x13) or _down(0x50)):
                     if not _PAUSE[0]:
                         _set_paused(True)
-                # GO AGAIN: Ctrl+G -> resume from the CURRENT view, and skip
-                # the opening countdown. G=0x47.
-                if _down(0x11) and _down(0x47):
+                # GO AGAIN: resume from the CURRENT view, and skip the opening
+                # countdown. Ctrl+Shift+Y (0x59) or F9 (0x78).
+                #
+                # NOT Ctrl+G. That is Chrome's find-next: it opened the browser
+                # search bar right on top of the map instead of resuming
+                # (Patrick, 2026-08-25). Anything the browser binds is unusable
+                # here, because the map always has focus while we sweep.
+                if (_down(0x11) and _down(0x10) and _down(0x59)) or _down(0x78):
                     _GO_NOW[0] = True
                     if _PAUSE[0]:
                         _set_paused(False)
@@ -1072,7 +1079,7 @@ def _start_stop_watcher():
 
     # Compact reminder right as motion begins -- the full block is on the
     # launch banner (print_controls). The corner gesture lives only here.
-    print("  KEYS: Ctrl+Shift+Pause = PAUSE   Ctrl+G = GO   "
+    print("  KEYS: Ctrl+Shift+Pause = PAUSE   Ctrl+Shift+Y or F9 = GO   "
           "Ctrl+Shift+S = stop   Ctrl+Shift+K = kill")
     print("  (mouse stop: jam the pointer into any screen CORNER, hold ~1s)")
 _NET_CAPTURE = [None]    # the always-on network capture (set in main)
@@ -4753,7 +4760,7 @@ def sweep_backend(page, ws, seen, area_label, dry, cols, rows, capture):
         for c in range(cols):
             if _STOP[0]:                       # gentle stop -> quit within a cell
                 return total
-            pause_gate(page)                   # Ctrl+Shift+Pause / Ctrl+G
+            pause_gate(page)                   # Ctrl+Shift+Pause / Ctrl+Shift+Y
             if _STOP[0]:
                 return total
             if on_map(page):
@@ -4789,7 +4796,7 @@ def sweep_grid(page, ws, seen, area_label, dry, capture):
         done.add(key)
         if _STOP[0]:                 # gentle stop -> quit within a cell
             return
-        pause_gate(page)             # Ctrl+Shift+Pause / Ctrl+G
+        pause_gate(page)             # Ctrl+Shift+Pause / Ctrl+Shift+Y
         if _STOP[0]:
             return
         if _map_frozen(page):        # WebGL freeze -> alert + stop cleanly
@@ -5018,7 +5025,7 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture, max_cells=None):
                 for _ in range(run):
                     if _STOP[0]:                # gentle stop -> quit within a cell
                         return total
-                    # PAUSED -> hands off the map until Ctrl+G. On resume the
+                    # PAUSED -> hands off the map until GO. On resume the
                     # map is wherever Patrick left it, so the old spiral is
                     # meaningless: start a fresh one from the CURRENT view
                     # instead of panning back toward the old center.
