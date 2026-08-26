@@ -4,8 +4,8 @@
  "machine": "LAPTOP-FJEEPATI",
  "build_fingerprint": "863b24da",
  "mode": "",
- "updated_at": "2026-08-26 02:44:54",
- "last_phase": "sweep_start",
+ "updated_at": "2026-08-26 03:11:18",
+ "last_phase": "pass_done",
  "phases": [
   [
    "start",
@@ -66,6 +66,11 @@
    "sweep_start",
    "02:44:54",
    317.8
+  ],
+  [
+   "pass_done",
+   "03:11:18",
+   1902.4
   ]
  ]
 }
