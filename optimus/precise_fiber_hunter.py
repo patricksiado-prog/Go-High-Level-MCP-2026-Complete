@@ -5064,6 +5064,66 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture, max_cells=None):
         return total
 
 
+def scan_targets(limit=12):
+    """WHERE TO POINT THE MACHINE NEXT. Two kinds of place earn a sweep today:
+
+      NEW FIBER  -- a build-out headline named the town, so fresh GREEN is
+                    sitting there that nobody has worked yet.
+      CABLE OUT  -- the competitor just went down there. Their customers are in
+                    the dark right now and AT&T fiber is the fix. This is a
+                    selling event with a clock on it.
+
+    Returns the merged, deduped list with the reason attached, so the operator
+    reads WHY a town is on the list, not just its name.
+    """
+    if _WEB is None:
+        return []
+    try:
+        web = _web_intel() or {}
+    except Exception:
+        return []
+    out, seen_q = [], set()
+    for kind, why in (("cable", "CABLE OUT"), ("build", "NEW FIBER")):
+        for it in (web.get(kind) or []):
+            zips = it.get("zips") or []
+            city = (it.get("city") or "").strip()
+            st = (it.get("state") or "").strip()
+            if zips:                   # a ZIP aims tighter than a city name
+                q, label = zips[0], ("%s %s" % (city, zips[0])).strip()
+            elif city and st:
+                q = label = "%s, %s" % (city, st)
+            elif city:
+                q = label = city
+            else:
+                continue               # a headline with no place is not a target
+            if q.upper() in seen_q:
+                continue
+            seen_q.add(q.upper())
+            out.append({"query": q, "label": label, "why": why,
+                        "headline": (it.get("title") or "")[:96]})
+            if len(out) >= limit:
+                return out
+    return out
+
+
+def print_scan_targets():
+    """The 'go here next' block. Printed with the opening intel so nobody has
+    to guess where to aim -- the whole AT&T footprint is the territory and a
+    blank map is a bad place to start."""
+    t = scan_targets()
+    print("  ---- WHERE TO SCAN NEXT ------------------------------------")
+    if not t:
+        print("     (no build-out or cable-outage news right now --")
+        print("      sweep where you are, or run --follow-news later)")
+        return
+    for i, x in enumerate(t, 1):
+        print("     %d. %-22s [%-9s] %s"
+              % (i, x["label"][:22], x["why"], x["headline"][:44]))
+    print("")
+    print("     Type one into the map search box, or launch with")
+    print("     --follow-news to sweep them all automatically.")
+
+
 def news_targets(limit=12):
     """The towns the AT&T BUILD-OUT news just named, as map search queries.
 
@@ -5107,7 +5167,7 @@ def follow_news_pass(page, ws, seen, dry, capture, cells_per_target=12):
     Falls back to the normal spiral when there is no news -- an empty feed must
     never mean an idle hunter.
     """
-    targets = news_targets()
+    targets = scan_targets()
     if not targets:
         print("  (no build-out news targets right now -- sweeping where the "
               "map sits instead)")
@@ -5116,7 +5176,8 @@ def follow_news_pass(page, ws, seen, dry, capture, cells_per_target=12):
     print("  FOLLOWING THE BUILD-OUT NEWS -- %d town(s), %d cells each:"
           % (len(targets), cells_per_target))
     for t in targets:
-        print("     %-24s %s" % (t["label"][:24], t["headline"][:60]))
+        print("     %-22s [%-9s] %s"
+              % (t["label"][:22], t["why"], t["headline"][:52]))
     total = 0
     for i, t in enumerate(targets, 1):
         if _STOP[0]:
@@ -5124,7 +5185,8 @@ def follow_news_pass(page, ws, seen, dry, capture, cells_per_target=12):
         pause_gate(page)
         if _STOP[0]:
             break
-        print("\n  [NEWS TARGET %d/%d] %s" % (i, len(targets), t["label"]))
+        print("\n  [SCAN TARGET %d/%d] %s  (%s)"
+              % (i, len(targets), t["label"], t["why"]))
         try:
             if not search_zip(page, t["query"]):
                 print("     (could not fly the map there -- skipping)")
@@ -7177,6 +7239,7 @@ def intel_banner():
             if not (_INTEL_WHY.get("zips") or _INTEL_WHY.get("gold")):
                 print("     no zone scans and no gold dots yet")
     _print_dispatch(sh, web)
+    print_scan_targets()
     print("  ------------------------------------------------------------")
 
 
