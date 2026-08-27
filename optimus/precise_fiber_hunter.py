@@ -947,8 +947,8 @@ def pause_gate(page=None):
     print("\n" + "=" * 58)
     print("  PAUSED -- the hunter has let go of the map.")
     print("  Move it however you like: pan, zoom, search a new address.")
-    print("  Press Ctrl+Shift+Y to GO again from where you leave it,")
-    print("  or Ctrl+Shift+Pause again to un-pause.")
+    print("  Press Ctrl+UP-arrow to GO again from where you leave it,")
+    print("  or Ctrl+DOWN again to un-pause. Capture stays ON while paused.")
     print("=" * 58 + "\n")
     while _PAUSE[0] and not _STOP[0]:
         time.sleep(0.25)
@@ -982,7 +982,9 @@ def countdown_to_start(secs=10):
     # The keys ride on the ticking line itself. Printed once above the counter
     # they scroll out of sight the moment anything else logs, and an operator
     # staring at a countdown cannot be expected to remember three combos.
-    keys = "Ctrl+Shift+Y = GO now | Ctrl+Shift+Pause = hold | Ctrl+Shift+S = stop"
+    keys = ("Ctrl+UP-arrow = GO | Ctrl+DOWN-arrow = PAUSE (move the map by"
+            " hand, capture stays on; DOWN again or UP = resume) |"
+            " Ctrl+Shift+S = stop")
     # Poll ~10x a second instead of sleeping a whole second between checks.
     # The watcher reads the keyboard every 0.15s, but this loop only LOOKED
     # once a second, so a press could sit unnoticed for up to a full second
@@ -1054,42 +1056,48 @@ def _start_stop_watcher():
                     print("  KILL SWITCH (Ctrl+Shift+K): force-quitting now.")
                     print("#" * 58 + "\n")
                     os._exit(0)          # immediate; launcher sees 0 = no restart
-                # PAUSE: Ctrl+Shift+Pause -> let go of the map so it can be moved
-                # by hand. Ctrl+Shift+P does the same, because Pause/Break is an
-                # Fn-layer key on most HP laptops and a hotkey you cannot press
-                # is not a hotkey. Pause=0x13 P=0x50.
-                pause_now = (_down(0x11) and _down(0x10)
-                             and (_down(0x13) or _down(0x50)))
+                # PAUSE: Ctrl+P (Patrick, 2026-08-27: "cntrl p pause" --
+                # the three-finger chords "never work" at the keyboard, so the
+                # motion keys are two fingers now). Shift held too still
+                # counts; Pause/Break stays as an alias. Chrome's own Ctrl+P
+                # (the Print dialog) is swallowed by an init script injected
+                # into the page, so the browser never sees the key.
+                # MOTION ONLY: pause releases the map so it can be moved by
+                # hand -- capture and the uploader keep running throughout.
+                # Pause=0x13 P=0x50.
+                # Primary: Ctrl+DOWN-ARROW = motion DOWN (Patrick,
+                # 2026-08-27, third round of keys: two fingers, and a key no
+                # program anywhere binds to a dialog). Ctrl+P and Ctrl+Pause
+                # stay as quiet aliases. Down=0x28 Pause=0x13 P=0x50.
+                pause_now = (_down(0x11)
+                             and (_down(0x28) or _down(0x13) or _down(0x50)))
                 if pause_now and not was["pause"]:
-                    # TOGGLE. It used to pause only, so pressing it again did
-                    # nothing and you had to remember a second, different key
-                    # to start again. One key is the whole point of a
-                    # start/stop.
+                    # TOGGLE. One key stops and starts the motion.
                     _set_paused(not _PAUSE[0])
-                    print("\n  %s (Ctrl+Shift+Pause)\n"
-                          % ("PAUSED -- the map is yours" if _PAUSE[0]
+                    print("\n  %s (Ctrl+DOWN)\n"
+                          % ("PAUSED -- the map is yours (capture still on)"
+                             if _PAUSE[0]
                              else "RESUMED -- sweeping from the CURRENT view"))
                 was["pause"] = pause_now
-                # GO AGAIN: resume from the CURRENT view, and skip the opening
-                # countdown. Ctrl+Shift+Y (0x59) or F9 (0x78).
-                #
-                # NOT Ctrl+G. That is Chrome's find-next: it opened the browser
-                # search bar right on top of the map instead of resuming
-                # (Patrick, 2026-08-25). Anything the browser binds is unusable
-                # here, because the map always has focus while we sweep.
-                # F9 USED TO WORK BARE, and that broke the one thing pause
-                # exists for. You pause to pan and zoom the map by hand; a
-                # stray F9 -- an Fn-layer key, a media key, another window --
-                # silently resumed the sweep and yanked the map back mid-edit,
-                # with nothing on screen to say why. GO now needs Ctrl+Shift
-                # like every other control here.
-                go_now = (_down(0x11) and _down(0x10)
-                          and (_down(0x59) or _down(0x78)))
+                # GO: Ctrl+G (Patrick, 2026-08-27: "cntrl g go"). Ctrl+G is
+                # Chrome's find-next, which used to open the search bar over
+                # the map (2026-08-25) -- that is why an init script now
+                # swallows Ctrl+G inside the page, so Chrome never acts on it
+                # and only the hunter does. Ctrl+Shift+Y stays as an alias.
+                # Bare F9 stays dead: a stray press once un-paused a sweep
+                # mid-edit with nothing on screen to say why.
+                # MOTION ONLY: go starts the sweep from the CURRENT view.
+                # G=0x47 Y=0x59.
+                # Primary: Ctrl+UP-ARROW = motion UP. Ctrl+G and
+                # Ctrl+Shift+Y stay as aliases. Up=0x26 G=0x47 Y=0x59.
+                go_now = (_down(0x11)
+                          and (_down(0x26) or _down(0x47)
+                               or (_down(0x10) and _down(0x59))))
                 if go_now and not was["go"]:
                     _GO_NOW[0] = True
                     if _PAUSE[0]:
                         _set_paused(False)
-                        print("\n  RESUMED (Ctrl+Shift+Y) -- sweeping from the "
+                        print("\n  RESUMED (Ctrl+UP) -- sweeping from the "
                               "CURRENT view\n")
                 was["go"] = go_now
                 # GENTLE STOP (keyboard): Ctrl+Shift+S -> finish this cell, close
@@ -1154,8 +1162,8 @@ def _start_stop_watcher():
 
     # Compact reminder right as motion begins -- the full block is on the
     # launch banner (print_controls). The corner gesture lives only here.
-    print("  KEYS: Ctrl+Shift+Pause = PAUSE/RESUME   Ctrl+Shift+Y = GO   "
-          "Ctrl+Shift+S = stop   Ctrl+Shift+K = kill")
+    print("  KEYS: Ctrl+DOWN = PAUSE/RESUME (motion only, capture stays on)"
+          "   Ctrl+UP = GO from current view   Ctrl+Shift+S = stop\n")
     print("  (mouse stop: jam the pointer into any screen CORNER, hold ~1s)")
 _NET_CAPTURE = [None]    # the always-on network capture (set in main)
 
@@ -5346,6 +5354,18 @@ def sweep_continuous(page, ws, seen, area_label, dry, capture, max_cells=None):
                     if pause_gate(page):
                         if _STOP[0]:
                             return total
+                        _GO_NOW[0] = False   # resume already re-aims; eat the flag
+                        di, run, reaim = 0, 1, True
+                        break
+                    # GO pressed mid-run: fresh spiral from the CURRENT view.
+                    # THE BUG THAT MADE "GO NEVER WORKED" TRUE (Patrick,
+                    # 2026-08-27): the key set _GO_NOW and only the opening
+                    # countdown ever read it -- no sweep ever consumed the
+                    # flag, so outside the first ten seconds the GO key did
+                    # nothing at all. Now the sweep honors it.
+                    if _GO_NOW[0]:
+                        _GO_NOW[0] = False
+                        print("\n  [GO] fresh spiral from the CURRENT view\n")
                         di, run, reaim = 0, 1, True
                         break
                     if _map_frozen(page):       # WebGL freeze -> alert + stop
@@ -8107,6 +8127,26 @@ def main():
                   "--disable-features=CalculateNativeWinOcclusion,IntensiveWakeUpThrottling,HighEfficiencyModeAvailable",
                   "--disable-dev-shm-usage"],
         )
+
+        # Ctrl+P / Ctrl+G are the hunter's PAUSE and GO keys now (Patrick,
+        # 2026-08-27). Inside Chrome those same keys mean Print dialog and
+        # find-next -- both pop a window straight over the map. This script
+        # rides into every page and cancels the browser's handling of exactly
+        # those two combos, so the global key listener is the only thing that
+        # acts on them. Everything else on the keyboard passes through
+        # untouched.
+        try:
+            ctx.add_init_script(
+                "window.addEventListener('keydown', function (e) {"
+                " var k = (e.key || '').toLowerCase();"
+                " if (e.ctrlKey && (k === 'p' || k === 'g' ||"
+                "     k === 'arrowup' || k === 'arrowdown')) {"
+                "  e.preventDefault(); e.stopImmediatePropagation();"
+                " }"
+                "}, true);")
+        except Exception as _e:
+            print("  (key-shield init script failed: %s -- Ctrl+Shift+P/"
+                  "Ctrl+Shift+Y still work)" % str(_e)[:50])
         ctx.add_init_script(MAPBOX_HOOK_JS)   # hook the map before it loads
         ctx.add_init_script(GEO_HIDE_JS)      # hide the giant geolocation blob
         ctx.add_init_script(GL_WATCH_JS)      # detect WebGL context loss (freeze)
