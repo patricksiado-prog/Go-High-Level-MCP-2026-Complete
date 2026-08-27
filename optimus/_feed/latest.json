@@ -1,10 +1,10 @@
 {
- "generated_at": "2026-08-26 14:53:35",
- "run_id": "20260826-145327",
+ "generated_at": "2026-08-26 22:46:47",
+ "run_id": "20260826-223528",
  "operator": "Patrick",
  "machine": "LAPTOP-FJEEPATI",
  "area": "",
- "build_fingerprint": "2ad46bc0",
+ "build_fingerprint": "1a9f9df1",
  "counts": {
   "green": 0,
   "fiber": 0,
@@ -29,17 +29,49 @@
  "phases": [
   [
    "start",
-   "14:53:27",
+   "22:35:36",
    0.0
   ],
   [
+   "playwright_up",
+   "22:35:59",
+   23.3
+  ],
+  [
+   "chromium_up",
+   "22:36:09",
+   33.1
+  ],
+  [
+   "browser_up",
+   "22:36:14",
+   37.7
+  ],
+  [
+   "page_loaded",
+   "22:36:20",
+   44.4
+  ],
+  [
+   "LOGGED_OUT",
+   "22:36:28",
+   52.3
+  ],
+  [
+   "LOGIN_TIMEOUT",
+   "22:46:35",
+   658.5
+  ],
+  [
    "exit",
-   "14:53:31",
-   4.1
+   "22:46:42",
+   665.4
   ]
  ],
  "last_phase": "exit",
  "stage_counters": {
+  "auth_expired": 4,
+  "parse_error": 1,
   "classified_green": 0,
   "classified_gold": 0,
   "classified_grey": 0,
@@ -49,21 +81,65 @@
  "wire_audit_records": 0,
  "wire_audit_by_colour": {},
  "capture_truth": {
-  "delivery": null,
-  "raw_features": null,
+  "delivery": "AUTH_EXPIRED",
+  "raw_features": 0,
   "rendered": null,
   "classified": 0,
   "written": 0,
-  "auth_ok": null,
+  "auth_ok": false,
   "map_ok": null,
   "zoom_ok": null,
-  "notes": []
+  "notes": [
+   "HTTP 301 REDIRECTED TO LOGIN -- not logged in, nothing lands",
+   "NOT JSON -- AT&T sent something this parser cannot read. First 120 chars: <!DOCTYPE html> <html lang=\"en\">     <head>         <!-- The following 3 met",
+   "HTTP 302 redirected -- session likely expired",
+   "HTTP 302 redirected -- session likely expired",
+   "SESSION EXPIRED -- AT&T sent a login page, not data. Log OUT of youachieve.att.com, close the browser, log back in, then re-run.",
+   "access chooser, not the map",
+   "capture: NO serviceability responses seen -- the map isn't loading fiber data (check you're LOGGED IN and dots are visible)"
+  ]
  },
- "first_failure": null,
- "capture_diagnostic": {},
+ "first_failure": "delivery",
+ "capture_diagnostic": {
+  "serviceability_responses": 0,
+  "leads_decoded": 0,
+  "empty_payload_top_keys": null,
+  "capture_reason": "NO serviceability responses seen -- the map isn't loading fiber data (check you're LOGGED IN and dots are visible)"
+ },
  "customer_specimens": [],
  "customer_specimen_count": 0,
- "zero_lead_responses": [],
+ "zero_lead_responses": [
+  {
+   "url": "https://youachieve.att.com/yourefer/fiber",
+   "content_type": "text/html; charset=UTF-8",
+   "total_bytes": 63,
+   "body_head": "HTTP 301 -- REDIRECTED TO LOGIN -- not logged in, nothing lands"
+  },
+  {
+   "url": "https://youachieve.att.com/yourefer/fiber/",
+   "content_type": "text/html;charset=UTF-8",
+   "total_bytes": 13746,
+   "body_head": "\n\n<!DOCTYPE html>\n<html lang=\"en\">\n    <head>\n        <!-- The following 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->\n        <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge,chrome=1\" />\n        <meta charset=\"utf-8\" />\n        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n\n        \n                <link rel=\"icon\" type=\"image/png\" href=\"/ui/img/YouAchieve_rgb_pos.png\" integrity=\"sha384-JvkF7hO1ndiThbKZ4jdWx6jwPxGPClZU2vk7JW8xWqD0DMi3sLgxdVZOtgyCid4H\" crossorigin=\"anonymous\" />\n                <link rel=\"apple-touch-icon\" sizes=\"57x57\" href=\"/ui/img/apple-icons/yA-apple-icon-57x57.png\" integrity=\"sha384-j4Dc5hCK7j2Jw6aaXrovwi4thZRzBiNTWsH87PfjbVo7+xkdoZF41k+Atilu/+Vy\" crossorigin=\"anonymous\" />\n                <link rel=\"apple-touch-icon\" sizes=\"72x72\" href=\"/ui/img/apple-icons/yA-apple-icon-72x72.png\" integrity=\"sha384-8zbXgQYS6vHMzWXDpnd6HhWnqE9aaQS8twRpqV9TF5nVymQDJQ7uFLq2pqx4LLix\" crossorigin=\"anonymous\" />\n                <link rel=\"apple-touch-icon\" sizes=\"114x114\" href=\"/ui/img/apple-icons/yA-apple-icon-114x114.png\" integrity=\"sha384-Kh6dxaqmRhHl7VBoHkuzrVKxlAt3KsVjKVdWt22aROs0wxHHVPUr2MDRPpfcJlCP\" crossorigin=\"anonymous\" />\n                <link rel=\"apple-touch-icon\" sizes=\"144x144\" href=\"/ui/img/apple-icons/yA-apple-icon-144x144.png\" integrity=\"sha384-2WIpfFnnVjRTqjqYKcjaCKbi5VykMjuwEDHOpNKc77v5Y2+aQjQArRmhz8mbyLQi\" crossorigin=\"anonymous\" />\n            \n\n        <!-- Additional Meta Tags -->\n        <meta name=\"description\" content=\"AT&T You Achieve Platform\"> \n\n        <!-- Site CSS Files -->\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/jquery/jquery-ui-1_14_1/jquery-ui.min.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/bootstrap.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/font-awesome.min.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/indexV2.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/you-perform.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/jquery/ui/tinymce/fonts.css\" />\n        \n\n        <!-- Page CSS Files -->\n        \n\n        <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->\n        <!--[if lt IE 12]>\n          <script src=\"https://cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv.min.js\" integrity=\"sha512-UDJtJXfzfsiPPgnI5S1000FPLBHMhvzAMX15I+qG2E2OAzC9P1JzUwJOfnypXiOH7MRPaqzhPbBGDNNj7zBfoA==\" crossorigin=\"anonymous\" referrerpolicy=\"no-referrer\"></script>\n          <script src=\"https://cdnjs.cloudflare.com/ajax/libs/respond.js/1.4.2/respond.min.js\" integrity=\"sha512-qWVvreMuH9i0DrugcOtifxdtZVBBL0X75r9YweXsdCHtXUidlctw7NXg5KVP3ITPtqZ2S575A0wFkvgS2anqSA==\" crossorigin=\"anonymous\" referrerpolicy=\"no-referrer\"></script>\n        <![endif]-->\n\n        <title>you Achieve | Landing</title>\n    <script type=\"text/javascript\" src=\"https://youachieve.att.com/resources/4742a524ea328741d98ac6233c9dc954522001624dcc5\"  ></script></head>\n\n    <body style=\"background-color: #FFF;\">\n        <div id=\"appWrapper\">\n            \n            \n            \n            <div id=\"sidebar-wrapper-left\">\n                <ul class=\"sidebar-nav-left\">\n                    <li style=\"line-height: 56px; text-align:right;\"><button type=\"button\" class=\"btn btn-outline-blue menuLeftToggle\" style=\"margin-bottom: 8px; margin-top:8px; margin-right: 10px;\">Close Menu <i class=\"fa fa-remove\"></i></button></li>\n\n                    \n                </ul>\n            </div>\n            \n            \n            \n            <div id=\"sidebar-wrapper-right\">\n                <ul class=\"sidebar-nav\">\n                    <li style=\"line-height: 56px; text-align:right;\">\n                        <button type=\"button\" class=\"btn btn-outline-blue menuRightToggle\" style=\"margin-bottom: 8px; margin-top:8px; margin-right: 10px;\">Close M"
+  },
+  {
+   "url": "https://saml.e-access.att.com/isam/sps/oidc/rp/SAML-IDP/kickoff/SAML-IDP-Password?Target=https%3A%2F%2Fsaml.e-access.att.com%2Fisam%2Fsps%2Fattsamlidp_mfaia%2Fsaml20%2Flogininitial%3FRequestBinding%3DHTTPPost%26PartnerId%3Dhttps%3A%2F%2Fyouachieve.att.com%26RelayState%3Dhttps%3A%2F%2Fyouachieve.att.",
+   "content_type": "",
+   "total_bytes": 48,
+   "body_head": "HTTP 302 -- redirected -- session likely expired"
+  },
+  {
+   "url": "https://oidc.idp.elogin.att.com/mga/sps/oauth/oauth20/authorize?response_mode=form_post&SAMLPartner=https%3A%2F%2Fyouachieve.att.com&claims=%7B%22id_token%22%3A%7B%22authenticationTypes%22%3A%7B%22essential%22%3Afalse%7D%7D%7D&scope=openid&Target=https%3A%2F%2Fsaml.e-access.att.com%2Fisam%2Fsps%2Fat",
+   "content_type": "text/html",
+   "total_bytes": 48,
+   "body_head": "HTTP 302 -- redirected -- session likely expired"
+  },
+  {
+   "url": "https://oidc.idp.elogin.att.com/lrr/attLRR/LrrController?TAM_OP=token_login&USERNAME=unauthenticated&ERROR_CODE=0x00000000&ERROR_TEXT=HPDBA0521I%20%20%20Successful%20completion&METHOD=GET&URL=%2Fmga%2Fsps%2Foauth%2Foauth20%2Fauthorize%3Fresponse_mode%3Dform_post%26SAMLPartner%3Dhttps%253A%252F%252Fy",
+   "content_type": "text/html;charset=utf-8",
+   "total_bytes": 121684,
+   "body_head": "<!DOCTYPE html>\n\n\n\n\n\n\n\n\n\n<html id=\"html\" lang=\"en\">\n  <head>\n    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n    \n    \n    \n    \n    \n    \n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no\" >\n    <meta http-equiv=\"Content-Type\"  content=\"text/html; charset=utf-8\">\n    <title>AT&amp;T Security Server: Login</title>\n    <base href='/lrr/attLRR/'>\n    <link rel=\"stylesheet\" href=\"resources/static/styles/main.css?v16.1.21-20260612135918676\">\n    <link rel=\"stylesheet\" href=\"resources/static/styles/fonts.css?v16.1.21-20260612135918676\">\n    <link rel=\"stylesheet\" href=\"resources/static/styles/cato.css?v16.1.21-20260612135918676\">\n    <link rel=\"stylesheet\" href=\"resources/static/styles/checkbox.css?v16.1.21-20260612135918676\">\n    <script>\n      if ( typeof window.globals  === 'undefined')\n      {\n        window.globals={};\n      }\n    </script>\n    \n      \n        \n        <script>\n          globals.attUID = false;\n        </script>\n      \n      \n    \n\n    <!--[if lte IE 9]> <link rel=\"stylesheet\" type=\"text/css\" href=\"resources/static/styles/ie.css?v16.1.21-20260612135918676\" /> <![endif]-->\n    <script src=\"resources/v1/js/jquery-3.7.1.min.js\"></script>\n    <script src=\"resources/v1/js/jquery.blockUI.js\"></script>\n    <script src=\"resources/v1/js/haloeamSpinner.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/mk.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/utilities.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/static/scripts/script.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/static/scripts/backEndFunctions.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/ie7.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/passkey.js?v16.1.21-20260612135918676\"></script>\n    <script src=\"resources/js/frontEndLogging.js?v16.1.21-20260612135918676\"></script>\n\n    <script>\n      function getFaqLink( params )\n      {\n         var url = \"https://oidc.idp.elogin.att.com/faq/eiam/static/v2/resources/html/faq/FAQs_en.html?aa=prod\";\n         if ( params != null )\n         {\n             url = url + \"&\" + params;\n         }\n         window.open(url, \"_faq\");\n      }\n\n      globals = Object.assign({},globals, {\n  \"cspAReqLnk\": \"%2Fmga%2Fsps%2Foauth%2Foauth20%2Fauthorize%3Fresponse_mode%3Dform_post%26SAMLPartner%3Dhttps%253A%252F%252Fyouachieve.att.com%26claims%3D%257B%2522id_token%2522%253A%257B%2522authenticationTypes%2522%253A%257B%2522essential%2522%253Afalse%257D%257D%257D%26scope%3Dopenid%26Target%3Dhttps%253A%252F%252Fsaml.e-access.att.com%252Fisam%252Fsps%252Fattsamlidp_mfaia%252Fsaml20%252Flogininitial%253FRequestBinding%253DHTTPPost%2526PartnerId%253Dhttps%253A%252F%252Fyouachieve.att.com%2526RelayState%253Dhttps%253A%252F%252Fyouachieve.att.com%252Fyourefer%252Ffiber%252Findex.cfm%253F%26state%3DbsDEmtb5fF%26client_id%3DPassword-SAML-IDP%26nonce%3DpMbZGsV8Sm%26redirect_uri%3Dhttps%253A%252F%252Fsaml.e-access.att.com%252Fisam%252Fsps%252Foidc%252Frp%252FSAML-IDP%252Fredirect%252FSAML-IDP-Password%26acr_values%3DMFAIA%26response_type%3Did_token\",\n  \"legacyCricketFlag\": false,\n  \"mkNativeLogoutUrl\": \"/pkmslogout?localLogout=true&retURL=\",\n  \"enableKeyBindings\": true,\n  \"winAuthAlways\": false,\n  \"defaultAuthenticationType\": \"lrrsecurityKey\",\n  \"ajaxStatusHandlerInfo\": {\n    \"0\": {\n      \"max_retries\": 10,\n      \"delayMS\": 1000\n    },\n    \"503\": {\n      \"max_retries\": 2,\n      \"delayMS\": 1000\n    }\n  },\n  \"referenceId\": \"2olh8JHx6dJ9q5wYB85ObKKd8xawYHKBIleYICUOp0\",\n  \"tokenLogin\": false,\n  \"protocol\": \"https\",\n  \"hostname\": \"oidc.idp.elogin.att.com\",\n  \"phase2LoginFormTypes\": {\n    \"auth\": \"passAuth\",\n    \"GlobalLoginPassword\": \"passAuth\",\n    \"GlobalLoginPasswordVerification\": \"passAuth\",\n    \"mobileKey\": \"mkpush\",\n    \"mobileKeyOTP\": \"mkotp\",\n    \"securityKey\": \"securityKeyAuth\",\n    \"MTIPSToken\": \"mtipsauth\",\n    \"SAFE"
+  }
+ ],
  "sample_count": 0,
  "samples": [],
  "note": ""
