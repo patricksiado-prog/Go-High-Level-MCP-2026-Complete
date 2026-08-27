@@ -6772,7 +6772,14 @@ def init_bizmatch(ws):
     # BACKLOG: match every lead captured in prior runs (local jsonl, no quota) so
     # leads grabbed before the scraper ran still get a business name+phone. The
     # seen-sets above (sheet + CSV) keep this from re-writing duplicates.
-    _backlog_match()
+    # The backlog match re-scans EVERY address ever captured (1.35M on Patrick's
+    # machine) against the business list, on every launch, to re-find matches it
+    # already found. That is minutes of startup before a single new dot is read.
+    # Opt in with --match-backlog when you actually want it re-run.
+    if "--match-backlog" in sys.argv:
+        _backlog_match()
+    else:
+        print("  (backlog business match skipped -- add --match-backlog to run it)")
 
 
 def reload_biz_index():
@@ -7805,6 +7812,13 @@ def main():
     # extra program and no extra icon: the hunter decides. follow_news_pass()
     # already falls back to the normal spiral when the feed is quiet, so an
     # empty news day still sweeps.
+    ap.add_argument("--clean-on-start", action="store_true",
+                    help="dedupe every tab BEFORE sweeping. Slow on a big sheet; "
+                         "CLEAN_SHEET.bat does the same job on demand")
+    ap.add_argument("--match-backlog", action="store_true",
+                    help="re-scan every address ever captured against the "
+                         "business list. Slow, and only needed after a big "
+                         "Maps Scraper run")
     ap.add_argument("--no-follow-news", action="store_true",
                     help="do NOT chase the build-out news; just spiral out from "
                          "wherever the map is sitting")
@@ -8052,7 +8066,16 @@ def main():
         # locked so it never collides with the scraper's dedupe.
         if not args.dry and ws is not None and not args.no_dedupe:
             try:
-                startup_clean_and_counts(ws.spreadsheet)   # clean + show totals NOW
+                # The startup dedupe loops up to EIGHT passes over every tab
+                # before the first dot is captured. On a big sheet that is
+                # minutes of Google calls, and CLEAN_SHEET.bat already does the
+                # same job on demand. It is opt-in now; the periodic dedupe
+                # still runs in the background while the hunt works.
+                if args.clean_on_start:
+                    startup_clean_and_counts(ws.spreadsheet)
+                else:
+                    print("  (startup dedupe skipped -- add --clean-on-start, "
+                          "or just run CLEAN_SHEET.bat)")
                 start_periodic_dedupe(ws.spreadsheet)      # keep it clean while running
             except Exception as e:
                 print("  (dedupe off: %s)" % str(e)[:60])
