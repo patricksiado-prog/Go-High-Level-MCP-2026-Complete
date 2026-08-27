@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-08-27 05:08:56",
+ "generated_at": "2026-08-27 05:12:27",
  "run_id": "20260827-045836",
  "operator": "Patrick",
  "machine": "LAPTOP-FJEEPATI",
@@ -96,18 +96,23 @@
    "pass_done",
    "05:08:49",
    612.9
+  ],
+  [
+   "exit",
+   "05:12:24",
+   828.3
   ]
  ],
- "last_phase": "pass_done",
+ "last_phase": "exit",
  "stage_counters": {
   "auth_expired": 6,
   "parse_error": 3,
   "serviceability_replies": 17,
   "invalid_zero": 1,
-  "classified_green": 2254,
+  "classified_green": 4508,
   "classified_gold": 0,
-  "classified_grey": 718,
-  "classified_unknown": 8
+  "classified_grey": 1436,
+  "classified_unknown": 16
  },
  "crash": {},
  "wire_audit_records": 0,
@@ -133,6 +138,7 @@
    "NOT JSON -- AT&T sent something this parser cannot read. First 120 chars: <!DOCTYPE html> <html lang=\"en\">     <head>         <!-- The following 3 met",
    "NOT JSON -- AT&T sent something this parser cannot read. First 120 chars: <!DOCTYPE html> <html lang=\"en\">     <head>         <!-- The following 3 met",
    "mapbox MAP_NOT_READY / INVALID_ZERO",
+   "capture: OK: 17 serviceability responses -> 2980 leads",
    "capture: OK: 17 serviceability responses -> 2980 leads"
   ]
  },
