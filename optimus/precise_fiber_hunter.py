@@ -3589,6 +3589,57 @@ _SHEET_FULL = {"hit": False}
 _WRITE_STAMPS = []          # times of recent append calls, for the throttle
 
 
+_AUTOSHRINK = {"tried": False}
+
+
+def _auto_free_space(ws):
+    """The cell-limit 400 means the WORKBOOK is out of cells -- but a tab is
+    billed for its whole GRID, not its rows, and the hunter creates tabs as
+    5000x26 that hold ten rows. So when FULL hits, shrink every over-allocated
+    grid to its used size automatically. Deletes nothing, needs nobody:
+    Patrick's standing rule (2026-08-27) is no separate programs to run.
+
+    Safety: rows never go below what's used + slack; columns never go below
+    the tab's own header width, and never below 13 -- OUT_HEADER is 13 wide,
+    and a 12-column floor would delete the Status column.
+
+    Runs at most ONCE per process. Reads ~2 per tab, writes 1 per resized tab,
+    all through the throttle."""
+    if _AUTOSHRINK["tried"] or ws is None:
+        return 0
+    _AUTOSHRINK["tried"] = True
+    try:
+        tabs = ws.spreadsheet.worksheets()
+    except Exception as e:
+        print("   (auto free-space could not list tabs: %s)" % str(e)[:50])
+        return 0
+    print("   sheet FULL -- shrinking over-allocated grids (deletes nothing)...")
+    freed = 0
+    for t in tabs:
+        try:
+            gr, gc = t.row_count, t.col_count
+            if gr * gc < 50000:
+                continue                      # not worth a read+write
+            used_r = len(t.col_values(1))
+            head_c = len(t.row_values(1))
+            want_r = min(gr, max(used_r + 2000, 100))
+            want_c = min(gc, max(head_c, 13))
+            if want_r * want_c >= gr * gc:
+                continue
+            _sheet_throttle()
+            t.resize(rows=want_r, cols=want_c)
+            freed += gr * gc - want_r * want_c
+            print("   shrunk %-28s %dx%d -> %dx%d"
+                  % (t.title[:28], gr, gc, want_r, want_c))
+        except Exception:
+            continue
+    if freed:
+        print("   freed {:,} cells -- writes can resume.".format(freed))
+    else:
+        print("   nothing left to shrink -- the workbook truly needs archiving.")
+    return freed
+
+
 def _err_kind(e):
     """QUOTA = wait and retry. FULL = the workbook is out of cells, never
     retry. OTHER = transient, worth a couple of goes."""
@@ -3664,14 +3715,17 @@ def commit_rows(ws, tab, rows, tries=4):
             except Exception as e:
                 kind = _err_kind(e)
                 if kind == "FULL":
+                    # Make room automatically before giving up: shrink every
+                    # over-allocated grid, then retry this same batch once.
+                    if not _AUTOSHRINK["tried"] and _auto_free_space(ws) > 0:
+                        continue
                     _SHEET_FULL["hit"] = True
                     print("\n" + "!" * 64)
                     print("  THE SPREADSHEET IS FULL -- 10,000,000 cell limit.")
-                    print("  Nothing more can be written to THIS file, by any tool,")
-                    print("  until room is made. Rows are being parked to disk and")
-                    print("  will replay automatically once there is space.")
-                    print("  Fix: archive 'Precise Fiber' to its own spreadsheet,")
-                    print("       or delete the frozen TEST-*-2026-08-24 tabs.")
+                    print("  Grids were already auto-shrunk; real archiving is")
+                    print("  needed now (plan is parked in the brain, 22.35).")
+                    print("  Nothing is lost: rows are parked to disk and replay")
+                    print("  automatically once there is room.")
                     print("!" * 64 + "\n")
                     break
                 print("   SHEET COMMIT FAILED %s batch=%d attempt=%d/%d: %s"
@@ -5458,7 +5512,14 @@ def news_targets(limit=12):
     return out
 
 
-def follow_news_pass(page, ws, seen, dry, capture, cells_per_target=12):
+# How many zoom presses after a news flight. A geocoder suggestion lands at
+# TOWN height, where the AT&T map literally says "No addresses with Fiber
+# availability" and renders zero dots (watched live at Kyrock KY, 2026-08-27).
+# Dots exist only close-in, so every landing zooms before it sweeps.
+NEWS_DOT_ZOOM = 3
+
+
+def follow_news_pass(page, ws, seen, dry, capture, cells_per_target=40):
     """Fly to each town the build-out news named and sweep it, then move on.
 
     Falls back to the normal spiral when there is no news -- an empty feed must
@@ -5492,11 +5553,32 @@ def follow_news_pass(page, ws, seen, dry, capture, cells_per_target=12):
             print("     (search failed: %s -- skipping)" % str(e)[:60])
             continue
         time.sleep(SEARCH_SETTLE)
+        # Landed -- now get to DOT altitude and ask the server for the plate:
+        # zoom close, then press the map's own "search this area". Without
+        # both, the whole flight harvests nothing (Patrick, 2026-08-27:
+        # "it just needs to zoom in more and search more").
+        try:
+            focus_map(page)
+            zoom(page, NEWS_DOT_ZOOM, "in")
+            time.sleep(1.2)
+            search_this_area(page)
+            time.sleep(2.5)
+        except Exception as e:
+            print("     (zoom/search-area note: %s)" % str(e)[:50])
         n = sweep_continuous(page, ws, seen, t["label"], dry, capture,
                              max_cells=cells_per_target)
         total += n
         print("  [NEWS TARGET] %s -> +%d  (run total %d)"
               % (t["label"], n, total))
+    # A FINISHED list must never mean an idle hunter -- same law as an empty
+    # feed. Ending here is also what dropped the console onto "Press Enter to
+    # close", where a stray Enter killed Chromium mid-thought. Keep sweeping
+    # outward from the last target until someone stops it.
+    if not _STOP[0] and targets:
+        print("\n  news targets done -- sweeping OUTWARD from %s until stopped."
+              % targets[-1]["label"])
+        total += sweep_continuous(page, ws, seen,
+                                  targets[-1]["label"] + "+", dry, capture)
     return total
 
 
@@ -7840,7 +7922,7 @@ def main():
     ap.add_argument("--no-follow-news", action="store_true",
                     help="do NOT chase the build-out news; just spiral out from "
                          "wherever the map is sitting")
-    ap.add_argument("--cells-per-target", type=int, default=12,
+    ap.add_argument("--cells-per-target", type=int, default=40,
                     help="cells to sweep in each news-named town (--follow-news)")
     ap.add_argument("--grid", action="store_true",
                     help="pan in a sequential GRID (lawnmower, row by row) instead of "
@@ -8391,8 +8473,13 @@ def main():
                           note="pass %d; single run complete" % passno)
             break
         if not args.auto:
+            # 'q', not Enter. An Enter meant for the countdown or a search box
+            # landed here and closed Chromium mid-run (2026-08-27). Anything
+            # else re-prompts; only a deliberate q (or a dead stdin) closes.
             try:
-                input("Press Enter to close the browser... ")
+                while input("Type q then Enter to CLOSE the browser"
+                            " (Enter alone does nothing)... ").strip().lower() != "q":
+                    pass
             except EOFError:
                 pass
         ctx.close()
