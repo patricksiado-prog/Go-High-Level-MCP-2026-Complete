@@ -10,7 +10,7 @@ installs. Lives in Drive so it can be updated without re-sharing the installer.
 Run by SCRAPER_SETUP.bat, or directly:  python maps_scraper_standalone.py
 """
 
-import os, csv, re, time, json, urllib.parse
+import os, io, csv, re, time, json, urllib.parse
 
 VERSION = "2.1 (2026-06-18)"   # bump this when the scraper changes; printed on start
 
@@ -446,16 +446,20 @@ def open_sheet():
             ws = sh.worksheet(SHEET_TAB)
         except Exception:
             ws = sh.add_worksheet(title=SHEET_TAB, rows="20000", cols="7")
-        if not ws.get_all_values():
+        # ONE read of the tab, not two. Reads have their own ~300/min quota,
+        # and pulling the whole tab twice for data already in hand is how a
+        # launch spends its budget before writing anything.
+        try:
+            vals = ws.get_all_values()
+        except Exception:
+            vals = []
+        if not vals:
             ws.append_row(["Name", "Address", "Phone", "Website", "Category",
                            "Resi?", "Cell?"])
         seen = set()
-        try:
-            for r in ws.get_all_values()[1:]:
-                if len(r) >= 2:
-                    seen.add(r[0].strip().upper() + "|" + r[1].strip().upper())
-        except Exception:
-            pass
+        for r in vals[1:]:
+            if len(r) >= 2:
+                seen.add(r[0].strip().upper() + "|" + r[1].strip().upper())
         print("  -> writing to the '%s' tab live, as it runs." % SHEET_TAB)
         try:                       # load captured fiber leads for the cross-match
             init_match(sh)
@@ -641,17 +645,23 @@ def _match_new(new):
             if pu:
                 _MATCH["green_ph"].add(pu)
             g.append(row)
-    try:
-        if g and _MATCH.get("green_ws"):
-            _MATCH["green_ws"].append_rows(g, value_input_option="RAW")
-        if o and _MATCH.get("orange_ws"):
-            _MATCH["orange_ws"].append_rows(o, value_input_option="RAW")
-        if g or o:
-            total = len(_MATCH["green_seen"]) + len(_MATCH["orange_seen"])
-            print("    MATCH  +%d green (fiber lead + business), +%d orange (upgrade + business)"
-                  "  [total matches: %d]" % (len(g), len(o), total))
-    except Exception:
-        pass
+    # These are the money rows -- a business sitting on a green or orange dot.
+    # They used to go out as a bare append_rows wrapped in `except: pass`, so a
+    # full sheet threw them away without printing anything at all. Now they go
+    # through the same write path as everything else: paced, classified, and
+    # parked to disk rather than dropped.
+    gw, ow = 0, 0
+    if g and _MATCH.get("green_ws"):
+        gw = _safe_append(_MATCH["green_ws"], g, GREEN_BIZ_TAB)
+    if o and _MATCH.get("orange_ws"):
+        ow = _safe_append(_MATCH["orange_ws"], o, ORANGE_BIZ_TAB)
+    if g or o:
+        total = len(_MATCH["green_seen"]) + len(_MATCH["orange_seen"])
+        held = (len(g) - gw) + (len(o) - ow)
+        print("    MATCH  +%d green (fiber lead + business), +%d orange (upgrade + business)"
+              "  [total matches: %d]%s"
+              % (len(g), len(o), total,
+                 ("  (%d held on disk until the sheet has room)" % held) if held else ""))
 
 
 
@@ -919,36 +929,368 @@ def start_periodic_dedupe(sh, every=_DEDUPE_EVERY):
           % (every // 60))
 
 
-def append_sheet(ws, rows, sheet_seen):
-    """Append the new (not-already-in-sheet) rows NOW. Updates sheet_seen.
-    Called after each category so the sheet fills continually."""
+# ---------------------------------------------------------------------------
+# SHEET WRITES -- quota, permanent errors, and never losing a row.
+#
+# All three of these were real failures on 2026-08-27, all in one loop:
+#   1. The 400 "would increase the number of cells above the limit" error was
+#      retried batch after batch. It can NEVER succeed -- the workbook is out
+#      of cells. Retrying it just fills the screen and burns quota.
+#   2. `sheet_seen.add(key)` ran BEFORE the write, so a failed batch marked its
+#      rows as already-in-the-sheet. "will retry next batch" was never true:
+#      those rows were gone for good, even after space was freed.
+#   3. Nothing paced the writes against Google's ~60-per-minute ceiling.
+# ---------------------------------------------------------------------------
+
+# How many PCs are scraping into this sheet right now. Google counts its write
+# quota PER SERVICE ACCOUNT, not per machine, and every PC runs the same
+# google_creds.json -- so two laptops each pacing at 50/min send 100 against a
+# ~60/min ceiling and BOTH crawl. Set OPTIMUS_MACHINES=2 before launching.
+_MACHINES = [1]
+try:
+    _MACHINES[0] = max(1, int(os.environ.get("OPTIMUS_MACHINES", "1")))
+except Exception:
+    pass
+
+_SHEET_FULL = {"hit": False, "said": False}
+_WRITE_STAMPS = []
+_PARK_SEQ = [0]
+_RUN_STAMP = time.strftime("%Y%m%d-%H%M%S")
+
+
+_AUTOSHRINK = {"tried": False}
+
+
+def _auto_free_space(ws):
+    """The cell-limit 400 means the WORKBOOK is out of cells -- but a tab is
+    billed for its whole GRID, not its rows, so a 5000x26 tab holding ten rows
+    bills 130,000 cells. When FULL hits, shrink every over-allocated grid to
+    its used size automatically. Deletes nothing, asks nobody: Patrick's
+    standing rule (2026-08-27) is no separate programs anyone has to run.
+
+    Rows never go below used + slack; columns never below the tab's own header
+    width, and never below 13 (the hunter's OUT_HEADER is 13 wide).
+    Runs at most ONCE per process, through the write throttle."""
+    if _AUTOSHRINK["tried"] or ws is None:
+        return 0
+    _AUTOSHRINK["tried"] = True
+    try:
+        tabs = ws.spreadsheet.worksheets()
+    except Exception as e:
+        print("  (auto free-space could not list tabs: %s)" % str(e)[:50])
+        return 0
+    print("  sheet FULL -- shrinking over-allocated grids (deletes nothing)...")
+    freed = 0
+    for t in tabs:
+        try:
+            gr, gc = t.row_count, t.col_count
+            if gr * gc < 50000:
+                continue                      # not worth a read+write
+            used_r = len(t.col_values(1))
+            head_c = len(t.row_values(1))
+            want_r = min(gr, max(used_r + 2000, 100))
+            want_c = min(gc, max(head_c, 13))
+            if want_r * want_c >= gr * gc:
+                continue
+            _sheet_throttle()
+            t.resize(rows=want_r, cols=want_c)
+            freed += gr * gc - want_r * want_c
+            print("  shrunk %-28s %dx%d -> %dx%d"
+                  % (t.title[:28], gr, gc, want_r, want_c))
+        except Exception:
+            continue
+    if freed:
+        print("  freed {:,} cells -- writes can resume.".format(freed))
+    else:
+        print("  nothing left to shrink -- the workbook truly needs archiving.")
+    return freed
+
+
+def _err_kind(e):
+    """QUOTA = wait and retry. FULL = the workbook is out of cells, never
+    retry. OTHER = transient, worth a couple of goes."""
+    t = str(e)
+    if ("above the limit of" in t or "increase the number of cells" in t
+            or "exceeds the maximum" in t):
+        return "FULL"
+    if ("[429]" in t or "Quota exceeded" in t or "RATE_LIMIT" in t
+            or "rateLimitExceeded" in t or "userRateLimit" in t):
+        return "QUOTA"
+    return "OTHER"
+
+
+def _sheet_throttle(max_per_min=50):
+    """Stay under the write quota instead of discovering it with a 429.
+    Google's window is rolling and per minute, so hold the next write until the
+    oldest ages out. The budget is divided by the number of PCs sharing the
+    sheet -- the quota belongs to the service account, and every PC uses the
+    same google_creds.json."""
+    max_per_min = max(6, int(max_per_min / max(1, _MACHINES[0])))
+    now = time.time()
+    _WRITE_STAMPS[:] = [t for t in _WRITE_STAMPS if now - t < 60]
+    if len(_WRITE_STAMPS) >= max_per_min:
+        wait = max(1, int(60 - (now - _WRITE_STAMPS[0]) + 1))
+        print("   (write quota reached -- holding %ds so nothing is lost)" % wait)
+        time.sleep(wait)
+        now = time.time()
+        _WRITE_STAMPS[:] = [t for t in _WRITE_STAMPS if now - t < 60]
+    _WRITE_STAMPS.append(time.time())
+
+
+def _pending_dir():
+    d = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_pending_maps")
+    try:
+        os.makedirs(d, exist_ok=True)
+    except Exception:
+        pass
+    return d
+
+
+def _park_rows(rows, tab=None):
+    """Save rows Google would not take, so a later run can write them.
+
+    The file records WHICH TAB the rows belong to -- business rows and matched
+    fiber-lead rows go to different tabs, and a replay that put them all in one
+    place would be worse than losing them.
+
+    Named by run + sequence, never by row COUNT alone: two failed batches of
+    the same size in one run would overwrite each other, and the one function
+    whose whole job is 'do not lose rows' would be losing them."""
+    if not rows:
+        return True
+    tab = tab or SHEET_TAB
+    _PARK_SEQ[0] += 1
+    path = os.path.join(_pending_dir(), "maps__%s__%s__%04d__%d.json"
+                        % (re.sub(r"[^A-Za-z0-9]+", "_", tab),
+                           _RUN_STAMP, _PARK_SEQ[0], len(rows)))
+    try:
+        with io.open(path, "w", encoding="utf-8") as f:
+            json.dump({"tab": tab, "rows": rows}, f)
+        return True
+    except Exception as e:
+        print("  (could not park %d rows: %s)" % (len(rows), str(e)[:50]))
+        return False
+
+
+def _read_park(path):
+    """Load a park file. Tolerates the old bare-list format."""
+    with io.open(path, encoding="utf-8") as f:
+        d = json.load(f)
+    if isinstance(d, list):
+        return SHEET_TAB, d
+    return d.get("tab") or SHEET_TAB, d.get("rows") or []
+
+
+def _safe_append(ws, rows, tab):
+    """Write rows to `ws` in 500-row chunks, parking anything Google refuses.
+    Returns how many rows Google actually acknowledged."""
     if ws is None or not rows:
         return 0
-    new = []
+    if _SHEET_FULL["hit"]:
+        _park_rows(rows, tab)
+        return 0
+    written = 0
+    for i in range(0, len(rows), 500):
+        chunk = rows[i:i + 500]
+        if _write_chunk(ws, chunk):
+            written += len(chunk)
+        else:
+            _park_rows(chunk, tab)
+    return written
+
+
+def _say_full():
+    """Say the sheet is full ONCE, with the fix, instead of once per batch."""
+    if _SHEET_FULL["said"]:
+        return
+    _SHEET_FULL["said"] = True
+    print("")
+    print("  " + "=" * 66)
+    print("  THE SHEET IS FULL. Google will not accept another row.")
+    print("  (10,000,000-cell limit on the workbook -- not a network problem,")
+    print("   and no number of retries can ever succeed.)")
+    print("")
+    print("  NOTHING IS LOST. Every business is still going into the CSV, and")
+    print("  the sheet rows are being saved on this PC -- they write themselves")
+    print("  into the sheet automatically the next time there is room.")
+    print("")
+    print("  Grids were already auto-shrunk. The workbook now genuinely needs")
+    print("  archiving (the plan is parked in the brain, BRAIN.md 22.35).")
+    print("  " + "=" * 66)
+    print("")
+
+
+def _write_chunk(ws, chunk):
+    """Write one chunk. Returns True if Google acknowledged it.
+    Raises nothing: classifies the failure and parks on anything permanent."""
+    waits = [15, 35, 65, 65]
+    for attempt in range(len(waits) + 1):
+        if _SHEET_FULL["hit"]:
+            return False
+        try:
+            _sheet_throttle()
+            ws.append_rows(chunk, value_input_option="RAW")
+            return True
+        except Exception as e:
+            kind = _err_kind(e)
+            if kind == "FULL":
+                # Make room automatically, then retry this same chunk once.
+                if not _AUTOSHRINK["tried"] and _auto_free_space(ws) > 0:
+                    continue
+                _SHEET_FULL["hit"] = True
+                _say_full()
+                return False
+            if attempt >= len(waits):
+                print("  (sheet write failed after %d tries, parking %d rows: %s)"
+                      % (attempt + 1, len(chunk), str(e)[:50]))
+                return False
+            if kind == "QUOTA":
+                # Google's window is per MINUTE. A 1s or 2s backoff cannot
+                # outlive it, so short waits just collect more 429s.
+                print("   (rate limited -- waiting %ds)" % waits[attempt])
+                time.sleep(waits[attempt])
+            else:
+                time.sleep(min(5, waits[attempt]))
+    return False
+
+
+def append_sheet(ws, rows, sheet_seen):
+    """Append the new (not-already-in-sheet) rows NOW.
+
+    A key enters `sheet_seen` only once the row is safely accounted for --
+    written to the sheet, or parked to disk for a later run. A row that is
+    neither is left unseen so the next pass picks it up again.
+    """
+    if ws is None or not rows:
+        return 0
+    new, keys = [], []
     for r in rows:
         key = ((r.get("name") or "").strip().upper() + "|"
                + (r.get("address") or "").strip().upper())
-        if key in sheet_seen:
+        if key in sheet_seen or key in keys:
             continue
-        sheet_seen.add(key)
         _a, _p = r.get("address") or "", r.get("phone") or ""
         new.append([r.get("name") or "", _a, _p,
                     r.get("website") or "", r.get("category") or "",
                     resi_hint(_a), cell_hint(_p)])
+        keys.append(key)
     if not new:
         return 0
-    try:
+
+    written = 0
+    # Already known to be full: park straight away, don't ask Google again.
+    if _SHEET_FULL["hit"]:
+        if _park_rows(new, SHEET_TAB):
+            sheet_seen.update(keys)
+    else:
         for i in range(0, len(new), 500):
-            ws.append_rows(new[i:i + 500], value_input_option="RAW")
-    except Exception as e:
-        print("  (sheet write hiccup, will retry next batch: %s)" % str(e)[:60])
-        return 0
-    # cross-match these new businesses against the captured fiber dots
+            chunk, ckeys = new[i:i + 500], keys[i:i + 500]
+            if _write_chunk(ws, chunk):
+                sheet_seen.update(ckeys)
+                written += len(chunk)
+            elif _park_rows(chunk, SHEET_TAB):
+                sheet_seen.update(ckeys)      # parked = safe, will be replayed
+
+    # Cross-match EVERY new business against the captured dots, not just the
+    # ones this tab accepted. The matches go to different tabs and park
+    # themselves; gating them on this write would lose leads for no reason.
     try:
         _match_new(new)
+    except Exception as e:
+        print("  (cross-match skipped: %s)" % str(e)[:50])
+    return written
+
+
+def replay_parked(ws, sheet_seen, max_files=60, max_rows=15000):
+    """Write rows parked by earlier runs, back into the tab each one came from.
+
+    Bounded per launch. An unbounded replay is how the hunter's backlog turned
+    into a doom loop: one worksheet lookup and one append per parked FILE blew
+    the read quota before a single row was written, and left more parked than
+    it found. So: at most `max_files` files and `max_rows` rows, grouped by tab
+    so each tab is resolved ONCE, and merged into 500-row writes.
+    """
+    if ws is None:
+        return 0
+    d = _pending_dir()
+    try:
+        files = sorted(f for f in os.listdir(d) if f.endswith(".json"))
     except Exception:
-        pass
-    return len(new)
+        return 0
+    if not files:
+        return 0
+    print("  %d parked batch(es) from earlier runs -- replaying up to %d."
+          % (len(files), min(len(files), max_files)))
+
+    # group first: rows for the same tab are written together, not file by file
+    by_tab, rows_read = {}, 0
+    for name in files[:max_files]:
+        if rows_read >= max_rows:
+            break
+        path = os.path.join(d, name)
+        try:
+            tab, rows = _read_park(path)
+        except Exception:
+            continue
+        if not rows:
+            try:
+                os.remove(path)
+            except Exception:
+                pass
+            continue
+        slot = by_tab.setdefault(tab, {"rows": [], "files": []})
+        slot["rows"].extend(rows)
+        slot["files"].append(path)
+        rows_read += len(rows)
+
+    done, wrote = 0, 0
+    for tab, slot in by_tab.items():
+        if _SHEET_FULL["hit"]:
+            break
+        target = _resolve_tab(ws, tab)
+        if target is None:
+            continue                       # tab not open this run: leave parked
+        ok = True
+        rows = slot["rows"]
+        for i in range(0, len(rows), 500):
+            if not _write_chunk(target, rows[i:i + 500]):
+                ok = False
+                break
+            wrote += len(rows[i:i + 500])
+        if ok:                             # delete ONLY what Google acknowledged
+            for path in slot["files"]:
+                try:
+                    os.remove(path)
+                    done += 1
+                except Exception:
+                    pass
+
+    if done:
+        print("  replayed %d parked batch(es) (%d rows) into the sheet." % (done, wrote))
+        try:
+            for r in ws.get_all_values()[1:]:
+                if len(r) >= 2:
+                    sheet_seen.add(r[0].strip().upper() + "|" + r[1].strip().upper())
+        except Exception:
+            pass
+    elif _SHEET_FULL["hit"]:
+        print("  (still full -- parked rows kept on disk, nothing deleted.)")
+    left = len(files) - done
+    if left > 0:
+        print("  %d batch(es) still parked -- they go in on a later run." % left)
+    return done
+
+
+def _resolve_tab(ws, tab):
+    """The worksheet for a parked tab name. Resolved from what is already open,
+    so a replay costs no extra reads."""
+    if tab == SHEET_TAB:
+        return ws
+    if tab == GREEN_BIZ_TAB:
+        return _MATCH.get("green_ws")
+    if tab == ORANGE_BIZ_TAB:
+        return _MATCH.get("orange_ws")
+    return None
 
 
 REPO_BRANCH = "claude/optimus-map-tools-setup-6dcl6o"
@@ -1092,6 +1434,12 @@ def main():
     from playwright.sync_api import sync_playwright
     os.makedirs(PROFILE_DIR, exist_ok=True)
     sheet_ws, sheet_seen = (open_sheet() if to_sheet else (None, set()))
+    # Rows an earlier run could not write (sheet full, quota) go in first, so a
+    # backlog drains instead of growing. Bounded per launch -- see replay_parked.
+    try:
+        replay_parked(sheet_ws, sheet_seen)
+    except Exception as e:
+        print("  (replay skipped: %s)" % str(e)[:60])
     # Keep the tabs deduped in the background while the scraper runs (phone-keyed
     # on the biz tabs). Cross-machine locked so it never collides with the hunter.
     if sheet_ws is not None and os.environ.get("SCRAPER_NO_DEDUPE", "").strip() not in ("1", "true", "yes"):
