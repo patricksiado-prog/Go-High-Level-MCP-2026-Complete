@@ -880,6 +880,103 @@ def _dd_unique_phones(sh, tab):
     return len(u)
 
 
+# ---------------------------------------------------------------------------
+# ONE-SHOT GOLD PURGE (Patrick, 2026-08-27: "delete every gold dot before gold
+# dot capture worked!!"). Gold-by-default -- the rule that called a customer
+# gold whenever it could not decode the build code -- died on 2026-08-23
+# (BRAIN 22.17); confirmed-copper-only capture was verified 2026-08-24
+# (TEST-Gold-2026-08-24). So every 'Gold Confirmed' row captured BEFORE
+# 2026-08-24 is that old contamination: not confirmed copper, not a $140
+# upgrade, just a decode failure wearing a gold label.
+#
+# Safety, in order: the WHOLE tab is saved to a local CSV first; the removed
+# rows are ALSO saved to their own JSON (NOT the replay dir -- replay would
+# write them straight back); a missing/unrecognizable 'Captured At' header
+# aborts the purge and touches nothing; the rewrite is the same 2-call
+# overwrite+trim the dedupe uses (append-safe); and a marker file makes it
+# run once per PC, ever.
+# ---------------------------------------------------------------------------
+GOLD_TAB = "Gold Confirmed"
+GOLD_CUTOFF = "2026-08-24"          # keep rows captured ON or AFTER this day
+_GOLD_PURGE_MARKER = os.path.join(HERE, "gold_purge_done.flag")
+
+
+def purge_prefix_gold(sh):
+    if os.path.exists(_GOLD_PURGE_MARKER) or sh is None:
+        return
+    try:
+        ws = sh.worksheet(GOLD_TAB)
+        vals = ws.get_all_values()
+    except Exception as e:
+        print("  (gold purge skipped -- cannot read '%s': %s)" % (GOLD_TAB, str(e)[:50]))
+        return
+    if len(vals) < 2:
+        open(_GOLD_PURGE_MARKER, "w").write("empty tab %s" % time.ctime())
+        return
+    hdr = vals[0]
+    cap_i = None
+    for i, h in enumerate(hdr):
+        if h.strip().lower() == "captured at":
+            cap_i = i
+            break
+    if cap_i is None:
+        print("  (gold purge ABORTED -- no 'Captured At' column in '%s'; nothing touched)"
+              % GOLD_TAB)
+        return
+    rows = vals[1:]
+
+    def _kept(r):
+        # Must LOOK like a date before it may compare as one: "not a date"
+        # sorts above "2026-08-24" as a string and would survive the purge.
+        d = (r[cap_i] if cap_i < len(r) else "").strip()
+        return bool(re.match(r"^\d{4}-\d{2}-\d{2}", d)) and d[:10] >= GOLD_CUTOFF
+
+    keep = [r for r in rows if _kept(r)]
+    remove = [r for r in rows if not _kept(r)]
+    if not remove:
+        open(_GOLD_PURGE_MARKER, "w").write("clean already %s" % time.ctime())
+        print("  gold purge: nothing to remove -- all %d rows are post-fix." % len(rows))
+        return
+
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    try:                                       # backup EVERYTHING before any change
+        import csv as _csv
+        bpath = os.path.join(HERE, "gold_confirmed_backup_%s.csv" % stamp)
+        with open(bpath, "w", newline="", encoding="utf-8") as f:
+            _csv.writer(f).writerows(vals)
+        with io.open(os.path.join(HERE, "gold_purged_%s.json" % stamp),
+                     "w", encoding="utf-8") as f:
+            json.dump({"tab": GOLD_TAB, "cutoff": GOLD_CUTOFF, "rows": remove}, f)
+    except Exception as e:
+        print("  (gold purge ABORTED -- could not write the backup: %s)" % str(e)[:50])
+        return
+
+    print("  GOLD PURGE: '%s' has %d rows; %d captured before %s (the era when"
+          % (GOLD_TAB, len(rows), len(remove), GOLD_CUTOFF))
+    print("  gold-by-default mislabeled decode failures) -- removing them now.")
+    print("  Full backup: %s" % bpath)
+    try:
+        width = max(len(hdr), max((len(r) for r in keep), default=len(hdr)))
+        body = [(list(r) + [""] * width)[:width] for r in keep]
+        _sheet_throttle()
+        if body:
+            ws.batch_update([{"range": "A2", "values": body}],
+                            value_input_option="RAW")
+        lo, hi = len(body) + 2, len(rows) + 1
+        if hi >= lo:
+            _sheet_throttle()
+            ws.spreadsheet.batch_update({"requests": [{"deleteDimension": {"range": {
+                "sheetId": ws.id, "dimension": "ROWS",
+                "startIndex": lo - 1, "endIndex": hi}}}]})
+        open(_GOLD_PURGE_MARKER, "w").write(
+            "purged %d kept %d %s" % (len(remove), len(keep), time.ctime()))
+        print("  GOLD PURGE DONE: kept %d confirmed gold, removed %d pre-fix rows."
+              % (len(keep), len(remove)))
+    except Exception as e:
+        print("  (gold purge FAILED mid-write: %s -- backup is safe at %s;"
+              " it will retry next launch)" % (str(e)[:60], bpath))
+
+
 def startup_clean_and_counts(sh):
     """Run at program START: delete the exact/phone duplicates NOW (looping until
     it converges), then print the real total of every tab so you see the numbers
@@ -1444,6 +1541,7 @@ def main():
     # on the biz tabs). Cross-machine locked so it never collides with the hunter.
     if sheet_ws is not None and os.environ.get("SCRAPER_NO_DEDUPE", "").strip() not in ("1", "true", "yes"):
         try:
+            purge_prefix_gold(sheet_ws.spreadsheet)          # one-shot, see above
             startup_clean_and_counts(sheet_ws.spreadsheet)   # clean + show totals NOW
             start_periodic_dedupe(sheet_ws.spreadsheet)      # keep it clean while running
         except Exception as e:
