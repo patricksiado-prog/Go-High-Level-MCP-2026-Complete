@@ -823,6 +823,14 @@ def _dd_keys():
     def pf_key(r):
         return r[0].strip().upper() if (r and r[0].strip()) else ""
 
+    def pf_score(r):
+        # Keep the FULLEST copy of an address, not the earliest. Keeping the
+        # earliest meant a skinny 3-column row from June beat its own fresh
+        # 13-column re-capture -- the full address was deleted and the
+        # incomplete one won forever (found 2026-08-27 while building "full
+        # address everywhere").
+        return sum(1 for c in r if str(c).strip())
+
     def maps_key(r):
         r = (list(r) + [""] * 3)
         ph = _dd_phone(r[2])
@@ -830,7 +838,7 @@ def _dd_keys():
             return ph
         nm, ad = r[0].strip().upper(), r[1].strip().upper()
         return ("N:" + nm + "|" + ad) if (nm or ad) else ""
-    return biz_key, biz_score, pf_key, maps_key
+    return biz_key, biz_score, pf_key, pf_score, maps_key
 
 
 def dedupe_all_tabs(sh):
@@ -839,13 +847,13 @@ def dedupe_all_tabs(sh):
     lk = _dd_acquire_lock(sh)
     if lk is None:
         return 0                            # another machine is deduping now
-    biz_key, biz_score, pf_key, maps_key = _dd_keys()
+    biz_key, biz_score, pf_key, pf_score, maps_key = _dd_keys()
     _DD_PASS[0] += 1
     jobs = [("Maps Businesses", maps_key, None),
             ("Fiber Green Biz", biz_key, biz_score),
             ("Upgrade Orange Biz", biz_key, biz_score)]
     if _DD_PASS[0] == 1 or _DD_PASS[0] % 6 == 0:   # huge tab: clean less often
-        jobs.insert(0, ("Precise Fiber", pf_key, None))
+        jobs.insert(0, ("Precise Fiber", pf_key, pf_score))
     total = 0
     for tab, kf, sf in jobs:
         try:
@@ -878,6 +886,180 @@ def _dd_unique_phones(sh, tab):
         if p:
             u.add(p)
     return len(u)
+
+
+# ---------------------------------------------------------------------------
+# ADDRESS BACKFILL (Patrick, 2026-08-27: "full address everywhere w time
+# stamp"). Rows captured before the 13-column format hold a street line and
+# nothing else -- no city, state or ZIP -- so an exported row cannot be mailed,
+# skip-traced, or handed to a rep as-is. Any such row that still carries
+# coordinates can be repaired for free: the US Census Bureau's public geocoder
+# reverse-resolves lat/lng to city + state + ZIP with no key and no cost. A
+# bounded batch runs each launch inside the scraper, so the tab heals itself
+# over a few days with nobody running anything.
+#
+# HONESTY RULES:
+#   * A row with no coordinates CANNOT be filled and is left exactly as it is.
+#     Never invent a city from a street name.
+#   * A failed or slow lookup leaves that row untouched, to retry next launch.
+#   * "Backfilled At" is stamped in its own column, so a repaired row says when
+#     it was completed. The capture timestamp in "Captured At" is NEVER
+#     overwritten -- that is when the DOT was seen, and it stays true.
+# ---------------------------------------------------------------------------
+PF_TAB = "Precise Fiber"
+BACKFILL_PER_LAUNCH = 400        # rows repaired per launch; bounded on purpose
+NO_MATCH = "NO MATCH"            # stamp for coordinates that resolve to nothing
+_CENSUS_URL = ("https://geocoding.geo.census.gov/geocoder/geographies/"
+               "coordinates?x=%s&y=%s&benchmark=Public_AR_Current"
+               "&vintage=Current_Current&format=json")
+
+
+def _a1(idx):
+    """0-based column index -> A1 letters (27 -> AB)."""
+    out, i = "", idx + 1
+    while i:
+        i, r = divmod(i - 1, 26)
+        out = chr(65 + r) + out
+    return out
+
+
+def _census_place(lat, lng):
+    """(city, state, zip) for a coordinate, or None. Free, keyless, and it
+    fails quietly -- a repair that cannot be verified is not made."""
+    import urllib.request
+    try:
+        url = _CENSUS_URL % (str(lng).strip(), str(lat).strip())
+        with urllib.request.urlopen(url, timeout=12) as r:
+            geo = (json.load(r).get("result") or {}).get("geographies") or {}
+    except Exception:
+        return None
+    blocks = geo.get("2020 Census Blocks") or geo.get("Census Blocks") or []
+    places = (geo.get("Incorporated Places") or geo.get("Census Designated Places")
+              or geo.get("County Subdivisions") or [])
+    zips = (geo.get("2010 Census ZIP Code Tabulation Areas")
+            or geo.get("Zip Code Tabulation Areas") or [])
+    city = (places[0].get("NAME") or "").strip() if places else ""
+    state = (blocks[0].get("STUSAB") or "").strip() if blocks else ""
+    zc = ""
+    for z in zips:
+        zc = (z.get("ZCTA5") or z.get("GEOID") or "").strip()
+        if zc:
+            break
+    if not (city or state or zc):
+        return None
+    return city, state, zc
+
+
+def backfill_addresses(sh, limit=BACKFILL_PER_LAUNCH):
+    """Fill City/State/ZIP on located rows that lack them, and stamp when.
+    Bounded, resumable, and it never touches a row it cannot verify."""
+    try:
+        ws = sh.worksheet(PF_TAB)
+        vals = ws.get_all_values()
+    except Exception as e:
+        print("  (address backfill skipped -- cannot read %s: %s)"
+              % (PF_TAB, str(e)[:50]))
+        return 0
+    if len(vals) < 2:
+        return 0
+    hdr = [h.strip().lower() for h in vals[0]]
+    col = lambda name: hdr.index(name) if name in hdr else -1
+    i_lat, i_lng = col("lat"), col("lng")
+    i_city, i_state, i_zip = col("city"), col("state"), col("zip")
+    if min(i_lat, i_lng, i_city, i_state, i_zip) < 0:
+        print("  (address backfill skipped -- %s has no Lat/Lng/City/State/ZIP "
+              "header; nothing touched)" % PF_TAB)
+        return 0
+    width = max(len(vals[0]), i_zip + 1)
+    i_when = col("backfilled at")
+    if i_when < 0:                       # add the stamp column once
+        i_when = width
+        width += 1
+        try:
+            _sheet_throttle()
+            ws.update_cell(1, i_when + 1, "Backfilled At")
+        except Exception as e:
+            print("  (could not add the Backfilled At header: %s)" % str(e)[:40])
+            return 0
+
+    cell = lambda r, i: (r[i] if i < len(r) else "").strip()
+    todo, no_coords, dead = [], 0, 0
+    for n, r in enumerate(vals[1:], start=2):        # n = real sheet row number
+        if cell(r, i_city) and cell(r, i_state) and cell(r, i_zip):
+            continue                                 # already complete
+        if not (cell(r, i_lat) and cell(r, i_lng)):
+            no_coords += 1
+            continue                                 # cannot fill honestly
+        if cell(r, i_when).upper().startswith(NO_MATCH):
+            dead += 1
+            continue    # its coordinates resolve to nothing; asked once, never
+                        # again -- otherwise a handful of junk points would
+                        # refill the batch every launch and starve real rows
+        todo.append((n, cell(r, i_lat), cell(r, i_lng)))
+        if len(todo) >= limit:
+            break
+    if dead:
+        print("  address backfill: %d row(s) have coordinates that resolve to "
+              "nothing -- marked, not retried." % dead)
+    if no_coords:
+        print("  address backfill: %d row(s) have no coordinates -- left exactly "
+              "as they are (a city is never guessed from a street name)." % no_coords)
+    if not todo:
+        print("  address backfill: every located row already has a full address.")
+        return 0
+
+    print("  address backfill: repairing %d located row(s) from their "
+          "coordinates (free Census geocoder)..." % len(todo))
+    stamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    updates, misses, filled = [], [], 0
+    for n, lat, lng in todo:
+        place = _census_place(lat, lng)
+        if place is None:
+            time.sleep(1.0)                          # one quick re-ask
+            place = _census_place(lat, lng)
+        if not place:
+            # HOLD the miss -- do not write the marker yet. A marker is
+            # permanent (the row is never looked up again), so it may only be
+            # written once something ELSE in this same run proves the geocoder
+            # was actually answering. A one-second re-ask does NOT survive an
+            # outage: with the service down, every row here would miss, and
+            # marking them would retire real addresses for good over a network
+            # blip. Proof of life first, markers second.
+            misses.append(n)
+            continue
+        city, state, zc = place
+        row = [""] * width
+        row[i_city], row[i_state], row[i_zip] = city, state, zc
+        row[i_when] = stamp
+        updates.append({"range": "%s%d:%s%d" % (_a1(i_city), n, _a1(i_when), n),
+                        "values": [row[i_city:i_when + 1]]})
+        filled += 1
+        time.sleep(0.4)                              # polite to a free service
+    if misses and filled:
+        # The service answered for other rows, so these coordinates really do
+        # resolve to nothing. Retire them so a handful of junk points cannot
+        # refill the batch every launch and starve real rows.
+        for n in misses:
+            updates.append({"range": "%s%d:%s%d"
+                                     % (_a1(i_when), n, _a1(i_when), n),
+                            "values": [["%s %s" % (NO_MATCH, stamp)]]})
+    elif misses:
+        print("  address backfill: the geocoder answered nothing this run "
+              "(%d row(s)) -- looks like an outage, so NOTHING was marked; "
+              "they are retried next launch." % len(misses))
+    if not updates:
+        return 0
+    try:
+        for i in range(0, len(updates), 100):
+            _sheet_throttle()
+            ws.batch_update(updates[i:i + 100], value_input_option="RAW")
+        print("  address backfill: %d row(s) now carry a full address, stamped %s."
+              % (filled, stamp))
+        return filled
+    except Exception as e:
+        print("  (address backfill write failed: %s -- rows unchanged, retried "
+              "next launch)" % str(e)[:60])
+        return 0
 
 
 # ---------------------------------------------------------------------------
@@ -1542,6 +1724,7 @@ def main():
     if sheet_ws is not None and os.environ.get("SCRAPER_NO_DEDUPE", "").strip() not in ("1", "true", "yes"):
         try:
             purge_prefix_gold(sheet_ws.spreadsheet)          # one-shot, see above
+            backfill_addresses(sheet_ws.spreadsheet)         # bounded, resumable
             startup_clean_and_counts(sheet_ws.spreadsheet)   # clean + show totals NOW
             start_periodic_dedupe(sheet_ws.spreadsheet)      # keep it clean while running
         except Exception as e:
