@@ -3602,13 +3602,25 @@ def _err_kind(e):
     return "OTHER"
 
 
+# How many hunter PCs share this spreadsheet. Google counts its quota PER
+# SERVICE ACCOUNT, not per machine -- and every PC runs the same
+# google_creds.json. So two laptops each throttling to 50 writes/min send 100
+# against a ~60/min ceiling, and BOTH collect 429s and crawl. It looks like the
+# network is slow; it is actually the two machines fighting each other for one
+# quota. Set --machines to the number of PCs running and the budget is split.
+_MACHINES = [1]
+
+
 def _sheet_throttle(max_per_min=50):
     """Stay under the write quota instead of discovering it with a 429.
 
-    Google's window is rolling and per minute, so this holds the 51st write of
-    any 60 seconds until the oldest one ages out. Cheaper than the retry storm
-    it replaces.
+    Google's window is rolling and per minute, so this holds the next write
+    until the oldest ages out. Cheaper than the retry storm it replaces.
+
+    The budget is divided by the number of machines sharing the sheet, because
+    the quota belongs to the service account and every PC uses the same one.
     """
+    max_per_min = max(6, int(max_per_min / max(1, _MACHINES[0])))
     now = time.time()
     _WRITE_STAMPS[:] = [t for t in _WRITE_STAMPS if now - t < 60]
     if len(_WRITE_STAMPS) >= max_per_min:
@@ -7812,6 +7824,12 @@ def main():
     # extra program and no extra icon: the hunter decides. follow_news_pass()
     # already falls back to the normal spiral when the feed is quiet, so an
     # empty news day still sweeps.
+    ap.add_argument("--machines", type=int, default=1, metavar="N",
+                    help="how many hunter PCs are running against this SAME "
+                         "sheet. Google's write quota belongs to the service "
+                         "account, not the PC, so two machines at full speed "
+                         "send double the allowed rate and both stall. Set it "
+                         "to 2 when two laptops are sweeping.")
     ap.add_argument("--clean-on-start", action="store_true",
                     help="dedupe every tab BEFORE sweeping. Slow on a big sheet; "
                          "CLEAN_SHEET.bat does the same job on demand")
@@ -7887,6 +7905,12 @@ def main():
                     help="write to the sheet in-process (June's original way) "
                          "instead of the separate write worker")
     args = ap.parse_args()
+    # Split the Google write budget across every PC sharing this sheet. The
+    # quota is per SERVICE ACCOUNT, and all machines use the same creds file.
+    _MACHINES[0] = max(1, int(getattr(args, "machines", 1) or 1))
+    if _MACHINES[0] > 1:
+        print("  sharing the sheet with %d machine(s) -- write rate split so "
+              "they stop fighting each other for one quota" % _MACHINES[0])
 
     # NO ZIP PROMPT. With no --zip/--auto (how the launcher runs it) this stays
     # in MANUAL mode: you pan/search the AT&T map to the spot you want by hand,
