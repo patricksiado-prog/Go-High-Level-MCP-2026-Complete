@@ -35,7 +35,10 @@ from precise_fiber_hunter import open_sheet
 
 CELL_LIMIT = 10_000_000
 SLACK_ROWS = 2000          # headroom left on a tab so appends keep working
-MIN_COLS = 12              # every pipeline tab is <= 12 wide
+# 13, NOT 12: OUT_HEADER grew a 13th column (Status) on 2026-08-26. A
+# 12-column floor here would have resized Precise Fiber to 12 wide and
+# DELETED every Status value. Caught before this was ever run.
+MIN_COLS = 13
 PROTECTED = ("Precise Fiber", "Gold Confirmed", "Grey Fiber Customers",
              "Unknown Customers", "Maps Businesses", "Fiber Green Biz",
              "Upgrade Orange Biz", "DASHBOARD", "README")
@@ -72,7 +75,7 @@ def main():
         total += cells
         used = _used_rows(ws)
         want_r = grid_r if used is None else max(used + SLACK_ROWS, 100)
-        want_c = max(MIN_COLS, min(grid_c, 12))
+        want_c = max(MIN_COLS, min(grid_c, MIN_COLS))
         gain = cells - (want_r * want_c) if want_r < grid_r or want_c < grid_c else 0
         gain = max(0, gain)
         print("  %-30s %9s %13s %11s %10s"
