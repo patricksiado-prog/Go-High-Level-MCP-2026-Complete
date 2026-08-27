@@ -7919,9 +7919,18 @@ def main():
                     help="re-scan every address ever captured against the "
                          "business list. Slow, and only needed after a big "
                          "Maps Scraper run")
+    # NEWS-CHASING IS OFF BY DEFAULT (Patrick, 2026-08-27, after watching it
+    # live: "absolutely fucking take this away ... get me back to putting the
+    # map in the right place pressing start, then it goes until forever").
+    # The flight ability is KEPT behind --follow-news, with the lessons it
+    # taught baked in (zoom to dot level after landing, press search-this-area,
+    # never end when the list ends). Default = aim the map, start, sweep
+    # OUTWARD from there until the machine dies or someone stops it.
+    ap.add_argument("--follow-news", action="store_true",
+                    help="EXPERIMENTAL: fly to towns from AT&T build-out news "
+                         "instead of sweeping where the map is aimed")
     ap.add_argument("--no-follow-news", action="store_true",
-                    help="do NOT chase the build-out news; just spiral out from "
-                         "wherever the map is sitting")
+                    help="(legacy no-op: staying put is the default now)")
     ap.add_argument("--cells-per-target", type=int, default=40,
                     help="cells to sweep in each news-named town (--follow-news)")
     ap.add_argument("--grid", action="store_true",
@@ -8282,11 +8291,14 @@ def main():
                 cap = _NET_CAPTURE[0]
                 if cap is None:
                     n = 0
-                elif not (args.no_follow_news or args.grid):
-                    # DEFAULT: go where fiber is actually being built.
+                elif args.follow_news and not args.grid:
+                    # OPT-IN: fly to towns from the build-out news.
                     n = follow_news_pass(page, ws, seen, args.dry, cap,
                                          cells_per_target=args.cells_per_target)
-                else:                    # CONTINUOUS: grid (default) or spiral, until stopped
+                else:
+                    # DEFAULT: the map is wherever the operator aimed it.
+                    # Sweep outward from RIGHT THERE, forever, until the
+                    # machine dies or a stop key says otherwise.
                     _sweep = sweep_grid if args.grid else sweep_continuous
                     n = _sweep(page, ws, seen, area_label, args.dry, cap)
                 if n:
