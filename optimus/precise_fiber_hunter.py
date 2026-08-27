@@ -3682,8 +3682,33 @@ def commit_rows(ws, tab, rows, tries=4):
     return committed, failed
 
 
-def replay_pending(sh, log=print):
-    """Re-commit batches parked by an earlier run. Best-effort, at startup."""
+REPLAY_MAX_FILES = 60          # per launch; the rest wait for the next one
+REPLAY_MAX_ROWS = 15000        # per launch, across all tabs
+
+
+def replay_pending(sh, log=print, max_files=REPLAY_MAX_FILES,
+                   max_rows=REPLAY_MAX_ROWS):
+    """Re-commit batches parked by an earlier run. Best-effort, at startup.
+
+    This used to make the problem worse every launch, three ways:
+
+      1. It called sh.worksheet() once PER FILE. That is a Google API READ
+         each time, and reads have their own per-minute quota. With a few
+         hundred parked files it blew the READ quota before writing anything
+         -- the "cannot replay ... Read requests" errors. The worksheet is now
+         looked up ONCE PER TAB and cached.
+
+      2. It replayed every file, one append per file. Hundreds of tiny writes
+         is the fastest way to hit the WRITE quota. Rows for the same tab are
+         now merged and committed in full-size batches instead.
+
+      3. Nothing was capped, so a failed replay left every file in place and
+         the next launch had even more to choke on. It now drains a bounded
+         amount per launch and says what is left, which converges instead of
+         compounding.
+
+    A file is deleted only once its rows are really in the sheet.
+    """
     sh = _as_spreadsheet(sh)
     if sh is None:
         return 0
@@ -3694,24 +3719,65 @@ def replay_pending(sh, log=print):
         return 0
     if not files:
         return 0
-    log("   replaying %d parked batch(es) from a previous run..." % len(files))
-    total = 0
-    for name in files:
+    if _SHEET_FULL["hit"]:
+        log("   %d parked batch(es) waiting, but the workbook is FULL -- "
+            "run FREE_SPACE.bat, then relaunch." % len(files))
+        return 0
+
+    take = files[:max_files]
+    log("   replaying %d of %d parked batch(es)..." % (len(take), len(files)))
+
+    # Group by tab FIRST so each tab costs one worksheet lookup, not one per file.
+    by_tab, rows_seen = {}, 0
+    for name in take:
         path = os.path.join(d, name)
         try:
             with open(path) as f:
                 blob = json.load(f)
-            ws = sh.worksheet(blob["tab"])
         except Exception as e:
-            log("   (cannot replay %s: %s)" % (name, str(e)[:60]))
+            log("   (unreadable, skipping %s: %s)" % (name, str(e)[:50]))
             continue
-        got, _ = commit_rows(ws, blob["tab"], blob.get("rows") or [])
-        if got:
-            total += got
+        rows = blob.get("rows") or []
+        if not rows:
             try:
-                os.remove(path)          # only once it is really in the sheet
-            except Exception:
+                os.remove(path)          # empty park file, nothing to land
+            except OSError:
                 pass
+            continue
+        if rows_seen + len(rows) > max_rows:
+            break
+        rows_seen += len(rows)
+        by_tab.setdefault(blob.get("tab") or OUT_TAB, []).append((path, rows))
+
+    total = 0
+    for tab, chunks in by_tab.items():
+        try:
+            ws = sh.worksheet(tab)       # ONE read per tab
+        except Exception as e:
+            log("   (cannot open %r: %s)" % (tab, str(e)[:60]))
+            continue
+        merged = [r for _p, rows in chunks for r in rows]
+        got, failed = commit_rows(ws, tab, merged)
+        total += got
+        # Delete park files only up to the number of rows Google acknowledged.
+        landed = got
+        for path, rows in chunks:
+            if landed >= len(rows):
+                landed -= len(rows)
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+            else:
+                break                    # this batch did not fully land -- keep it
+        log("   %-24s %d row(s) replayed%s"
+            % (tab, got, (", %d still parked" % failed) if failed else ""))
+        if _SHEET_FULL["hit"]:
+            break                        # no point trying the next tab
+
+    left = len(files) - sum(len(c) for c in by_tab.values())
+    if left > 0:
+        log("   %d parked batch(es) left for the next launch." % left)
     if total:
         log("   replayed %d row(s) that an earlier run could not commit." % total)
     return total
