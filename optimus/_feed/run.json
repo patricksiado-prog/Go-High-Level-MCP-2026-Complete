@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-08-26 03:22:27",
+ "generated_at": "2026-08-27 05:12:31",
  "run_id": "",
  "operator": "",
  "machine": "",
@@ -28,13 +28,8 @@
  "mode": "",
  "phases": [
   [
-   "EXIT_1",
-   "03:22:27",
-   0.0
-  ],
-  [
    "exit",
-   "03:22:27",
+   "05:12:31",
    0.0
   ]
  ],
@@ -45,11 +40,7 @@
   "classified_grey": 0,
   "classified_unknown": 0
  },
- "crash": {
-  "summary": "SystemExit(1) -- something called sys.exit",
-  "traceback": "",
-  "at": "2026-08-26 03:22:27"
- },
+ "crash": {},
  "wire_audit_records": 0,
  "wire_audit_by_colour": {},
  "capture_truth": {
