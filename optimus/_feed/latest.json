@@ -1,10 +1,10 @@
 {
- "generated_at": "2026-08-27 05:42:48",
- "run_id": "20260827-050453",
+ "generated_at": "2026-08-27 09:40:18",
+ "run_id": "20260827-092915",
  "operator": "Patrick",
  "machine": "LAPTOP-FJEEPATI",
  "area": "",
- "build_fingerprint": "43b3863d",
+ "build_fingerprint": "d5397388",
  "counts": {
   "green": 0,
   "fiber": 0,
@@ -29,18 +29,49 @@
  "phases": [
   [
    "start",
-   "05:04:54",
+   "09:29:15",
    0.0
   ],
   [
+   "playwright_up",
+   "09:29:54",
+   38.7
+  ],
+  [
+   "chromium_up",
+   "09:30:01",
+   45.3
+  ],
+  [
+   "browser_up",
+   "09:30:03",
+   48.0
+  ],
+  [
+   "page_loaded",
+   "09:30:07",
+   51.5
+  ],
+  [
+   "LOGGED_OUT",
+   "09:30:09",
+   54.1
+  ],
+  [
+   "LOGIN_TIMEOUT",
+   "09:40:12",
+   656.8
+  ],
+  [
    "exit",
-   "05:42:45",
-   2271.6
+   "09:40:16",
+   660.7
   ]
  ],
  "last_phase": "exit",
  "stage_counters": {
-  "grey_committed": 1918,
+  "auth_expired": 1,
+  "parse_error": 1,
   "classified_green": 0,
   "classified_gold": 0,
   "classified_grey": 0,
@@ -50,21 +81,44 @@
  "wire_audit_records": 0,
  "wire_audit_by_colour": {},
  "capture_truth": {
-  "delivery": null,
-  "raw_features": null,
+  "delivery": "PARSE_ERROR",
+  "raw_features": 0,
   "rendered": null,
   "classified": 0,
   "written": 0,
-  "auth_ok": null,
+  "auth_ok": false,
   "map_ok": null,
   "zoom_ok": null,
-  "notes": []
+  "notes": [
+   "HTTP 301 REDIRECTED TO LOGIN -- not logged in, nothing lands",
+   "NOT JSON -- AT&T sent something this parser cannot read. First 120 chars: <!DOCTYPE html> <html lang=\"en\">     <head>         <!-- The following 3 met",
+   "access chooser, not the map",
+   "capture: NO serviceability responses seen -- the map isn't loading fiber data (check you're LOGGED IN and dots are visible)"
+  ]
  },
- "first_failure": null,
- "capture_diagnostic": {},
+ "first_failure": "delivery",
+ "capture_diagnostic": {
+  "serviceability_responses": 0,
+  "leads_decoded": 0,
+  "empty_payload_top_keys": null,
+  "capture_reason": "NO serviceability responses seen -- the map isn't loading fiber data (check you're LOGGED IN and dots are visible)"
+ },
  "customer_specimens": [],
  "customer_specimen_count": 0,
- "zero_lead_responses": [],
+ "zero_lead_responses": [
+  {
+   "url": "https://youachieve.att.com/yourefer/fiber",
+   "content_type": "text/html; charset=UTF-8",
+   "total_bytes": 63,
+   "body_head": "HTTP 301 -- REDIRECTED TO LOGIN -- not logged in, nothing lands"
+  },
+  {
+   "url": "https://youachieve.att.com/yourefer/fiber/",
+   "content_type": "text/html;charset=UTF-8",
+   "total_bytes": 13746,
+   "body_head": "\n\n<!DOCTYPE html>\n<html lang=\"en\">\n    <head>\n        <!-- The following 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->\n        <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge,chrome=1\" />\n        <meta charset=\"utf-8\" />\n        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n\n        \n                <link rel=\"icon\" type=\"image/png\" href=\"/ui/img/YouAchieve_rgb_pos.png\" integrity=\"sha384-JvkF7hO1ndiThbKZ4jdWx6jwPxGPClZU2vk7JW8xWqD0DMi3sLgxdVZOtgyCid4H\" crossorigin=\"anonymous\" />\n                <link rel=\"apple-touch-icon\" sizes=\"57x57\" href=\"/ui/img/apple-icons/yA-apple-icon-57x57.png\" integrity=\"sha384-j4Dc5hCK7j2Jw6aaXrovwi4thZRzBiNTWsH87PfjbVo7+xkdoZF41k+Atilu/+Vy\" crossorigin=\"anonymous\" />\n                <link rel=\"apple-touch-icon\" sizes=\"72x72\" href=\"/ui/img/apple-icons/yA-apple-icon-72x72.png\" integrity=\"sha384-8zbXgQYS6vHMzWXDpnd6HhWnqE9aaQS8twRpqV9TF5nVymQDJQ7uFLq2pqx4LLix\" crossorigin=\"anonymous\" />\n                <link rel=\"apple-touch-icon\" sizes=\"114x114\" href=\"/ui/img/apple-icons/yA-apple-icon-114x114.png\" integrity=\"sha384-Kh6dxaqmRhHl7VBoHkuzrVKxlAt3KsVjKVdWt22aROs0wxHHVPUr2MDRPpfcJlCP\" crossorigin=\"anonymous\" />\n                <link rel=\"apple-touch-icon\" sizes=\"144x144\" href=\"/ui/img/apple-icons/yA-apple-icon-144x144.png\" integrity=\"sha384-2WIpfFnnVjRTqjqYKcjaCKbi5VykMjuwEDHOpNKc77v5Y2+aQjQArRmhz8mbyLQi\" crossorigin=\"anonymous\" />\n            \n\n        <!-- Additional Meta Tags -->\n        <meta name=\"description\" content=\"AT&T You Achieve Platform\"> \n\n        <!-- Site CSS Files -->\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/jquery/jquery-ui-1_14_1/jquery-ui.min.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/bootstrap.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/font-awesome.min.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/indexV2.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/css/you-perform.css\" />\n        \n            <link rel=\"stylesheet\" type=\"text/css\" href=\"/ui/jquery/ui/tinymce/fonts.css\" />\n        \n\n        <!-- Page CSS Files -->\n        \n\n        <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->\n        <!--[if lt IE 12]>\n          <script src=\"https://cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv.min.js\" integrity=\"sha512-UDJtJXfzfsiPPgnI5S1000FPLBHMhvzAMX15I+qG2E2OAzC9P1JzUwJOfnypXiOH7MRPaqzhPbBGDNNj7zBfoA==\" crossorigin=\"anonymous\" referrerpolicy=\"no-referrer\"></script>\n          <script src=\"https://cdnjs.cloudflare.com/ajax/libs/respond.js/1.4.2/respond.min.js\" integrity=\"sha512-qWVvreMuH9i0DrugcOtifxdtZVBBL0X75r9YweXsdCHtXUidlctw7NXg5KVP3ITPtqZ2S575A0wFkvgS2anqSA==\" crossorigin=\"anonymous\" referrerpolicy=\"no-referrer\"></script>\n        <![endif]-->\n\n        <title>you Achieve | Landing</title>\n    <script type=\"text/javascript\" src=\"https://youachieve.att.com/resources/4742a524ea328741d98ac6233c9dc954522001624dcc5\"  ></script></head>\n\n    <body style=\"background-color: #FFF;\">\n        <div id=\"appWrapper\">\n            \n            \n            \n            <div id=\"sidebar-wrapper-left\">\n                <ul class=\"sidebar-nav-left\">\n                    <li style=\"line-height: 56px; text-align:right;\"><button type=\"button\" class=\"btn btn-outline-blue menuLeftToggle\" style=\"margin-bottom: 8px; margin-top:8px; margin-right: 10px;\">Close Menu <i class=\"fa fa-remove\"></i></button></li>\n\n                    \n                </ul>\n            </div>\n            \n            \n            \n            <div id=\"sidebar-wrapper-right\">\n                <ul class=\"sidebar-nav\">\n                    <li style=\"line-height: 56px; text-align:right;\">\n                        <button type=\"button\" class=\"btn btn-outline-blue menuRightToggle\" style=\"margin-bottom: 8px; margin-top:8px; margin-right: 10px;\">Close M"
+  }
+ ],
  "sample_count": 0,
  "samples": [],
  "note": ""
