@@ -622,7 +622,12 @@ def _match_new(new):
     if not leads:
         return
     g, o = [], []
-    for name, addr, phone, web, cat in new:
+    for _row in new:
+        # _safe_append builds 7-wide rows (…, resi_hint, cell_hint). Unpacking a
+        # fixed 5 raised ValueError on the FIRST row, so every cross-match batch
+        # aborted and the business-to-dot match never wrote anything. Slice, so
+        # adding a column can never silently kill the match again.
+        name, addr, phone, web, cat = _row[:5]
         color = leads.get(_norm_addr(addr))
         if not color:
             continue
