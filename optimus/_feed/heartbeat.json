@@ -1,51 +1,16 @@
 {
- "run_id": "20260828-042410",
+ "run_id": "20260828-044650",
  "operator": "Patrick",
  "machine": "LAPTOP-FJEEPATI",
  "build_fingerprint": "d5397388",
  "mode": "",
- "updated_at": "2026-08-28 04:35:05",
- "last_phase": "exit",
+ "updated_at": "2026-08-28 04:46:56",
+ "last_phase": "start",
  "phases": [
   [
    "start",
-   "04:24:15",
+   "04:46:56",
    0.0
-  ],
-  [
-   "playwright_up",
-   "04:24:43",
-   27.5
-  ],
-  [
-   "chromium_up",
-   "04:24:51",
-   35.8
-  ],
-  [
-   "browser_up",
-   "04:24:53",
-   38.0
-  ],
-  [
-   "page_loaded",
-   "04:24:57",
-   41.6
-  ],
-  [
-   "LOGGED_OUT",
-   "04:24:59",
-   43.9
-  ],
-  [
-   "LOGIN_TIMEOUT",
-   "04:35:02",
-   646.4
-  ],
-  [
-   "exit",
-   "04:35:05",
-   649.5
   ]
  ]
 }
