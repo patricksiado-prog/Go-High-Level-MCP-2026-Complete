@@ -98,15 +98,21 @@ def push_live_counts_scraper(total, sheet_added, zip_now, matches=None):
     """Running total for the SCRAPER (businesses pulled), pushed to
     optimus/_live/LIVE_COUNTS_scraper.txt so Claude can read it live."""
     import socket
+    if _SHEET_FULL["hit"]:
+        status = ("STATUS: *** SHEET FULL -- NOTHING IS REACHING THE SHEET ***\n"
+                  "        %d row(s) parked on this PC; they go in when there is room"
+                  % _PARKED_ROWS[0])
+    else:
+        status = "STATUS: scraping (updates as it runs)"
     txt = (
         "OPTIMUS SCRAPER -- LIVE COUNTS\n"
         "updated: %s   host: %s   ZIP now: %s\n"
-        "STATUS: scraping (updates as it runs)\n"
+        "%s\n"
         "----------------------------------------\n"
         "BUSINESSES pulled this run:   %d\n"
         "added to sheet (Maps Biz):    %d\n"
         % (time.strftime("%Y-%m-%d %H:%M:%S"), socket.gethostname(),
-           str(zip_now), total, sheet_added))
+           str(zip_now), status, total, sheet_added))
     if matches is not None:
         txt += "COMBO matches (green+orange): %d\n" % matches
     gh_put("optimus/_live/LIVE_COUNTS_scraper.txt", txt)
@@ -1239,6 +1245,7 @@ except Exception:
 _SHEET_FULL = {"hit": False, "said": False}
 _WRITE_STAMPS = []
 _PARK_SEQ = [0]
+_PARKED_ROWS = [0]        # rows parked to disk this run -- shown in every status line
 _RUN_STAMP = time.strftime("%Y%m%d-%H%M%S")
 
 
@@ -1350,6 +1357,7 @@ def _park_rows(rows, tab=None):
     try:
         with io.open(path, "w", encoding="utf-8") as f:
             json.dump({"tab": tab, "rows": rows}, f)
+        _PARKED_ROWS[0] += len(rows)
         return True
     except Exception as e:
         print("  (could not park %d rows: %s)" % (len(rows), str(e)[:50]))
@@ -1783,7 +1791,14 @@ def main():
                 qdone.add(q)                             # mark this search complete
                 save_progress(qdone)
                 withp = sum(1 for r in rows if r.get("phone"))
-                print("  [%d/%d] %-32s +%d (%d w/phone)" % (i, len(qs), q[:32], new, withp))
+                # When the sheet is full the run keeps capturing (the rows are
+                # parked and replay later) -- but the operator must never be
+                # able to mistake that for delivery. A banner printed once
+                # scrolls away in minutes; this is on every single line.
+                flag = ("   <-- NOT ON THE SHEET, parked (%d held)" % _PARKED_ROWS[0]
+                        if _SHEET_FULL["hit"] else "")
+                print("  [%d/%d] %-32s +%d (%d w/phone)%s"
+                      % (i, len(qs), q[:32], new, withp, flag))
                 # REAL-TIME COUNT: push the running tally every 5 searches so
                 # Claude can read "how many pulled so far" at any moment.
                 if i % 5 == 0:
@@ -1792,12 +1807,24 @@ def main():
                 zips_done.add(z)                         # whole ZIP covered
                 save_zips_done(zips_done)
                 push_live_counts_scraper(total, sheet_added, z)   # ZIP-complete snapshot
-                print("=== ZIP %s done -> moving to the next needed ZIP ===" % z)
+                if _SHEET_FULL["hit"]:
+                    print("=== ZIP %s done -- BUT NOTHING WENT TO THE SHEET (%d rows "
+                          "parked on this PC; the workbook is full) ===" % (z, _PARKED_ROWS[0]))
+                else:
+                    print("=== ZIP %s done -> moving to the next needed ZIP ===" % z)
         out_f.close()
         ctx.close()
     push_live_counts_scraper(total, sheet_added, "DONE (final count)")
     print("\nDONE this session: %d businesses (CSV: %s)." % (total, OUT_PATH))
-    if to_sheet:
+    if to_sheet and _SHEET_FULL["hit"]:
+        print("")
+        print("  " + "!" * 66)
+        print("  NOTHING REACHED THE SHEET THIS RUN. The workbook is FULL.")
+        print("  %d row(s) are parked on this PC and go in automatically once" % _PARKED_ROWS[0])
+        print("  there is room. Scraping more right now adds nothing you can use.")
+        print("  Tell Patrick the sheet is full.")
+        print("  " + "!" * 66)
+    elif to_sheet:
         print("  %d added to the '%s' tab (live as it ran)." % (sheet_added, SHEET_TAB))
     if stopped:
         print("\n  Stopped early -- run again to pick up where it left off.")
