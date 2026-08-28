@@ -961,6 +961,52 @@ def _census_place(lat, lng):
     return city, state, zc
 
 
+# The canonical Precise Fiber layout. MUST stay identical to OUT_HEADER in
+# precise_fiber_hunter.py -- the hunter appends rows in exactly this order, so
+# these labels describe columns that already hold data.
+PF_HEADER = ["Address", "Dot Color", "Captured At", "Business", "Phone",
+             "Run ID", "Operator", "Lat", "Lng", "City", "State", "ZIP",
+             "Status"]
+
+
+def _repair_pf_header(ws, first):
+    """Put the missing labels back on row 1 of Precise Fiber.
+
+    Row 1 lost everything past 'Captured At' at some point. backfill_addresses
+    finds Lat/Lng/City/State/ZIP BY NAME, so it bailed on every single launch
+    and the address repair has never run once -- which is why captured rows
+    still have no city, state or ZIP and cannot be mailed or skip-traced. The
+    columns were never junk; only their labels were gone.
+
+    Timid on purpose, same contract as the hunter's _ensure_header:
+      * fills ONLY row-1 cells that are blank
+      * never overwrites a label already there (someone may have renamed one)
+      * never touches row 2 or below, so no data can move
+    Returns the repaired header list, or None if it could not help.
+    """
+    cur = list(first) + [""] * max(0, len(PF_HEADER) - len(first))
+    fixed, added = list(cur), []
+    for i, want in enumerate(PF_HEADER):
+        if str(cur[i]).strip():
+            continue                      # already labelled -- leave it alone
+        fixed[i] = want
+        added.append(want)
+    if not added:
+        return None
+    print("  Precise Fiber row 1 is missing %d column label(s): %s"
+          % (len(added), ", ".join(added)))
+    try:
+        _sheet_throttle()
+        ws.batch_update([{"range": "A1:%s1" % _a1(len(fixed) - 1),
+                          "values": [fixed]}], value_input_option="RAW")
+    except Exception as e:
+        print("  (could not repair the header: %s -- nothing else touched)"
+              % str(e)[:60])
+        return None
+    print("  header repaired -- the address backfill can find its columns now.")
+    return fixed
+
+
 def backfill_addresses(sh, limit=BACKFILL_PER_LAUNCH):
     """Fill City/State/ZIP on located rows that lack them, and stamp when.
     Bounded, resumable, and it never touches a row it cannot verify."""
@@ -978,8 +1024,23 @@ def backfill_addresses(sh, limit=BACKFILL_PER_LAUNCH):
     i_lat, i_lng = col("lat"), col("lng")
     i_city, i_state, i_zip = col("city"), col("state"), col("zip")
     if min(i_lat, i_lng, i_city, i_state, i_zip) < 0:
-        print("  (address backfill skipped -- %s has no Lat/Lng/City/State/ZIP "
-              "header; nothing touched)" % PF_TAB)
+        repaired = _repair_pf_header(ws, vals[0])
+        if repaired:
+            vals[0] = repaired
+            hdr = [h.strip().lower() for h in repaired]
+            i_lat, i_lng = col("lat"), col("lng")
+            i_city, i_state, i_zip = col("city"), col("state"), col("zip")
+    if min(i_lat, i_lng, i_city, i_state, i_zip) < 0:
+        # Loud, not a one-line skip. This quietly switched the entire address
+        # repair off for weeks and nobody could tell from the console.
+        print("")
+        print("  " + "!" * 66)
+        print("  ADDRESS BACKFILL IS OFF. '%s' row 1 does not name" % PF_TAB)
+        print("  Lat / Lng / City / State / ZIP, so nothing can be repaired and")
+        print("  captured rows stay un-mailable and un-skip-traceable.")
+        print("  Row 1 currently reads: %s" % (", ".join(vals[0]) or "(empty)"))
+        print("  " + "!" * 66)
+        print("")
         return 0
     width = max(len(vals[0]), i_zip + 1)
     i_when = col("backfilled at")
