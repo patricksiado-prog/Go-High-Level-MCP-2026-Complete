@@ -4324,6 +4324,39 @@ def open_sheet():
         return None
 
 
+# ---------------------------------------------------------------------------
+# WHICH TABS MAY BE DELETED.
+#
+# This used to be a KEEP list -- seven pipeline tabs, delete everything else.
+# That is fragile by design: every tab anyone adds later dies by default. By
+# 2026-08-28 that list had gone stale and would have deleted 'Grey Fiber
+# Customers' (26,689 rows), 'Unknown Customers', 'Backend Comm' (17,085),
+# 'Warm Backlog -- Replied YES' (the 40 people who actually said yes) and
+# '_Dedupe Lock' -- the cross-machine lock that stops the hunter and the
+# scraper deduping the same tab at once. It also listed "Enriched Leads",
+# which does not exist.
+#
+# Inverted: delete ONLY what is unmistakably scratch. Anything else survives,
+# so a new tab is safe by default instead of doomed by default.
+# ---------------------------------------------------------------------------
+_DEAD_TAB_PATTERNS = (
+    re.compile(r"^TEST-", re.I),        # frozen verification snapshots
+    re.compile(r"^ZZ_", re.I),          # scratch grids
+    re.compile(r"^_temp", re.I),        # temp lookups
+    re.compile(r"^_optimus_probe$", re.I),   # leftover from the sheet-full probe
+)
+# Empty on purpose and load-bearing -- never delete these, whatever they match.
+_PROTECTED_TABS = {"_dedupe lock", "_dispatch"}
+
+
+def _is_dead_tab(title):
+    """True only for scratch/test tabs. Everything else is kept."""
+    t = (title or "").strip()
+    if t.lower() in _PROTECTED_TABS:
+        return False
+    return any(p.match(t) for p in _DEAD_TAB_PATTERNS)
+
+
 def clean_sheet():
     """Free space in the production sheet so it accepts writes again, WITHOUT making
     a new one: delete junk tabs (anything not part of the pipeline), trim the Hunter
@@ -4332,24 +4365,19 @@ def clean_sheet():
     Run with --clean-sheet."""
     import gspread
     from google.oauth2.service_account import Credentials
-    # The Optimus pipeline tabs -- everything ELSE is junk (old MapMan run, test
-    # rows) and is safe to delete to reclaim cells.
-    pipeline_tabs = {OUT_TAB, GOLD_TAB, MAPS_TAB, GREEN_BIZ_TAB, ORANGE_BIZ_TAB,
-                     "Enriched Leads", STATUS_TAB}
     creds = find_creds()
     if not creds:
         print("No google_creds.json found -- can't clean the sheet."); return
     client = gspread.authorize(
         Credentials.from_service_account_file(creds, scopes=SCOPES))
     sh = client.open_by_key(SHEET_ID)
-    keep = {t.lower() for t in pipeline_tabs}
     wss = sh.worksheets()
-    print("Cleaning sheet -- %d tabs. Keeping: %s\n"
-          % (len(wss), ", ".join(sorted(pipeline_tabs))))
+    print("Cleaning sheet -- %d tabs. Deleting ONLY scratch/test tabs; "
+          "everything else is kept and trimmed.\n" % len(wss))
     for ws in wss:
         title = ws.title
         cells = ws.row_count * ws.col_count
-        if title.lower() not in keep:
+        if _is_dead_tab(title):
             try:
                 if len(sh.worksheets()) > 1:
                     sh.del_worksheet(ws)
@@ -4370,7 +4398,14 @@ def clean_sheet():
                 vals = tail
                 print("  trimmed '%s' to last 100 heartbeats" % title)
             used_rows = max(len(vals) + 5, 10)
-            used_cols = max((max((len(r) for r in vals), default=1)), 1)
+            # NEVER below 13 columns. OUT_HEADER is 13 wide and the hunter appends
+            # 13-wide rows POSITIONALLY. Old rows in Precise Fiber are only 3 wide,
+            # so sizing to the widest data row would cut the tab to 3 columns and
+            # every later write would land City in State, silently. This is the
+            # same trap free_space.py had at MIN_COLS=12, which would have wiped
+            # every Status value. Header width wins, floor of 13.
+            _hdr_w = len(vals[0]) if vals else 0
+            used_cols = max(_hdr_w, max((len(r) for r in vals), default=1), 13)
             if used_rows < ws.row_count or used_cols < ws.col_count:
                 ws.resize(rows=used_rows, cols=used_cols)
                 print("  trimmed '%s' -> %d x %d (was %d cells)"
