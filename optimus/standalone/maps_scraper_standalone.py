@@ -500,6 +500,42 @@ _MATCH = {"leads": None, "green_ws": None, "orange_ws": None,
           "green_ph": set(), "orange_ph": set()}
 
 
+PF_REDIRECT_FILE = os.path.join(os.path.expanduser("~"), "optimus",
+                                "optimus_sheet_id.txt")
+
+
+def _pf_spreadsheet(sh):
+    """The workbook that holds 'Precise Fiber'.
+
+    Reads the SAME redirect file the hunter reads, so when green dots are split
+    into their own spreadsheet both programs follow. Without that, the hunter
+    would write dots to the new file while the scraper kept cross-matching
+    against the old one and quietly found nothing.
+
+    No redirect file -> returns `sh` unchanged, so behaviour is identical to
+    before until somebody deliberately splits.
+    """
+    try:
+        if not os.path.exists(PF_REDIRECT_FILE):
+            return sh
+        raw = open(PF_REDIRECT_FILE, encoding="utf-8").read().strip()
+    except Exception:
+        return sh
+    if not raw:
+        return sh
+    m = re.search(r"/spreadsheets/d/([A-Za-z0-9_-]{20,})", raw)
+    sid = m.group(1) if m else raw.split()[0]
+    if not re.fullmatch(r"[A-Za-z0-9_-]{20,}", sid or ""):
+        return sh
+    try:
+        return sh.client.open_by_key(sid)
+    except Exception as e:
+        print("  (Precise Fiber redirect %s would not open: %s -- falling back to "
+              "the main workbook. Check it is shared with the service account.)"
+              % (sid, str(e)[:50]))
+        return sh
+
+
 def _norm_addr(a):
     if not a:
         return ""
@@ -586,7 +622,7 @@ def init_match(sh):
     business can be flagged if it sits on a GREEN/ORANGE dot, and open the two match
     tabs. No-op if there's no Precise Fiber tab yet."""
     try:
-        pf = sh.worksheet("Precise Fiber").get_all_values()
+        pf = _pf_spreadsheet(sh).worksheet("Precise Fiber").get_all_values()
     except Exception:
         _MATCH["leads"] = {}
         return
@@ -1011,7 +1047,7 @@ def backfill_addresses(sh, limit=BACKFILL_PER_LAUNCH):
     """Fill City/State/ZIP on located rows that lack them, and stamp when.
     Bounded, resumable, and it never touches a row it cannot verify."""
     try:
-        ws = sh.worksheet(PF_TAB)
+        ws = _pf_spreadsheet(sh).worksheet(PF_TAB)
         vals = ws.get_all_values()
     except Exception as e:
         print("  (address backfill skipped -- cannot read %s: %s)"

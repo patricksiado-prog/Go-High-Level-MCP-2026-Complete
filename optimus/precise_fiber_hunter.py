@@ -4204,6 +4204,72 @@ def backfill_gold_dots():
     _backfill_gold_from(sh)
 
 
+def read_pf_redirect():
+    """The spreadsheet ID Precise Fiber should live in, or None for the default.
+
+    Reads ~/optimus/optimus_sheet_id.txt (NEW_SHEET_ID_FILE). The hook was defined
+    long ago and never actually read; this wires it up.
+
+    WHY: Precise Fiber is ~8.4M of the workbook's 10M cells, so the production
+    sheet fills and every write is refused while the other tabs sit nearly empty.
+    Putting the green dots in their own file gives them a fresh 10M and leaves
+    Gold Confirmed / Maps Businesses / the biz tabs plenty of room.
+
+    No file -> None -> behaviour is exactly as before. Nothing changes until
+    somebody deliberately creates it.
+    """
+    try:
+        if not os.path.exists(NEW_SHEET_ID_FILE):
+            return None
+        raw = open(NEW_SHEET_ID_FILE, encoding="utf-8").read().strip()
+    except Exception:
+        return None
+    if not raw:
+        return None
+    # Accept a full URL as well as a bare ID -- easier to paste from the browser.
+    m = re.search(r"/spreadsheets/d/([A-Za-z0-9_-]{20,})", raw)
+    sid = m.group(1) if m else raw.split()[0]
+    if not re.fullmatch(r"[A-Za-z0-9_-]{20,}", sid or ""):
+        print("  (ignoring %s -- '%s' is not a spreadsheet ID)"
+              % (NEW_SHEET_ID_FILE, raw[:40]))
+        return None
+    return sid
+
+
+def open_pf_spreadsheet(client):
+    """(spreadsheet, sheet_id, redirected) for the Precise Fiber workbook.
+
+    If a redirect is set, open THAT. If it cannot be opened the usual cause is
+    that the new sheet was never SHARED WITH THE SERVICE ACCOUNT -- the account
+    has no Drive quota of its own and can only touch files shared with it. That
+    failure is announced loudly and we fall back to the production sheet, because
+    a quiet fallback here is precisely how the gold dots vanished for weeks
+    (client.create() threw, the exception was swallowed, nothing ever appeared).
+    """
+    sid = read_pf_redirect()
+    if not sid:
+        return client.open_by_key(SHEET_ID), SHEET_ID, False
+    try:
+        sh = client.open_by_key(sid)
+        print("  PRECISE FIBER -> separate workbook '%s' (%s)" % (sh.title, sid))
+        return sh, sid, True
+    except Exception as e:
+        print("")
+        print("  " + "!" * 66)
+        print("  CANNOT OPEN THE PRECISE FIBER WORKBOOK NAMED IN")
+        print("  %s" % NEW_SHEET_ID_FILE)
+        print("  id: %s" % sid)
+        print("  error: %s" % str(e)[:90])
+        print("")
+        print("  Almost always this means the new sheet was never shared with the")
+        print("  service account. Open google_creds.json, copy \"client_email\",")
+        print("  and share the sheet with that address as an Editor.")
+        print("  Falling back to the production sheet so nothing is lost.")
+        print("  " + "!" * 66)
+        print("")
+        return client.open_by_key(SHEET_ID), SHEET_ID, False
+
+
 def open_sheet():
     """Open the production sheet and the Precise Fiber tab. We do NOT create a new
     sheet -- if it's full, AUTO-CLEAN this one (delete junk tabs, trim) so it accepts
@@ -4220,14 +4286,29 @@ def open_sheet():
     try:
         client = gspread.authorize(
             Credentials.from_service_account_file(creds_file, scopes=SCOPES))
-        sh = client.open_by_key(SHEET_ID)
+        sh, pf_id, redirected = open_pf_spreadsheet(client)
         if _sheet_is_full(sh):
-            print("The sheet is FULL -- auto-cleaning the garbage so leads can save...")
-            try:
-                clean_sheet()
-            except Exception as e:
-                print("  (auto-clean hiccup: %s)" % str(e)[:80])
-            sh = client.open_by_key(SHEET_ID)   # re-open after cleaning
+            if redirected:
+                # Do NOT run clean_sheet() here. It is written for the production
+                # workbook -- it deletes every tab outside the pipeline list, and
+                # it clears the redirect file on its way out, which would silently
+                # undo a split somebody made on purpose.
+                print("")
+                print("  " + "!" * 66)
+                print("  THE SEPARATE PRECISE FIBER WORKBOOK IS ALSO FULL.")
+                print("  id: %s" % pf_id)
+                print("  Green dots have nowhere to land. Point")
+                print("  %s at a new empty sheet" % NEW_SHEET_ID_FILE)
+                print("  (shared with the service account) and relaunch.")
+                print("  " + "!" * 66)
+                print("")
+            else:
+                print("The sheet is FULL -- auto-cleaning the garbage so leads can save...")
+                try:
+                    clean_sheet()
+                except Exception as e:
+                    print("  (auto-clean hiccup: %s)" % str(e)[:80])
+                sh = client.open_by_key(SHEET_ID)   # re-open after cleaning
         try:
             ws = sh.worksheet(OUT_TAB)
         except Exception:
