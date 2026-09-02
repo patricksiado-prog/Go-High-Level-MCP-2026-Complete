@@ -3236,6 +3236,15 @@ def find_creds():
 
 
 NEW_SHEET_ID_FILE = os.path.join(os.path.expanduser("~"), "optimus", "optimus_sheet_id.txt")
+# THE SPLIT SHEET. 'Precise Fiber' is ~8.4M of the production workbook's 10M
+# cells, so production fills and every write is refused while the other tabs
+# sit nearly empty (measured 2026-08-30: fileSize byte-identical for days,
+# failed_writes 2,805, written 0). Green dots get their own workbook with a
+# fresh 10M. The file above still wins when present, so a PC can point
+# elsewhere; this constant is the default so NO PC needs touching.
+# Workbook 'ATT FIBER LEADS - Precise Fiber', shared with the fiberscanner
+# service account as writer (verified 2026-09-03). Empty string = no split.
+PF_SPLIT_SHEET_ID = "1DXu-nuQvVKrqQVk8LDNwLztG31ddi6sAyo8vXDFKcmQ"
 
 
 def _sheet_is_full(sh):
@@ -4220,12 +4229,12 @@ def read_pf_redirect():
     """
     try:
         if not os.path.exists(NEW_SHEET_ID_FILE):
-            return None
+            return PF_SPLIT_SHEET_ID or None
         raw = open(NEW_SHEET_ID_FILE, encoding="utf-8").read().strip()
     except Exception:
-        return None
+        return PF_SPLIT_SHEET_ID or None
     if not raw:
-        return None
+        return PF_SPLIT_SHEET_ID or None
     # Accept a full URL as well as a bare ID -- easier to paste from the browser.
     m = re.search(r"/spreadsheets/d/([A-Za-z0-9_-]{20,})", raw)
     sid = m.group(1) if m else raw.split()[0]
@@ -4312,7 +4321,11 @@ def open_sheet():
         try:
             ws = sh.worksheet(OUT_TAB)
         except Exception:
-            ws = sh.add_worksheet(title=OUT_TAB, rows="5000", cols="8")
+            # cols must match OUT_HEADER (13). It was hard-coded to 8 -- harmless
+            # for two years because production already had the tab, and the
+            # split workbook is the one place this line actually runs.
+            ws = sh.add_worksheet(title=OUT_TAB, rows="5000",
+                                  cols=str(len(OUT_HEADER)))
         if not ws.get_all_values():
             _ensure_header(ws, OUT_HEADER)
         return ws

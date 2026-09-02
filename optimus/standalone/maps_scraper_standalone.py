@@ -502,6 +502,10 @@ _MATCH = {"leads": None, "green_ws": None, "orange_ws": None,
 
 PF_REDIRECT_FILE = os.path.join(os.path.expanduser("~"), "optimus",
                                 "optimus_sheet_id.txt")
+# MUST equal PF_SPLIT_SHEET_ID in precise_fiber_hunter.py. The hunter writes
+# green dots there; this program cross-matches against it. Different values =
+# the match silently finds nothing. Empty string = no split.
+PF_SPLIT_SHEET_ID = "1DXu-nuQvVKrqQVk8LDNwLztG31ddi6sAyo8vXDFKcmQ"
 
 
 def _pf_spreadsheet(sh):
@@ -515,12 +519,17 @@ def _pf_spreadsheet(sh):
     No redirect file -> returns `sh` unchanged, so behaviour is identical to
     before until somebody deliberately splits.
     """
+    # Same default the hunter carries (PF_SPLIT_SHEET_ID there). If the two
+    # ever differ, the hunter writes green dots to one workbook and this match
+    # reads another -- and finds nothing, silently. Keep them identical.
+    raw = ""
     try:
-        if not os.path.exists(PF_REDIRECT_FILE):
-            return sh
-        raw = open(PF_REDIRECT_FILE, encoding="utf-8").read().strip()
+        if os.path.exists(PF_REDIRECT_FILE):
+            raw = open(PF_REDIRECT_FILE, encoding="utf-8").read().strip()
     except Exception:
-        return sh
+        raw = ""
+    if not raw:
+        raw = PF_SPLIT_SHEET_ID
     if not raw:
         return sh
     m = re.search(r"/spreadsheets/d/([A-Za-z0-9_-]{20,})", raw)
