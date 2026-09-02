@@ -1191,6 +1191,161 @@ GOLD_CUTOFF = "2026-08-24"          # keep rows captured ON or AFTER this day
 _GOLD_PURGE_MARKER = os.path.join(HERE, "gold_purge_done.flag")
 
 
+def _clean_open():
+    """Open the workbook for the startup clean WITHOUT going near 'Maps
+    Businesses'. open_sheet() creates that tab when it is missing, and a
+    20000x7 add_worksheet is 140,000 cells -- an instant 400 on a workbook at
+    the 10,000,000-cell ceiling. Its bare except then returned None, and the
+    whole cleanup block was gated on that, so the sheet being too full stopped
+    the very routine that frees the space. Measured 2026-09-03. This opens the
+    spreadsheet and nothing else."""
+    creds = _find_creds()
+    if not creds:
+        return None
+    import gspread
+    from google.oauth2.service_account import Credentials
+    scopes = ["https://www.googleapis.com/auth/spreadsheets",
+              "https://www.googleapis.com/auth/drive"]
+    client = gspread.authorize(
+        Credentials.from_service_account_file(creds, scopes=scopes))
+    return client.open_by_key(SHEET_ID)
+
+
+# ---------------------------------------------------------------------------
+# JUNK TABS -- frozen snapshots and scratch tabs, removed once per PC.
+#
+# Named junk ONLY. A tab that is not on this list SURVIVES. That default is
+# deliberate and it is the opposite of clean_sheet.py, which is a whitelist:
+# run against the 29 live tabs on 2026-09-03 that whitelist would have deleted
+# 14 tabs / 22,457 rows, and 7 of them were hand-built working tabs -- including
+# 'Warm Backlog -- Replied YES' (40 people who had already said yes), the
+# Angleton call list and the Beaumont work list. Reps and one-off scripts make
+# tabs constantly; a whitelist deletes the ones nobody thought to list.
+#
+# 'Gold Dots' goes because it is RETIRED and contaminated (BRAIN 22.14) and
+# 'GOLD - CLEAN' is its cleaned copy -- that one stays.
+# ---------------------------------------------------------------------------
+JUNK_TABS = {
+    "gold dots",
+    "tmp sweep census",
+    "zz_tmp_grid",
+    "_temp_ash_lookup",
+    "_optimus_probe",               # write-access probe, transient by design
+    "at&t test",
+}
+JUNK_TAB_PREFIX = ("test-", "debug", "_tmp", "tmp_", "zz_", "copy of ")
+_JUNK_TABS_MARKER = os.path.join(HERE, "junk_tabs_done.flag")
+
+
+def _is_junk_tab(title):
+    low = title.strip().lower()
+    # TEST-Gold-* holds real confirmed gold. It is never deleted here -- only
+    # migrate_test_gold() may remove it, and only after its rows are safely in
+    # 'Gold Confirmed'.
+    if low.startswith("test-gold"):
+        return False
+    return low in JUNK_TABS or low.startswith(JUNK_TAB_PREFIX)
+
+
+def migrate_test_gold(sh):
+    """Fold the TEST-Gold-* verification snapshots into 'Gold Confirmed', then
+    drop the tab. If the append fails for any reason the tab is LEFT ALONE --
+    losing confirmed gold to a tidy-up would be far worse than a stale tab."""
+    if sh is None:
+        return
+    try:
+        tabs = [w for w in sh.worksheets()
+                if w.title.strip().lower().startswith("test-gold")]
+    except Exception as e:
+        print("  (TEST-Gold migration skipped -- cannot list tabs: %s)" % str(e)[:60])
+        return
+    if not tabs:
+        return
+    try:
+        gold = sh.worksheet(GOLD_TAB)
+        have = set()
+        for r in gold.get_all_values()[1:]:
+            if r and r[0].strip():
+                have.add(r[0].strip().upper())
+    except Exception as e:
+        print("  (TEST-Gold migration skipped -- cannot read '%s': %s)"
+              % (GOLD_TAB, str(e)[:50]))
+        return
+    for w in tabs:
+        try:
+            _sheet_throttle()
+            vals = w.get_all_values()
+        except Exception as e:
+            print("  (TEST-Gold migration skipped for '%s': %s)" % (w.title, str(e)[:50]))
+            continue
+        body = [r for r in vals[1:]
+                if r and r[0].strip() and r[0].strip().upper() not in have]
+        try:
+            if body:
+                _sheet_throttle()
+                gold.append_rows(body, value_input_option="RAW")
+                for r in body:
+                    have.add(r[0].strip().upper())
+            _sheet_throttle()
+            sh.del_worksheet(w)
+            print("  migrated '%s': %d new gold row(s) into '%s', tab removed."
+                  % (w.title, len(body), GOLD_TAB))
+        except Exception as e:
+            print("  ! '%s' KEPT -- migration failed, nothing lost: %s"
+                  % (w.title, str(e)[:60]))
+
+
+def purge_junk_tabs(sh):
+    """Delete the frozen snapshots and scratch tabs, backing every one up to a
+    local CSV FIRST. A tab that cannot be backed up is not deleted."""
+    if sh is None or os.path.exists(_JUNK_TABS_MARKER):
+        return
+    try:
+        doomed = [w for w in sh.worksheets() if _is_junk_tab(w.title)]
+    except Exception as e:
+        print("  (junk-tab clean SKIPPED -- cannot list tabs: %s)" % str(e)[:60])
+        return
+    if not doomed:
+        print("  junk tabs: none present -- nothing to remove.")
+        open(_JUNK_TABS_MARKER, "w").write("clean already %s" % time.ctime())
+        return
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    bdir = os.path.join(HERE, "tab_backup_%s" % stamp)
+    try:
+        os.makedirs(bdir)
+    except Exception:
+        pass
+    print("\n  JUNK TABS: removing %d. Every one is saved to %s first."
+          % (len(doomed), bdir))
+    gone, held = 0, []
+    for w in doomed:
+        try:
+            _sheet_throttle()
+            vals = w.get_all_values()
+            safe = re.sub(r"[^A-Za-z0-9._-]+", "_", w.title).strip("_") or "tab"
+            with io.open(os.path.join(bdir, safe + ".csv"), "w",
+                         newline="", encoding="utf-8") as f:
+                csv.writer(f).writerows(vals)
+        except Exception as e:
+            # No backup, no delete. A tab we could not read is a tab we keep.
+            print("    ! KEPT '%s' -- could not back it up (%s)"
+                  % (w.title, str(e)[:40]))
+            held.append(w.title)
+            continue
+        try:
+            _sheet_throttle()
+            sh.del_worksheet(w)
+            gone += 1
+            print("    - %-32s %7d rows  (backed up)"
+                  % (w.title[:32], max(len(vals) - 1, 0)))
+        except Exception as e:
+            print("    ! could not delete '%s': %s" % (w.title, str(e)[:40]))
+            held.append(w.title)
+    if gone and not held:
+        open(_JUNK_TABS_MARKER, "w").write("removed %d %s" % (gone, time.ctime()))
+    print("  JUNK TABS DONE: removed %d, backups in %s\n" % (gone, bdir))
+
+
 def purge_prefix_gold(sh):
     if os.path.exists(_GOLD_PURGE_MARKER) or sh is None:
         return
@@ -1201,7 +1356,11 @@ def purge_prefix_gold(sh):
         print("  (gold purge skipped -- cannot read '%s': %s)" % (GOLD_TAB, str(e)[:50]))
         return
     if len(vals) < 2:
-        open(_GOLD_PURGE_MARKER, "w").write("empty tab %s" % time.ctime())
+        # NOT marking done. An empty read is a FAILED read, not a clean tab --
+        # one quota blip used to write the marker and disable the purge on this
+        # PC forever (measured 2026-09-03).
+        print("  (gold purge: '%s' read as %d rows -- retrying next launch)"
+              % (GOLD_TAB, len(vals)))
         return
     hdr = vals[0]
     cap_i = None
@@ -1822,6 +1981,42 @@ def main():
 
     from playwright.sync_api import sync_playwright
     os.makedirs(PROFILE_DIR, exist_ok=True)
+    # ---- THE STARTUP CLEAN -------------------------------------------------
+    # Patrick, 2026-09-03: "attach that software to the map scraper start up /
+    # for the 5th time i don't want 5 programs, 2 is enough." So the clean is
+    # HERE, not in a .bat nobody remembers to run.
+    #
+    # It runs BEFORE open_sheet() on purpose. open_sheet() can need to create a
+    # 20000x7 tab = 140,000 cells, which is an instant 400 on a workbook at the
+    # 10M ceiling; its bare except returned None and the old cleanup block was
+    # gated on that. So the sheet being full stopped the cleanup that frees the
+    # space -- the purge was the cure for the condition blocking the purge, and
+    # it had never run once in five builds. Clean first, then open.
+    _clean_sh = None
+    if to_sheet and os.environ.get("SCRAPER_NO_CLEAN", "").strip().lower() \
+            not in ("1", "true", "yes"):
+        print("\n  Startup clean (once per PC: junk gold rows, then junk tabs)...")
+        try:
+            _clean_sh = _clean_open()
+        except Exception as e:
+            print("  *** STARTUP CLEAN DID NOT RUN -- could not open the "
+                  "workbook: %s" % str(e)[:70])
+        if _clean_sh is None:
+            print("  *** STARTUP CLEAN SKIPPED -- no google_creds.json on this PC."
+                  "\n  *** The junk gold rows and junk tabs are STILL THERE.")
+        else:
+            for _label, _step in (("GOLD PURGE", purge_prefix_gold),
+                                  ("TEST-GOLD MIGRATION", migrate_test_gold),
+                                  ("JUNK TAB CLEAN", purge_junk_tabs)):
+                try:
+                    _step(_clean_sh)
+                except Exception as e:
+                    # NO SILENT RUNNING (2026-08-28): name the step that failed.
+                    # This used to collapse into "(dedupe off: ...)", which reads
+                    # as a minor unrelated notice rather than "the gold tab was
+                    # not cleaned".
+                    print("  *** %s DID NOT RUN: %s" % (_label, str(e)[:70]))
+
     sheet_ws, sheet_seen = (open_sheet() if to_sheet else (None, set()))
     # Rows an earlier run could not write (sheet full, quota) go in first, so a
     # backlog drains instead of growing. Bounded per launch -- see replay_parked.
@@ -1833,7 +2028,6 @@ def main():
     # on the biz tabs). Cross-machine locked so it never collides with the hunter.
     if sheet_ws is not None and os.environ.get("SCRAPER_NO_DEDUPE", "").strip() not in ("1", "true", "yes"):
         try:
-            purge_prefix_gold(sheet_ws.spreadsheet)          # one-shot, see above
             backfill_addresses(sheet_ws.spreadsheet)         # bounded, resumable
             startup_clean_and_counts(sheet_ws.spreadsheet)   # clean + show totals NOW
             start_periodic_dedupe(sheet_ws.spreadsheet)      # keep it clean while running
