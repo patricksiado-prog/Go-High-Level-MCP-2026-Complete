@@ -635,7 +635,26 @@ def init_match(sh):
         k = _norm_addr(r[0])
         if k and k not in leads:
             leads[k] = color
+    # 'Precise Fiber' has been GREEN ONLY since 2026-08-26 -- every gold dot goes
+    # to 'Gold Confirmed' now, and this function never read that tab. So the
+    # ORANGE side of the match was scanning a tab with zero orange rows, and
+    # 'Upgrade Orange Biz' froze at 62 rows (measured 2026-09-03) while 38,481
+    # scraped businesses sat unmatched. Gold is loaded from its own tab and
+    # OVERRIDES green: a business on a gold dot is an upgrade sale, not a
+    # switch pitch, and it is the highest-value row this program can write.
+    n_gold = 0
+    try:
+        for r in sh.worksheet(GOLD_TAB).get_all_values()[1:]:
+            k = _norm_addr(r[0] if r else "")
+            if k:
+                if leads.get(k) != "ORANGE":
+                    n_gold += 1
+                leads[k] = "ORANGE"
+    except Exception as e:
+        print("  (gold dots NOT loaded for the match -- 'Upgrade Orange Biz' will not"
+              " grow this run: %s)" % str(e)[:50])
     _MATCH["leads"] = leads
+    _MATCH["n_gold"] = n_gold
     try:
         _MATCH["green_ws"] = _ensure_match_tab(sh, GREEN_BIZ_TAB)
         _MATCH["orange_ws"] = _ensure_match_tab(sh, ORANGE_BIZ_TAB)
@@ -652,9 +671,10 @@ def init_match(sh):
                 _MATCH[akey] = set(); _MATCH[pkey] = set()
     except Exception:
         pass
-    print("  COMBO MATCH ON: %d captured fiber leads loaded -> a scraped business on "
-          "a green/orange dot lands in the 'Fiber Green Biz' / 'Upgrade Orange Biz' tabs."
-          % len(leads))
+    print("  COMBO MATCH ON: %d captured fiber leads loaded (%d gold from '%s') -> a "
+          "scraped business on a green/orange dot lands in the 'Fiber Green Biz' / "
+          "'Upgrade Orange Biz' tabs."
+          % (len(leads), n_gold, GOLD_TAB))
 
 
 def _match_new(new):
