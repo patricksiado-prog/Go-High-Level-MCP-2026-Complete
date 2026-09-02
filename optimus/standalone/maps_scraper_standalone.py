@@ -1266,7 +1266,8 @@ def _run_startup_clean(sh):
     the handle open_sheet() gets when the standalone open lost a coin-flip 503."""
     for _label, _step in (("GOLD PURGE", purge_prefix_gold),
                           ("TEST-GOLD MIGRATION", migrate_test_gold),
-                          ("JUNK TAB CLEAN", purge_junk_tabs)):
+                          ("JUNK TAB CLEAN", purge_junk_tabs),
+                          ("TAB COUNTS", publish_tab_counts)):
         try:
             _step(sh)
         except Exception as e:
@@ -1413,6 +1414,40 @@ def purge_junk_tabs(sh):
     if gone and not held:
         open(_JUNK_TABS_MARKER, "w").write("removed %d %s" % (gone, time.ctime()))
     print("  JUNK TABS DONE: removed %d, backups in %s\n" % (gone, bdir))
+
+
+def publish_tab_counts(sh):
+    """Every tab and its data-row count -> optimus/_feed/sheet/tabs.json on
+    GitHub, WITH a timestamp, at every launch. Replaces COUNT_TABS.bat.
+
+    Patrick, 2026-09-03: "I don't like extra program, can u connect it to the
+    launch of something." Before this the feed refreshed only when someone
+    remembered to run the .bat; it sat at 08-27 numbers for a week and the
+    brain quoted 'Gold Confirmed = 11,490' as live while the tab held 1,884.
+    Runs AFTER the clean so the feed shows the cleaned state. Every launch, not
+    once per PC -- counts change, flags do not apply."""
+    if sh is None:
+        return
+    out = {"generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+           "source": "maps_scraper startup", "tabs": []}
+    try:
+        tabs = sh.worksheets()
+    except Exception as e:
+        print("  (tab counts NOT published -- cannot list tabs: %s)" % str(e)[:50])
+        return
+    for ws in tabs:
+        try:
+            _sheet_throttle()
+            n = max(len(ws.col_values(1)) - 1, 0)          # data rows, minus header
+        except Exception as e:
+            n = -1                                            # -1 = could not read
+        out["tabs"].append({"tab": ws.title, "rows": n})
+    text = json.dumps(out, ensure_ascii=False, separators=(",", ":"))
+    ok = gh_put("optimus/_feed/sheet/tabs.json", text)
+    print("  TAB COUNTS: %d tabs -> %s" % (
+        len(out["tabs"]),
+        "published (tabs.json, stamped %s)" % out["generated_at"] if ok
+        else "NOT published -- no github_token.txt, counts stay stale on GitHub"))
 
 
 def purge_prefix_gold(sh):
