@@ -1198,17 +1198,47 @@ def _clean_open():
     the 10,000,000-cell ceiling. Its bare except then returned None, and the
     whole cleanup block was gated on that, so the sheet being too full stopped
     the very routine that frees the space. Measured 2026-09-03. This opens the
-    spreadsheet and nothing else."""
+    spreadsheet and nothing else.
+
+    Returns (spreadsheet_or_None, reason). RETRIES: measured on Patrick's PC
+    2026-09-03, this got 'APIError: [503]' on the first attempt while
+    open_sheet() opened the same workbook fine seconds later. A 5xx is Google
+    being briefly unavailable, not a real failure, and giving up on it left the
+    junk in place for the whole run."""
     creds = _find_creds()
     if not creds:
-        return None
-    import gspread
-    from google.oauth2.service_account import Credentials
-    scopes = ["https://www.googleapis.com/auth/spreadsheets",
-              "https://www.googleapis.com/auth/drive"]
-    client = gspread.authorize(
-        Credentials.from_service_account_file(creds, scopes=scopes))
-    return client.open_by_key(SHEET_ID)
+        return None, "no google_creds.json on this PC"
+    last = "unknown"
+    for attempt in range(4):
+        try:
+            import gspread
+            from google.oauth2.service_account import Credentials
+            scopes = ["https://www.googleapis.com/auth/spreadsheets",
+                      "https://www.googleapis.com/auth/drive"]
+            client = gspread.authorize(
+                Credentials.from_service_account_file(creds, scopes=scopes))
+            return client.open_by_key(SHEET_ID), ""
+        except Exception as e:
+            last = str(e)[:70]
+            if attempt < 3:
+                print("     (workbook open failed: %s -- retrying)" % last)
+                time.sleep(3 * (attempt + 1))
+    return None, last
+
+
+def _run_startup_clean(sh):
+    """The three clean steps, in order. Split out so it can be retried against
+    the handle open_sheet() gets when the standalone open lost a coin-flip 503."""
+    for _label, _step in (("GOLD PURGE", purge_prefix_gold),
+                          ("TEST-GOLD MIGRATION", migrate_test_gold),
+                          ("JUNK TAB CLEAN", purge_junk_tabs)):
+        try:
+            _step(sh)
+        except Exception as e:
+            # NO SILENT RUNNING (2026-08-28): name the step that failed. This
+            # used to collapse into "(dedupe off: ...)", which reads as a minor
+            # unrelated notice rather than "the gold tab was not cleaned".
+            print("  *** %s DID NOT RUN: %s" % (_label, str(e)[:70]))
 
 
 # ---------------------------------------------------------------------------
@@ -1992,32 +2022,38 @@ def main():
     # gated on that. So the sheet being full stopped the cleanup that frees the
     # space -- the purge was the cure for the condition blocking the purge, and
     # it had never run once in five builds. Clean first, then open.
-    _clean_sh = None
-    if to_sheet and os.environ.get("SCRAPER_NO_CLEAN", "").strip().lower() \
-            not in ("1", "true", "yes"):
+    _want_clean = to_sheet and os.environ.get(
+        "SCRAPER_NO_CLEAN", "").strip().lower() not in ("1", "true", "yes")
+    _clean_done = False
+    if _want_clean:
         print("\n  Startup clean (once per PC: junk gold rows, then junk tabs)...")
+        _clean_sh, _why = None, "unknown"
         try:
-            _clean_sh = _clean_open()
+            _clean_sh, _why = _clean_open()
         except Exception as e:
-            print("  *** STARTUP CLEAN DID NOT RUN -- could not open the "
-                  "workbook: %s" % str(e)[:70])
-        if _clean_sh is None:
-            print("  *** STARTUP CLEAN SKIPPED -- no google_creds.json on this PC."
-                  "\n  *** The junk gold rows and junk tabs are STILL THERE.")
+            _why = str(e)[:70]
+        if _clean_sh is not None:
+            _run_startup_clean(_clean_sh)
+            _clean_done = True
         else:
-            for _label, _step in (("GOLD PURGE", purge_prefix_gold),
-                                  ("TEST-GOLD MIGRATION", migrate_test_gold),
-                                  ("JUNK TAB CLEAN", purge_junk_tabs)):
-                try:
-                    _step(_clean_sh)
-                except Exception as e:
-                    # NO SILENT RUNNING (2026-08-28): name the step that failed.
-                    # This used to collapse into "(dedupe off: ...)", which reads
-                    # as a minor unrelated notice rather than "the gold tab was
-                    # not cleaned".
-                    print("  *** %s DID NOT RUN: %s" % (_label, str(e)[:70]))
+            print("  *** Could not open the workbook for the clean: %s" % _why)
+            print("  *** Trying again on the connection the scraper opens next.")
 
     sheet_ws, sheet_seen = (open_sheet() if to_sheet else (None, set()))
+
+    # SECOND CHANCE. On 2026-09-03 the standalone open got a 503 and open_sheet()
+    # opened the SAME workbook seconds later -- so a transient blip used to cost
+    # the whole clean. If the first attempt lost, reuse the handle that worked.
+    if _want_clean and not _clean_done and sheet_ws is not None:
+        print("\n  Startup clean, second attempt (on the live connection)...")
+        try:
+            _run_startup_clean(sheet_ws.spreadsheet)
+            _clean_done = True
+        except Exception as e:
+            print("  *** STARTUP CLEAN DID NOT RUN: %s" % str(e)[:70])
+    if _want_clean and not _clean_done:
+        print("\n  *** THE JUNK GOLD ROWS AND JUNK TABS ARE STILL THERE.")
+        print("  *** Nothing was deleted. It retries on the next launch.\n")
     # Rows an earlier run could not write (sheet full, quota) go in first, so a
     # backlog drains instead of growing. Bounded per launch -- see replay_parked.
     try:
