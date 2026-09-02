@@ -1188,7 +1188,13 @@ def backfill_addresses(sh, limit=BACKFILL_PER_LAUNCH):
 # ---------------------------------------------------------------------------
 GOLD_TAB = "Gold Confirmed"
 GOLD_CUTOFF = "2026-08-24"          # keep rows captured ON or AFTER this day
-_GOLD_PURGE_MARKER = os.path.join(HERE, "gold_purge_done.flag")
+# v2 ON PURPOSE. The build before 2026-09-03 wrote the old 'gold_purge_done.flag'
+# even when the tab read as EMPTY -- i.e. on a FAILED read -- which disabled the
+# purge on that PC permanently and silently. Any flag that build left behind is
+# untrustworthy, so the marker name changes once and every PC gets exactly one
+# honest retry. Do not rename it back.
+_GOLD_PURGE_MARKER = os.path.join(HERE, "gold_purge_done_v2.flag")
+_GOLD_PURGE_MARKER_OLD = os.path.join(HERE, "gold_purge_done.flag")
 
 
 def _clean_open():
@@ -1328,7 +1334,11 @@ def migrate_test_gold(sh):
 def purge_junk_tabs(sh):
     """Delete the frozen snapshots and scratch tabs, backing every one up to a
     local CSV FIRST. A tab that cannot be backed up is not deleted."""
-    if sh is None or os.path.exists(_JUNK_TABS_MARKER):
+    if sh is None:
+        return
+    if os.path.exists(_JUNK_TABS_MARKER):
+        print("  junk tabs: already done on this PC. (delete %s to run it again)"
+              % _JUNK_TABS_MARKER)
         return
     try:
         doomed = [w for w in sh.worksheets() if _is_junk_tab(w.title)]
@@ -1377,8 +1387,22 @@ def purge_junk_tabs(sh):
 
 
 def purge_prefix_gold(sh):
-    if os.path.exists(_GOLD_PURGE_MARKER) or sh is None:
+    if sh is None:
         return
+    if os.path.exists(_GOLD_PURGE_MARKER):
+        # NO SILENT RUNNING: say WHY nothing happened. This used to be a bare
+        # `return` and an operator had no way to tell "already clean" from
+        # "quietly disabled".
+        try:
+            _was = io.open(_GOLD_PURGE_MARKER, encoding="utf-8").read().strip()[:60]
+        except Exception:
+            _was = "?"
+        print("  gold purge: already done on this PC (%s)." % _was)
+        print("  (delete %s to run it again)" % _GOLD_PURGE_MARKER)
+        return
+    if os.path.exists(_GOLD_PURGE_MARKER_OLD):
+        print("  gold purge: ignoring the OLD done-flag -- the build that wrote it"
+              " could write it on a FAILED read. Running the purge once more.")
     try:
         ws = sh.worksheet(GOLD_TAB)
         vals = ws.get_all_values()
