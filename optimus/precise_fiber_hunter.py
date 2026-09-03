@@ -343,7 +343,7 @@ try:
     _BLD_CODES["copper"] = tuple(str(x).lower() for x in _bc.get("copper", []))
 except Exception:
     pass
-BUILD_DATE = "2026-08-24"   # bump on every push so the console proves the version
+BUILD_DATE = "2026-09-03"   # bump on every push so the console proves the version
 
 # ---- DERIVED VERSION STAMP -------------------------------------------------
 # RULE (Patrick 2026-08-20, after BUILD_DATE reported 08-18 while running 08-20
