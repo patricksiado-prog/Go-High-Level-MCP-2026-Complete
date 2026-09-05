@@ -343,7 +343,16 @@ try:
     _BLD_CODES["copper"] = tuple(str(x).lower() for x in _bc.get("copper", []))
 except Exception:
     pass
-BUILD_DATE = "2026-09-03"   # bump on every push so the console proves the version
+BUILD_DATE = "2026-09-04"   # bump on every push so the console proves the version
+# LAUNCHER SENTINEL -- NEVER REMOVE. RUN_HUNTER.bat and INSTALL_OPTIMUS.bat only
+# accept a downloaded hunter that contains the literal text "GOLD CAPTURE ON"
+# (findstr /C:"GOLD CAPTURE ON"). That text lived in the launch banner until
+# 67bf57b (2026-08-25) cut the banner, and from that day every PC that updates
+# through its launcher silently kept its old copy -- 25 pushes never landed;
+# Patrick's desktop was still on the 08-18 build on 2026-09-04. This constant
+# is what un-pins them. The launchers are being moved to check BUILD_DATE, but
+# launchers do not self-update, so this line must stay for every PC out there.
+LAUNCHER_SENTINEL = "GOLD CAPTURE ON"
 
 # ---- DERIVED VERSION STAMP -------------------------------------------------
 # RULE (Patrick 2026-08-20, after BUILD_DATE reported 08-18 while running 08-20

@@ -40,8 +40,9 @@ curl -L -sf -o hunter_fixes.py.new        "%RAW%/hunter_fixes.py?cb=!CB!"       
 curl -L -sf -o backend_classifier.py.new  "%RAW%/backend_classifier.py?cb=!CB!"  || set "DLOK=0"
 curl -L -sf -o build_codes.json.new       "%RAW%/build_codes.json?cb=!CB!"       || set "DLOK=0"
 if not "!DLOK!"=="1" goto :dlfail
-REM only trust the download if the fresh main file is really the current build
-findstr /C:"GOLD CAPTURE ON" precise_fiber_hunter.py.new >nul 2>&1 || goto :dlbad
+REM only trust the download if the fresh main file is a real hunter build (it always carries BUILD_DATE;
+REM the old "GOLD CAPTURE ON" banner check pinned every PC to pre-08-25 code -- see LAUNCHER_SENTINEL in the hunter)
+findstr /C:"BUILD_DATE = " precise_fiber_hunter.py.new >nul 2>&1 || goto :dlbad
 move /y precise_fiber_hunter.py.new precise_fiber_hunter.py >nul
 move /y optimus_dot_detect.py.new   optimus_dot_detect.py   >nul
 move /y optimus_api_capture.py.new  optimus_api_capture.py  >nul

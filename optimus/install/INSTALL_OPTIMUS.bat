@@ -23,6 +23,7 @@ set "CREDS=https://drive.usercontent.google.com/download?id=1upYH4h2VsmOwO82v9CV
 echo.
 echo  ============================================================
 echo     OPTIMUS  --  installing Fiber Hunter + Maps Scraper
+echo     installer v2  --  2026-09-04  ^(fixes the update gate + pins gspread^)
 echo  ============================================================
 echo.
 
@@ -50,14 +51,17 @@ curl -L -o "%HUNTER%\backend_classifier.py"   "%RAW%/backend_classifier.py?cb=%C
 REM build_codes.json is REQUIRED for gold vs grey: without it every fiber
 REM customer would misclassify. Download it here too (not just in the launcher).
 curl -L -o "%HUNTER%\build_codes.json"        "%RAW%/build_codes.json?cb=%CB%"
-REM VERIFY we actually got the CURRENT build (only new code says "GOLD CAPTURE ON").
-REM The old marker "COMBO MATCH ON" lived in stale code too, so a failed/cached
-REM download looked like success -- that is exactly what stranded people on old code.
-findstr /C:"GOLD CAPTURE ON" "%HUNTER%\precise_fiber_hunter.py" >nul 2>&1
+REM VERIFY we got a real hunter file. EVERY build carries BUILD_DATE.
+REM  2026-09-04 FIX: this used to require the literal "GOLD CAPTURE ON", which lived
+REM  in the launch banner until commit 67bf57b (2026-08-25) removed the banner. After
+REM  that the test failed on EVERY newer hunter, so this installer shouted "WARNING:
+REM  still got OLD hunter code" while holding perfectly good code, and RUN_HUNTER.bat
+REM  (same test) threw its download away and kept the old copy. 25 hunter updates
+REM  never reached a PC: Patrick's desktop sat on 08-18 and his laptop on 08-24.
+findstr /C:"BUILD_DATE = " "%HUNTER%\precise_fiber_hunter.py" >nul 2>&1
 if errorlevel 1 (
-  echo     ^*^* WARNING: still got OLD hunter code ^(GitHub cache or no internet^).
-  echo        Wait 60 seconds and run this installer again -- it will pick up the
-  echo        new version once GitHub's cache clears.
+  echo     ^*^* WARNING: that download is not a hunter file ^(no internet, or a
+  echo        wifi login page came back instead^). Check the connection, run again.
 ) else (
   for /f "delims=" %%L in ('findstr /C:"BUILD_DATE = " "%HUNTER%\precise_fiber_hunter.py"') do echo     OK - newest Fiber Hunter confirmed -- %%L
 )
@@ -68,7 +72,13 @@ curl -L -o "%SCRAPER%\maps_scraper_standalone.py" "%SCRAPERPY%?cb=%CB%" || ( ech
 
 echo [4/7] Packages ^(both tools^)...
 py -m pip install --upgrade pip >nul 2>&1
-py -m pip install --upgrade numpy pillow scipy playwright gspread google-auth requests mapbox-vector-tile
+REM gspread is PINNED BELOW 6 on purpose. gspread 6 made Spreadsheet.client an
+REM HTTPClient with no open_by_key / no list_spreadsheet_files, which silently
+REM broke the Maps Scraper's Precise-Fiber split-workbook redirect (it fell back
+REM to the FULL main workbook and parked every row) and the "Enriched Leads"
+REM board (it could not read the feed folder). Both seen on the console 2026-09-04.
+py -m pip install --upgrade numpy pillow scipy playwright google-auth requests mapbox-vector-tile
+py -m pip install --upgrade "gspread<6"
 
 echo [5/7] Browser engine ^(first time can take a minute or two^)...
 py -m playwright install chromium
@@ -80,6 +90,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "try{Copy-Item '%HUNTER%\
 echo [7/7] Creating the two Desktop icons...
 if not exist "%LAUNCH%" mkdir "%LAUNCH%"
 curl -L -o "%LAUNCH%\RUN_HUNTER.bat"  "%BASE%/RUN_HUNTER.bat"
+REM The RUN_HUNTER.bat on GitHub still carries the broken "GOLD CAPTURE ON" gate,
+REM and launchers never self-update -- so repair the copy we just wrote. One string
+REM swap turns the dead check into a BUILD_DATE check that no banner edit can break.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$f='%LAUNCH%\RUN_HUNTER.bat'; if(Test-Path $f){$t=Get-Content $f -Raw; if($t -match 'GOLD CAPTURE ON'){Set-Content $f ($t -replace 'GOLD CAPTURE ON','BUILD_DATE = ') -NoNewline; Write-Host '     launcher repaired - it will accept hunter updates again'} else {Write-Host '     launcher already OK'}}"
 curl -L -o "%LAUNCH%\RUN_SCRAPER.bat" "%BASE%/RUN_SCRAPER.bat"
 curl -L -o "%LAUNCH%\hunter.ico"  "%BASE%/icons/hunter.ico"
 curl -L -o "%LAUNCH%\scraper.ico" "%BASE%/icons/scraper.ico"

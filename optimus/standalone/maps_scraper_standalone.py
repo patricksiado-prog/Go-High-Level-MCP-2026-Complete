@@ -508,6 +508,31 @@ PF_REDIRECT_FILE = os.path.join(os.path.expanduser("~"), "optimus",
 PF_SPLIT_SHEET_ID = "1DXu-nuQvVKrqQVk8LDNwLztG31ddi6sAyo8vXDFKcmQ"
 
 
+
+def _gc(sh):
+    """A real gspread Client for `sh`, on gspread 5 AND 6.
+
+    gspread 6 (what a plain `pip install gspread` gives every PC now) made
+    Spreadsheet.client an HTTPClient, which has no open_by_key() and no
+    list_spreadsheet_files(). That single change is the
+    "'HTTPClient' object has no attribute ..." on Patrick's console
+    2026-09-04, and it silently killed BOTH the Precise Fiber split-workbook
+    redirect (fell back to the FULL main workbook) and the SHEET LOG /
+    'Enriched Leads' board (could not list the feed folder). Nothing else
+    was wrong with either feature.
+    """
+    import gspread
+    c = getattr(sh, "client", None)
+    if c is not None and hasattr(c, "open_by_key"):
+        return c                                   # gspread 5: already a Client
+    # gspread 6 HTTPClient: .auth is only set when it built its own session;
+    # the AuthorizedSession always carries the credentials. Reuse that session
+    # so there is no re-auth and the same service account is used.
+    sess = getattr(c, "session", None)
+    auth = getattr(c, "auth", None) or getattr(sess, "credentials", None)
+    return gspread.Client(auth=auth, session=sess)
+
+
 def _pf_spreadsheet(sh):
     """The workbook that holds 'Precise Fiber'.
 
@@ -537,7 +562,7 @@ def _pf_spreadsheet(sh):
     if not re.fullmatch(r"[A-Za-z0-9_-]{20,}", sid or ""):
         return sh
     try:
-        return sh.client.open_by_key(sid)
+        return _gc(sh).open_by_key(sid)
     except Exception as e:
         print("  (Precise Fiber redirect %s would not open: %s -- falling back to "
               "the main workbook. Check it is shared with the service account.)"
@@ -925,11 +950,20 @@ def dedupe_all_tabs(sh):
         return 0                            # another machine is deduping now
     biz_key, biz_score, pf_key, pf_score, maps_key = _dd_keys()
     _DD_PASS[0] += 1
+    # GOLD AND GREY WERE NEVER IN THIS LIST -- found 2026-09-04. That is why
+    # 'Gold Confirmed' read 4,707 rows while a 176-row readable sample held TEN
+    # unique addresses (7631 Fuqua alone was written 96 times). Every other tab
+    # has been deduped every 30 minutes for weeks; the two colour tabs a rep
+    # actually calls off were the two nothing cleaned. Both are address-first,
+    # so they use the SAME key+score already proven on 'Precise Fiber': keep the
+    # FULLEST copy of each address, not the earliest.
     jobs = [("Maps Businesses", maps_key, None),
             ("Fiber Green Biz", biz_key, biz_score),
-            ("Upgrade Orange Biz", biz_key, biz_score)]
-    if _DD_PASS[0] == 1 or _DD_PASS[0] % 6 == 0:   # huge tab: clean less often
+            ("Upgrade Orange Biz", biz_key, biz_score),
+            ("Gold Confirmed", pf_key, pf_score)]
+    if _DD_PASS[0] == 1 or _DD_PASS[0] % 6 == 0:   # huge tabs: clean less often
         jobs.insert(0, ("Precise Fiber", pf_key, pf_score))
+        jobs.insert(1, ("Grey Fiber Customers", pf_key, pf_score))
     total = 0
     for tab, kf, sf in jobs:
         try:
@@ -1477,6 +1511,7 @@ SALES_HEADER = ["Sold At", "Address", "City", "State", "ZIP", "Name", "Cell", "P
 # SOLD, INSTALLED -> blue.
 STATUS_COLOURS = (
     ("PAID|SOLD|INSTALLED",              {"red": 0.74, "green": 0.84, "blue": 0.98}),  # blue
+    ("NO FIBER",                         {"red": 0.85, "green": 0.85, "blue": 0.85}),  # grey
     ("^NO$|^NI$|NOT INTERESTED|DEAD|DNC", {"red": 0.96, "green": 0.72, "blue": 0.72}),  # red
     ("^CB|CALL ?BACK|MAYBE",             {"red": 0.72, "green": 0.90, "blue": 0.72}),  # green
 )
@@ -1786,7 +1821,7 @@ def sync_sheet_log(sh):
     """Runs after open_sheet()/init_match(), so the green set is loaded."""
     if sh is None:
         return
-    client = sh.client
+    client = _gc(sh)
     book = _pf_spreadsheet(sh)
     where = "split workbook" if book is not sh else "MAIN workbook (split did not open)"
     stamp = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -1913,6 +1948,332 @@ def sync_sheet_log(sh):
     # the return value. A launch that lands nothing still stamps this, so a
     # stale stamp means "no scraper launch since", not "nothing to land".
     gh_put(FEED_ROOT + "/_landed.json", json.dumps(report, separators=(",", ":")))
+
+
+# ---------------------------------------------------------------------------
+# GHL STATUS (2026-09-04): every GoHighLevel contact, laid out on the hunter's
+# 13 columns and sorted onto FIVE tabs in the SPLIT workbook -- 'Green', 'Gold',
+# 'Grey', 'Biz', 'Fiber Biz' -- by the hunter tab its address sits on, with the
+# CRM's own facts beside it (enriched? sold? call back? not interested? no
+# fiber? SMS STOP?). Runs once at launch, right after the follow-up board.
+#
+# GHL is the source of truth for these five tabs, so each launch REPLACES the
+# tab wholesale (clear + one write per 5,000 rows) instead of appending -- a
+# person whose tags changed moves, and nothing is ever duplicated. Production
+# is at the 10,000,000-cell ceiling, so these tabs are never written there:
+# if the split workbook does not open, one line says so and nothing happens.
+# The token lives in ghl_token.txt next to this file (or GHL_PIT_TOKEN) and is
+# never printed or written anywhere. Nothing in here can raise out.
+# ---------------------------------------------------------------------------
+GHL_LOCATION_ID = "xZj500PjsflIQg2j9f9D"                  # T-OPTIMUS Houston
+GHL_API_BASE = "https://services.leadconnectorhq.com"
+GHL_API_VERSION = "2021-07-28"
+GHL_TOKEN_FILE = "ghl_token.txt"
+GHL_PULL_SECS = 20 * 60                                   # stop reading after this
+GHL_GOLD_LIST_CAP = 5000                                  # gold_unenriched.json entries
+GHL_TAB_GREEN, GHL_TAB_GOLD, GHL_TAB_GREY, GHL_TAB_BIZ, GHL_TAB_FIBER_BIZ = (
+    "Green", "Gold", "Grey", "Biz", "Fiber Biz")
+GHL_TABS = (GHL_TAB_GREEN, GHL_TAB_GOLD, GHL_TAB_GREY, GHL_TAB_BIZ, GHL_TAB_FIBER_BIZ)
+GHL_HEADER = HUNTER_COLS + ["Tab", "Enriched", "Name", "Cell", "Email", "GHL Contact ID",
+                            "Disposition", "DND", "Last Updated", "Synced At"]
+_G = {name: i for i, name in enumerate(GHL_HEADER)}
+GHL_UNVERIFIED_STATUS = "Not on the hunter map yet - colour unverified"
+# Disposition from tags, first match wins, in this order.
+_GHL_SOLD_RE = re.compile(r"^(sold|sold-won|command-sold|sara-sold|mobility-sold|"
+                          r"fiber-won|fiber-installed-pending)$")
+_GHL_DNC_TAGS = {"dnc", "dnc-flagged", "do not call"}
+_GHL_NI_TAGS = {"not interested", "not-interested", "wavv-not-interested"}
+_GHL_CB_TAGS = {"call back", "callback", "callback-scheduled", "churchie-callback-list"}
+_GHL_NOFIBER_TAGS = {"service not available", "no-fiber", "no fiber"}
+# Colour a tag CLAIMS. Used only when the address is on no hunter tab, and then
+# the row says UNVERIFIED -- a tag is a value somebody typed, not a dot.
+_GHL_GOLD_TAGS = {"alpha-t2-gold", "gold", "gold-dot", "gold-upgrade", "gold-attnet-confirmed",
+                  "type-copper", "seq2-t3-gold", "beaumont-gold-pocket", "leads_gold",
+                  "gold-biz", "upgrade-140"}
+_GHL_GREEN_TAGS = {"alpha-t5-green", "alpha-t3-green-pocket", "green", "green-dot", "green-new",
+                   "type-green", "seq2-t4-green", "fiber-green"}
+_GHL_BIZ_TAGS = {"alpha-t4-business", "type-green-biz", "fiber-green-biz", "fiber green biz",
+                 "gold-biz", "optimus-fiber-biz"}
+# Hunter tab -> the GHL tab(s) a contact at that address lands on.
+_GHL_ROUTE = {"Precise Fiber": (GHL_TAB_GREEN,),
+              GOLD_TAB: (GHL_TAB_GOLD,),
+              ORANGE_BIZ_TAB: (GHL_TAB_GOLD, GHL_TAB_FIBER_BIZ),
+              GREY_TAB: (GHL_TAB_GREY,),
+              MAPS_BIZ_TAB: (GHL_TAB_BIZ,),
+              GREEN_BIZ_TAB: (GHL_TAB_FIBER_BIZ,)}
+_GHL_TAG_ROUTE = {"GOLD": GHL_TAB_GOLD, "GREEN": GHL_TAB_GREEN, "BIZ": GHL_TAB_BIZ}
+
+
+def _ghl_token():
+    """ghl_token.txt next to this file, else GHL_PIT_TOKEN. Never printed."""
+    try:
+        p = os.path.join(os.path.dirname(os.path.abspath(__file__)), GHL_TOKEN_FILE)
+        if os.path.exists(p):
+            t = io.open(p, encoding="utf-8").read().strip()
+            if t:
+                return t
+    except Exception:
+        pass
+    return (os.environ.get("GHL_PIT_TOKEN") or "").strip()
+
+
+def _ghl_get(url, token):
+    """One GET. (status, body dict). A 429 is slept off ONCE (10s); any other
+    HTTP or network error comes back as (code or 0, {}) so the caller stops."""
+    import urllib.request, urllib.error
+    for attempt in (1, 2):
+        req = urllib.request.Request(url, headers={
+            "Authorization": "Bearer %s" % token, "Version": GHL_API_VERSION,
+            "Accept": "application/json", "User-Agent": "optimus-scraper"})
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                return 200, json.loads(r.read().decode("utf-8") or "{}")
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt == 1:
+                print("  (GHL STATUS: rate limited -- holding 10s)")
+                time.sleep(10)
+                continue
+            return e.code, {}
+        except Exception as e:
+            print("  (GHL STATUS: %s)" % str(e)[:60])
+            return 0, {}
+    return 429, {}
+
+
+def _ghl_contacts(token):
+    """Every contact in the location, 100 a page, oldest cursor first. Stops
+    after GHL_PULL_SECS or on the first non-429 error and returns what it has:
+    (contacts, complete?)."""
+    import urllib.parse
+    out, t0 = [], time.time()
+    after_id, after_ts, complete = "", "", True
+    while True:
+        if time.time() - t0 > GHL_PULL_SECS:
+            print("  GHL STATUS: %d minutes is enough -- using the %d contact(s) read so far."
+                  % (GHL_PULL_SECS // 60, len(out)))
+            complete = False
+            break
+        q = {"locationId": GHL_LOCATION_ID, "limit": "100"}
+        if after_id:
+            q["startAfterId"] = after_id
+        if after_ts:
+            q["startAfter"] = after_ts
+        code, body = _ghl_get("%s/contacts/?%s" % (GHL_API_BASE, urllib.parse.urlencode(q)), token)
+        if code != 200:
+            print("  GHL STATUS: GoHighLevel answered HTTP %s -- using the %d contact(s) read so far."
+                  % (code or "error", len(out)))
+            complete = False
+            break
+        page = body.get("contacts") or []
+        out.extend(c for c in page if isinstance(c, dict))
+        meta = body.get("meta") or {}
+        nid = str(meta.get("startAfterId") or "")
+        nts = str(meta.get("startAfter") or "")
+        if not page or not nid or nid == after_id:
+            break
+        after_id, after_ts = nid, nts
+    return out, complete
+
+
+def _ghl_tags(c):
+    return [str(t).strip().lower() for t in (c.get("tags") or []) if str(t).strip()]
+
+
+def _ghl_disposition(tags):
+    for t in tags:
+        if _GHL_SOLD_RE.match(t):
+            return "SOLD"
+    for t in tags:
+        if t in _GHL_DNC_TAGS:
+            return "DNC"
+    for t in tags:
+        if t in _GHL_NI_TAGS:
+            return "NI"
+    for t in tags:
+        if t in _GHL_CB_TAGS or t.startswith("for call back"):
+            return "CB"
+    for t in tags:
+        if t in _GHL_NOFIBER_TAGS:
+            return "NO FIBER"
+    return ""
+
+
+def _ghl_colour_tag(tags):
+    ts = set(tags)
+    if ts & _GHL_GOLD_TAGS:
+        return "GOLD"
+    if ts & _GHL_GREEN_TAGS:
+        return "GREEN"
+    if ts & _GHL_BIZ_TAGS:
+        return "BIZ"
+    return ""
+
+
+def _ghl_dnd(c):
+    """'SMS STOP' when the master flag is on or the SMS channel is opted out.
+    A STOP blocks TEXTS only -- WE CALL DND (Patrick 2026-09-04)."""
+    if c.get("dnd") is True:
+        return "SMS STOP"
+    sms = ((c.get("dndSettings") or {}).get("SMS") or {})
+    if str(sms.get("status") or "").lower() in ("permanent", "active", "true"):
+        return "SMS STOP"
+    return ""
+
+
+def _ghl_row(c, known, stamp):
+    """One GHL contact -> (tabs it lands on, sheet row). Pure -- tested
+    without Google. Hunter columns come from the lookup when the address is
+    on the map; otherwise the row is UNVERIFIED and routed by its colour tag.
+    () when it goes nowhere (not on the map, no colour tag)."""
+    gid = _s(c.get("id"))
+    addr = _s(c.get("address1"))
+    tags = _ghl_tags(c)
+    tab, hrow = known.get(_norm_addr(addr), ("", [""] * len(HUNTER_COLS)))
+    tabs = _GHL_ROUTE.get(tab, ())
+    if not tabs:
+        t = _GHL_TAG_ROUTE.get(_ghl_colour_tag(tags))
+        if not t:
+            return (), None
+        tabs, tab = (t,), ""
+    row = list(hrow)
+    row[0] = row[0] or addr
+    for col, fld in (("City", "city"), ("State", "state"), ("ZIP", "postalCode")):
+        if not row[_G[col]]:
+            row[_G[col]] = _s(c.get(fld))
+    if not row[1]:
+        row[1] = "UNVERIFIED"
+    if not row[12]:
+        row[12] = _STATUS_WORDS.get(row[1], GHL_UNVERIFIED_STATUS)
+    phone = _s(c.get("phone"))
+    name = " ".join(x for x in (_s(c.get("firstName")), _s(c.get("lastName"))) if x)
+    row += [tab, "YES" if phone else "NO", name, phone, _s(c.get("email")), gid,
+            _ghl_disposition(tags), _ghl_dnd(c), _s(c.get("dateUpdated")), stamp]
+    return tabs, row
+
+
+def _ghl_write_tab(book, title, rows, where):
+    """REPLACE one tab: clear, size the grid, write in 5,000-row blocks under
+    the throttle. (ok, full?) -- full means the workbook is out of cells."""
+    ws = _open_log_tab(book, title, GHL_HEADER, where)
+    if ws is None:
+        return False, False
+    values = [GHL_HEADER] + rows
+    try:
+        _sheet_throttle()
+        ws.clear()
+        if ws.row_count < len(values) or ws.col_count < len(GHL_HEADER):
+            _sheet_throttle()
+            ws.resize(rows=max(len(values), 2), cols=max(ws.col_count, len(GHL_HEADER)))
+        for i in range(0, len(values), 5000):
+            chunk = values[i:i + 5000]
+            _sheet_throttle()
+            ws.update("A%d:%s%d" % (i + 1, _col_letter(len(GHL_HEADER)), i + len(chunk)),
+                      chunk, value_input_option="RAW")
+        return True, False
+    except Exception as e:
+        full = _err_kind(e) == "FULL"
+        print("  *** GHL STATUS: '%s' NOT written -- %s%s"
+              % (title, "workbook FULL (cell ceiling), " if full else "", str(e)[:50]))
+        return False, full
+
+
+def sync_ghl_status(sh):
+    """Runs after sync_sheet_log(), so init_match()'s green set is loaded."""
+    if sh is None:
+        return
+    try:
+        token = _ghl_token()
+        if not token:
+            print("  GHL STATUS: no ghl_token.txt next to the scraper -- the GHL columns stay"
+                  " as they are. (GHL -> Settings -> Private Integrations, scope"
+                  " contacts.readonly; paste the token into ghl_token.txt)")
+            return
+        book = _pf_spreadsheet(sh)
+        if book is sh:
+            print("  GHL STATUS: the split workbook did not open -- the five GHL tabs are"
+                  " never written into production. Nothing written.")
+            return
+        stamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        t0 = time.time()
+        contacts, complete = _ghl_contacts(token)
+        print("  GHL STATUS: %d contact(s) read from GoHighLevel in %ds%s."
+              % (len(contacts), int(time.time() - t0), "" if complete else " (PARTIAL)"))
+        if not contacts:
+            return
+        known = _hunter_lookup(sh)
+        per = {t: [] for t in GHL_TABS}
+        seen, skipped, unverified = set(), 0, 0
+        for c in contacts:
+            gid = _s(c.get("id"))
+            if not gid or gid in seen:
+                continue
+            seen.add(gid)
+            tabs, row = _ghl_row(c, known, stamp)
+            if not tabs:
+                skipped += 1
+                continue
+            if row[1] == "UNVERIFIED":
+                unverified += 1
+            for t in tabs:
+                per[t].append(row)
+        if skipped:
+            print("  GHL STATUS: %d contact(s) on no hunter tab and carrying no colour tag"
+                  " -- not placed." % skipped)
+        report = {"generated_at": stamp, "source": "maps_scraper startup",
+                  "workbook": "split workbook", "contacts_read": len(contacts),
+                  "pull_complete": complete, "people": len(seen), "unverified": unverified,
+                  "not_placed": skipped, "tabs": {}}
+        where, full = "split workbook", False
+        for t in GHL_TABS:
+            rows = per[t]
+            n = {"people": len(rows),
+                 "enriched": sum(1 for r in rows if r[_G["Enriched"]] == "YES"),
+                 "sold": sum(1 for r in rows if r[_G["Disposition"]] == "SOLD"),
+                 "cb": sum(1 for r in rows if r[_G["Disposition"]] == "CB"),
+                 "ni": sum(1 for r in rows if r[_G["Disposition"]] == "NI"),
+                 "dnc": sum(1 for r in rows if r[_G["Disposition"]] == "DNC"),
+                 "no_fiber": sum(1 for r in rows if r[_G["Disposition"]] == "NO FIBER"),
+                 "sms_stop": sum(1 for r in rows if r[_G["DND"]]),
+                 "unverified": sum(1 for r in rows if r[1] == "UNVERIFIED")}
+            if full:
+                n["written"] = False
+            else:
+                ok, full = _ghl_write_tab(book, t, rows, where)
+                n["written"] = ok
+                if full:
+                    print("  *** GHL STATUS: the split workbook is at the 10,000,000-cell"
+                          " ceiling -- the remaining tabs are skipped this launch.")
+            report["tabs"][t] = n
+            print("  GHL STATUS: '%s': %d people (%d enriched, %d sold, %d CB, %d NI, %d no fiber)%s"
+                  % (t, n["people"], n["enriched"], n["sold"], n["cb"], n["ni"], n["no_fiber"],
+                     "" if n["written"] else " -- NOT WRITTEN"))
+        # Which gold dots on the map have NO GHL contact at that address yet:
+        # the enrichment backlog, published as addresses of map dots only --
+        # never a name, phone or email. Capped so the file stays readable.
+        try:
+            in_ghl = set(k for k in (_norm_addr(_s(c.get("address1"))) for c in contacts) if k)
+            gold = [(k, row) for k, (tab, row) in known.items() if tab == GOLD_TAB]
+            missing = [(k, row) for k, row in gold if k not in in_ghl]
+            addrs = [{"address": row[0] or k.replace("|", " "), "city": row[_G["City"]],
+                      "state": row[_G["State"]], "zip": row[_G["ZIP"]], "lat": row[_G["Lat"]],
+                      "lng": row[_G["Lng"]], "captured_at": row[_G["Captured At"]]}
+                     for k, row in missing[:GHL_GOLD_LIST_CAP]]
+            gold_counts = {"gold_dots_total": len(gold), "in_ghl": len(gold) - len(missing),
+                           "not_in_ghl": len(missing)}
+            out = dict({"generated_at": stamp}, **gold_counts)
+            if len(missing) > GHL_GOLD_LIST_CAP:
+                out["capped"] = True
+            out["addresses"] = addrs
+            gh_put(FEED_ROOT + "/gold_unenriched.json", json.dumps(out, separators=(",", ":")))
+            report["gold"] = gold_counts
+            print("  GHL STATUS: gold dots on the map: %d unique, %d in GHL (enriched), %d not yet"
+                  " enriched -> _feed/gold_unenriched.json"
+                  % (len(gold), len(gold) - len(missing), len(missing)))
+        except Exception as e:
+            print("  (GHL STATUS: gold backlog not published: %s)" % str(e)[:60])
+        gh_put(FEED_ROOT + "/_ghl_status.json", json.dumps(report, separators=(",", ":")))
+    except Exception as e:
+        print("  (GHL STATUS skipped: %s)" % str(e)[:60])
 
 
 def publish_tab_counts(sh):
@@ -2656,6 +3017,10 @@ def main():
             sync_sheet_log(sheet_ws.spreadsheet)
         except Exception as e:
             print("  *** SHEET LOG DID NOT RUN: %s" % str(e)[:70])
+        try:
+            sync_ghl_status(sheet_ws.spreadsheet)
+        except Exception as e:
+            print("  *** GHL STATUS DID NOT RUN: %s" % str(e)[:70])
     # Keep the tabs deduped in the background while the scraper runs (phone-keyed
     # on the biz tabs). Cross-machine locked so it never collides with the hunter.
     if sheet_ws is not None and os.environ.get("SCRAPER_NO_DEDUPE", "").strip() not in ("1", "true", "yes"):
