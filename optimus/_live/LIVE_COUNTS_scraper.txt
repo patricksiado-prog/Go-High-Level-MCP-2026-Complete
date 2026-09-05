@@ -1,7 +1,7 @@
 OPTIMUS SCRAPER -- LIVE COUNTS
-updated: 2026-09-05 10:38:09   host: LAPTOP-RS9EHSLO   ZIP now: 77005
+updated: 2026-09-05 10:56:52   host: LAPTOP-RS9EHSLO   ZIP now: 77005
 STATUS: *** SHEET FULL -- NOTHING IS REACHING THE SHEET ***
-        1313 row(s) parked on this PC; they go in when there is room
+        1318 row(s) parked on this PC; they go in when there is room
 ----------------------------------------
-BUSINESSES pulled this run:   1591
+BUSINESSES pulled this run:   1598
 added to sheet (Maps Biz):    0
