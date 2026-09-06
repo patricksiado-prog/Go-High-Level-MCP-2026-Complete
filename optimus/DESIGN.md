@@ -149,3 +149,9 @@ Discovery + business calling only. Found businesses route to **DNC-scrubbed,
 human-in-loop power-dialer calls**, 8am–9pm local. Verbal consent → then the
 consented text drip. Never a predictive blast or a cold text to a
 map/skip-traced number.
+
+
+## Running it day to day
+
+See `OPERATIONS.md` — the supervisor that keeps the Hunter and Maps Scraper
+alive, how "stuck" is decided, the AT&T login step, and the open blockers.
