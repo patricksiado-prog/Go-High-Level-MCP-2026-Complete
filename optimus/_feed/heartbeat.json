@@ -4,8 +4,8 @@
  "machine": "LAPTOP-JLCQ24SO",
  "build_fingerprint": "e26a3ffe",
  "mode": "",
- "updated_at": "2026-09-06 00:50:36",
- "last_phase": "page_loaded",
+ "updated_at": "2026-09-06 00:50:39",
+ "last_phase": "LOGGED_OUT",
  "phases": [
   [
    "start",
@@ -31,6 +31,11 @@
    "page_loaded",
    "00:50:36",
    37.0
+  ],
+  [
+   "LOGGED_OUT",
+   "00:50:39",
+   39.9
   ]
  ]
 }
