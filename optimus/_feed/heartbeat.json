@@ -1,51 +1,16 @@
 {
- "run_id": "20260906-132034",
+ "run_id": "20260906-134640",
  "operator": "PC:LAPTOP-JLCQ24SO",
  "machine": "LAPTOP-JLCQ24SO",
  "build_fingerprint": "e26a3ffe",
  "mode": "",
- "updated_at": "2026-09-06 13:32:48",
- "last_phase": "exit",
+ "updated_at": "2026-09-06 13:46:42",
+ "last_phase": "start",
  "phases": [
   [
    "start",
-   "13:20:38",
+   "13:46:42",
    0.0
-  ],
-  [
-   "playwright_up",
-   "13:20:59",
-   20.7
-  ],
-  [
-   "chromium_up",
-   "13:21:34",
-   56.3
-  ],
-  [
-   "browser_up",
-   "13:21:36",
-   58.6
-  ],
-  [
-   "page_loaded",
-   "13:21:46",
-   68.0
-  ],
-  [
-   "LOGGED_OUT",
-   "13:21:49",
-   71.0
-  ],
-  [
-   "LOGIN_TIMEOUT",
-   "13:31:54",
-   675.9
-  ],
-  [
-   "exit",
-   "13:32:48",
-   730.5
   ]
  ]
 }
