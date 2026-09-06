@@ -1,0 +1,84 @@
+{
+ "generated_at": "2026-09-06 01:34:36",
+ "run_id": "20260906-012950",
+ "operator": "PC:LAPTOP-JLCQ24SO",
+ "machine": "LAPTOP-JLCQ24SO",
+ "area": "",
+ "build_fingerprint": "e26a3ffe",
+ "counts": {
+  "green": 0,
+  "fiber": 0,
+  "copper": 0,
+  "unknown": 0,
+  "no_code": 0
+ },
+ "undecoded_codes": {},
+ "dedupe": {
+  "seen": 0,
+  "written": 0,
+  "duplicates": 0,
+  "unchanged": 0,
+  "gold_to_grey": 0,
+  "grey_to_gold": 0,
+  "unknown": 0,
+  "failed_writes": 0,
+  "history_rows": 0,
+  "history_failed": 0
+ },
+ "mode": "",
+ "phases": [
+  [
+   "start",
+   "01:29:52",
+   0.0
+  ],
+  [
+   "playwright_up",
+   "01:30:07",
+   15.1
+  ],
+  [
+   "CRASHED",
+   "01:34:30",
+   277.5
+  ],
+  [
+   "exit",
+   "01:34:33",
+   281.2
+  ]
+ ],
+ "last_phase": "exit",
+ "stage_counters": {
+  "classified_green": 0,
+  "classified_gold": 0,
+  "classified_grey": 0,
+  "classified_unknown": 0
+ },
+ "crash": {
+  "summary": "TimeoutError: BrowserType.launch_persistent_context: Timeout 180000ms exceeded.\nCall log:\n  - <launching> C:\\Users\\patri\\AppData\\Local\\ms-playwright\\chromium-1234\\chrome-win64\\chrome.exe --disable-field-trial-confi",
+  "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\patri\\optimus_hunter\\precise_fiber_hunter.py\", line 8693, in <module>\n    main()\n  File \"C:\\Users\\patri\\optimus_hunter\\precise_fiber_hunter.py\", line 8247, in main\n    ctx = pw.chromium.launch_persistent_context(\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\patri\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\playwright\\sync_api\\_generated.py\", line 17003, in launch_persistent_context\n    self._sync(\n  File \"C:\\Users\\patri\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\playwright\\_impl\\_sync_base.py\", line 115, in _sync\n    return task.result()\n           ^^^^^^^^^^^^^\n  File \"C:\\Users\\patri\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\playwright\\_impl\\_browser_type.py\", line 165, in launch_persistent_context\n    result = await self._channel.send_return_as_dict(\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\patri\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\playwright\\_impl\\_connection.py\", line 103, in send_return_as_dict\n    return await self._connection.wrap_api_call(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\patri\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\site-packages\\playwright\\_impl\\_connection.py\", line 632, in wrap_api_call\n    raise rewrite_error(error, f\"{parsed_st['apiName']}: {error}\") from None\nplaywright._impl._errors.TimeoutError: BrowserType.launch_persistent_context: Timeout 180000ms exceeded.\nCall log:\n  - <launching> C:\\Users\\patri\\AppData\\Local\\ms-playwright\\chromium-1234\\chrome-win64\\chrome.exe --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,BlockOriginHeaderModificationOnRedirect,Translate,AutoDeElevate,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --no-sandbox --start-maximized --hide-crash-restore-bubble --disable-session-crashed-bubble --no-first-run --no-default-browser-check --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --disable-features=CalculateNativeWinOcclusion,IntensiveWakeUpThrottling,HighEfficiencyModeAvailable --disable-dev-shm-usage --user-data-dir=C:\\Users\\patri\\optimus_hunter\\att_profile --remote-debugging-pipe about:blank\n  - <launched> pid=4512\n\n",
+  "at": "2026-09-06 01:34:30"
+ },
+ "wire_audit_records": 0,
+ "wire_audit_by_colour": {},
+ "capture_truth": {
+  "delivery": null,
+  "raw_features": null,
+  "rendered": null,
+  "classified": 0,
+  "written": 0,
+  "auth_ok": null,
+  "map_ok": null,
+  "zoom_ok": null,
+  "notes": []
+ },
+ "first_failure": null,
+ "capture_diagnostic": {},
+ "customer_specimens": [],
+ "customer_specimen_count": 0,
+ "zero_lead_responses": [],
+ "sample_count": 0,
+ "samples": [],
+ "note": ""
+}
