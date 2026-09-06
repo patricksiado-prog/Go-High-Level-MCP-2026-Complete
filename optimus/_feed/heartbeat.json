@@ -1,41 +1,46 @@
 {
- "run_id": "20260904-145042",
- "operator": "Patrick",
- "machine": "LAPTOP-FJEEPATI",
- "build_fingerprint": "3d2a6779",
+ "run_id": "20260905-234823",
+ "operator": "PC:LAPTOP-JLCQ24SO",
+ "machine": "LAPTOP-JLCQ24SO",
+ "build_fingerprint": "e26a3ffe",
  "mode": "",
- "updated_at": "2026-09-04 14:51:49",
- "last_phase": "LOGGED_OUT",
+ "updated_at": "2026-09-06 00:48:59",
+ "last_phase": "LOGIN_TIMEOUT",
  "phases": [
   [
    "start",
-   "14:50:44",
+   "23:48:24",
    0.0
   ],
   [
    "playwright_up",
-   "14:51:23",
-   39.0
+   "23:48:35",
+   10.6
   ],
   [
    "chromium_up",
-   "14:51:38",
-   53.5
+   "23:48:50",
+   26.2
   ],
   [
    "browser_up",
-   "14:51:41",
-   56.5
+   "23:48:50",
+   26.3
   ],
   [
    "page_loaded",
-   "14:51:45",
-   61.1
+   "23:48:55",
+   31.2
   ],
   [
    "LOGGED_OUT",
-   "14:51:49",
-   64.2
+   "23:48:56",
+   31.8
+  ],
+  [
+   "LOGIN_TIMEOUT",
+   "00:48:59",
+   3634.5
   ]
  ]
 }
