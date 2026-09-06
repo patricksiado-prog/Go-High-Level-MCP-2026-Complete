@@ -343,7 +343,7 @@ try:
     _BLD_CODES["copper"] = tuple(str(x).lower() for x in _bc.get("copper", []))
 except Exception:
     pass
-BUILD_DATE = "2026-09-04"   # bump on every push so the console proves the version
+BUILD_DATE = "2026-09-06"   # bump on every push so the console proves the version
 # LAUNCHER SENTINEL -- NEVER REMOVE. RUN_HUNTER.bat and INSTALL_OPTIMUS.bat only
 # accept a downloaded hunter that contains the literal text "GOLD CAPTURE ON"
 # (findstr /C:"GOLD CAPTURE ON"). That text lived in the launch banner until
@@ -380,6 +380,15 @@ try:
     import optimus_operator as _OP
 except Exception:                     # never let identity break a sweep
     _OP = None
+
+# FOLDER ORDERS. A second input to the controls the hunter already has, so a
+# machine in another room can be un-paused without walking to it. The module
+# has no power of its own -- it reads a JSON file and hands back the orders
+# for THIS machine; _apply_orders() below is what actually flips the flags.
+try:
+    import optimus_orders as _ORDERS
+except Exception:                     # no orders module -> keyboard only
+    _ORDERS = None
 
 
 def OPERATOR():
@@ -947,6 +956,62 @@ def _set_paused(on):
         pass
 
 
+def _apply_orders(every=20.0):
+    """Carry out any orders waiting in the shared folder. Never raises.
+
+    Each order maps onto a control the hunter already exposes on the
+    keyboard, so the worst a malformed order can do is pause a sweep.
+    Nothing here runs a command, and there is deliberately no path that
+    could: the vocabulary is fixed at six words and two of them are
+    declined below rather than half-done.
+    """
+    if _ORDERS is None:
+        return 0
+    try:
+        pending = _ORDERS.poll(every=every)
+    except Exception:
+        return 0
+    done = 0
+    for o in pending or []:
+        action = str(o.get("action") or "")
+        args = o.get("args") if isinstance(o.get("args"), dict) else {}
+        ok, detail = True, ""
+        try:
+            if action == "resume":
+                _set_paused(False)
+                _GO_NOW[0] = True
+                detail = "un-paused -- same as Ctrl+UP"
+            elif action == "pause":
+                _set_paused(True)
+                detail = "paused -- same as Ctrl+DOWN"
+            elif action == "stop":
+                _STOP[0] = True
+                detail = "stopping cleanly -- same as Ctrl+Shift+S"
+            elif action == "note":
+                text = str(args.get("text") or "")[:300]
+                print("\n  ORDER NOTE: %s\n" % text)
+                detail = "printed on this console"
+            elif action in ("claim", "release"):
+                # Territory lives in the sheet, and claim()/release() need
+                # the open spreadsheet handle -- which the pause loop does
+                # not have. Saying so beats pretending it was carried out.
+                ok = False
+                detail = ("%s needs the open sheet; not available from the "
+                          "pause loop -- use --claim/--release" % action)
+            else:
+                ok = False
+                detail = "unknown action"
+            print("  [order] %s -> %s" % (action, detail))
+            done += 1
+        except Exception as e:
+            ok, detail = False, str(e)[:120]
+        try:
+            _ORDERS.mark_done(o, ok=ok, detail=detail)
+        except Exception:
+            pass
+    return done
+
+
 def pause_gate(page=None):
     """Block here while paused. Returns True if we WERE paused, which tells the
     caller the map may have been moved by hand and it should re-aim rather than
@@ -960,6 +1025,10 @@ def pause_gate(page=None):
     print("  or Ctrl+DOWN again to un-pause. Capture stays ON while paused.")
     print("=" * 58 + "\n")
     while _PAUSE[0] and not _STOP[0]:
+        # A paused hunter is exactly when a remote resume matters, and this
+        # loop is already doing nothing. poll() only touches the disk every
+        # `every` seconds, so calling it from a 0.25s loop is free.
+        _apply_orders(every=10.0)
         time.sleep(0.25)
     if _STOP[0]:
         return True
@@ -6061,7 +6130,8 @@ _CORE_FILES = ("precise_fiber_hunter.py", "optimus_dedupe.py",
                "test_gold_predicate.py", "wire_diff.py",
                "clean_sheet.py", "CLEAN_SHEET.bat", "sheet_feed.py",
                "COUNT_TABS.bat", "free_space.py", "FREE_SPACE.bat",
-               "ghl_to_sheet.py", "GHL_TO_SHEET.bat")
+               "ghl_to_sheet.py", "GHL_TO_SHEET.bat",
+               "optimus_orders.py")
 
 
 def _raw_refresh(here):
