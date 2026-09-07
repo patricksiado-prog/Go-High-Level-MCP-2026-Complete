@@ -4,8 +4,8 @@
  "machine": "LAPTOP-JLCQ24SO",
  "build_fingerprint": "966aa0b7",
  "mode": "",
- "updated_at": "2026-09-07 10:16:29",
- "last_phase": "CRASHED",
+ "updated_at": "2026-09-07 10:16:32",
+ "last_phase": "exit",
  "phases": [
   [
    "start",
@@ -21,6 +21,11 @@
    "CRASHED",
    "10:16:29",
    159.0
+  ],
+  [
+   "exit",
+   "10:16:32",
+   162.0
   ]
  ]
 }
