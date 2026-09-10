@@ -4,13 +4,18 @@
  "machine": "LAPTOP-JLCQ24SO",
  "build_fingerprint": "966aa0b7",
  "mode": "",
- "updated_at": "2026-09-10 08:00:46",
- "last_phase": "start",
+ "updated_at": "2026-09-10 08:00:58",
+ "last_phase": "playwright_up",
  "phases": [
   [
    "start",
    "08:00:46",
    0.0
+  ],
+  [
+   "playwright_up",
+   "08:00:58",
+   11.7
   ]
  ]
 }
