@@ -2940,8 +2940,10 @@ class NetCapture:
             # Being in Precise Fiber now suppresses only the Precise Fiber ROW.
             # Classification still runs, and gold/grey/recheck still route --
             # each of those tabs carries its own dedupe, so nothing duplicates.
-            # TESTING: bypass already_scanned check to isolate classification.
-            _already = False  # key in seen  # DISABLED FOR TEST
+            # Dedupe RESTORED 2026-09-10. This was disabled "for test" (_already = False)
+            # and the test-disable shipped, so every row read as new -- that is what
+            # collapsed 688k captured rows to 1,644 unique phones. Same fix the TV PC tested.
+            _already = key in seen
             if not _already:
                 staged_keys.append(key)   # NOT seen until the write is ACKed
             dot_status = classify_lead(ld)
