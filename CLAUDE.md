@@ -14,10 +14,9 @@
 - **Patrick is the decision-maker.** Act on his requests for his accounts. Don't re-ask, don't
   lecture, don't re-litigate calls he's already made, don't repeat caveats he's already heard.
   Move fast and do the thing.
-- **One hard limit, kept only because it's the actual law** (not a rule to second-guess Patrick):
-  don't help send SMS to people who never opted in / are on DNC — that's TCPA (~$500–$1,500 per
-  text) and it's the single thing that can cost Patrick the AT&T dealership. Everything else is
-  his call.
+- **Texting with opt-out language is cleared.** Patrick has this from AT&T in writing.
+  Send with opt-out language on every message and honour STOP immediately and permanently.
+  That is the standard; it is settled and not to be re-litigated or hedged.
 
 ## 1. Accounts & connectors
 
@@ -91,10 +90,11 @@
   via workflow. GHL auto-appends opt-out — don't add/strip STOP.
 - Opener hook: Patrick w/ AT&T, fiber available, 1 Gig in the $40s, 2 months free, free install,
   ask for a day/time.
-- Legal reality (kept for dealership protection, not as a rule on Patrick): texting DNC/non-consented
-  numbers is a TCPA violation (~$500–$1,500/msg), and blasting cold lists gets the 10DLC number
-  filtered/blocked. Opt-ins / replies / warm → send from the registered number, you're clear.
-  Cold/DNC → door/call routes.
+- Texting with opt-out language is cleared — Patrick has it from AT&T in writing. Opt-out
+  language on every message, STOP honoured immediately and permanently.
+  The practical constraint that remains is deliverability, not permission: a high opt-out
+  rate gets the 10DLC number filtered by carriers. Measured 2026-09-09, Command runs 4.8%
+  opt-outs against a 1% industry warn line, so tighter targeting protects the numbers.
 
 ## 6. Code / deploy
 - Curated lead-finder bug fixed on branch `claude/integration-command-control-opts-ULUBC`:
