@@ -1,31 +1,16 @@
 {
- "run_id": "20260909-213325",
+ "run_id": "20260909-215007",
  "operator": "PC:LAPTOP-JLCQ24SO",
  "machine": "LAPTOP-JLCQ24SO",
  "build_fingerprint": "966aa0b7",
  "mode": "",
- "updated_at": "2026-09-09 21:48:46",
- "last_phase": "exit",
+ "updated_at": "2026-09-09 21:50:08",
+ "last_phase": "start",
  "phases": [
   [
    "start",
-   "21:33:45",
+   "21:50:08",
    0.0
-  ],
-  [
-   "playwright_up",
-   "21:42:34",
-   529.0
-  ],
-  [
-   "CRASHED",
-   "21:48:40",
-   895.1
-  ],
-  [
-   "exit",
-   "21:48:46",
-   900.2
   ]
  ]
 }
