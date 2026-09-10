@@ -1,0 +1,8 @@
+{
+  "_README": "Optimus kill list. Edit this file to lock machines. Read license_gate.py.",
+  "_how_to_deny_one_machine": "add its 16-char id to 'denied'. The id prints in the DEACTIVATED notice on that PC, and in RUN_HUNTER's startup line.",
+  "_how_to_kill_everything": "set kill_all=true AND kill_all_confirm to TODAY's date (YYYY-MM-DD). A bare true with no matching date is deliberately IGNORED.",
+  "kill_all": false,
+  "kill_all_confirm": "",
+  "denied": []
+}

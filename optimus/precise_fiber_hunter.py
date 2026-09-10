@@ -6140,7 +6140,8 @@ _CORE_FILES = ("precise_fiber_hunter.py", "optimus_dedupe.py",
                "clean_sheet.py", "CLEAN_SHEET.bat", "sheet_feed.py",
                "COUNT_TABS.bat", "free_space.py", "FREE_SPACE.bat",
                "ghl_to_sheet.py", "GHL_TO_SHEET.bat",
-               "optimus_orders.py", "license_gate.py")
+               "optimus_orders.py", "license_gate.py",
+               "optimus_deny.json")
 
 
 def _raw_refresh(here):
@@ -8091,6 +8092,12 @@ def _mark_profile_clean(profile_dir):
 
 def main():
     check_license()   # deny-listed / kill_all machines lock here (exit 0) before anything runs
+    try:
+        from license_gate import fingerprint as _lic_fp
+        print("  OPTIMUS machine id : %s   (owner: add to the deny list to lock this PC)"
+              % _lic_fp())
+    except Exception:
+        pass
     self_update()
     # Configured FIRST so every later milestone can be pushed live. A run that
     # hangs or is force-quit never reaches its exit report, and for a full day
