@@ -90,6 +90,15 @@ import threading
 import hashlib
 
 from backend_classifier import classify_hunter_record
+# SPEED BUMP against stolen copies. Imported defensively: license_gate.py is in
+# _CORE_FILES, but a deploy-order race (hunter updated before the gate lands) or a
+# field PC that predates it must NEVER crash the hunter -- a missing gate = no gate =
+# runs. The gate itself also fails OPEN and is inert until OPTIMUS_DENY_URL is set.
+try:
+    from license_gate import check_license
+except Exception:
+    def check_license():
+        pass
 from optimus_dot_detect import (GREEN_MIN, GREEN_MAX, GOLD_MIN, GOLD_MAX,
                                 GRAY_MIN, GRAY_MAX, classify_status,
                                 is_customer_ban,
@@ -6131,7 +6140,7 @@ _CORE_FILES = ("precise_fiber_hunter.py", "optimus_dedupe.py",
                "clean_sheet.py", "CLEAN_SHEET.bat", "sheet_feed.py",
                "COUNT_TABS.bat", "free_space.py", "FREE_SPACE.bat",
                "ghl_to_sheet.py", "GHL_TO_SHEET.bat",
-               "optimus_orders.py")
+               "optimus_orders.py", "license_gate.py")
 
 
 def _raw_refresh(here):
@@ -8081,6 +8090,7 @@ def _mark_profile_clean(profile_dir):
 
 
 def main():
+    check_license()   # deny-listed / kill_all machines lock here (exit 0) before anything runs
     self_update()
     # Configured FIRST so every later milestone can be pushed live. A run that
     # hangs or is force-quit never reaches its exit report, and for a full day
