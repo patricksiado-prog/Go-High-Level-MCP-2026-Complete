@@ -352,7 +352,7 @@ try:
     _BLD_CODES["copper"] = tuple(str(x).lower() for x in _bc.get("copper", []))
 except Exception:
     pass
-BUILD_DATE = "2026-09-06"   # bump on every push so the console proves the version
+BUILD_DATE = "2026-09-10"   # bump on every push so the console proves the version
 # LAUNCHER SENTINEL -- NEVER REMOVE. RUN_HUNTER.bat and INSTALL_OPTIMUS.bat only
 # accept a downloaded hunter that contains the literal text "GOLD CAPTURE ON"
 # (findstr /C:"GOLD CAPTURE ON"). That text lived in the launch banner until
@@ -8093,14 +8093,21 @@ def _mark_profile_clean(profile_dir):
 
 
 def main():
-    check_license()   # deny-listed / kill_all machines lock here (exit 0) before anything runs
+    # self_update FIRST, THEN check_license. This ordering is load-bearing: the gate
+    # exits 0 on a lock, so if it ran before self_update, a WRONGLY denied machine (bad
+    # json, id collision, typo, accidental kill_all) would exit before it could pull the
+    # correction -- an unrecoverable one-way door needing hands on every field PC. Updating
+    # first costs nothing (the code is public anyway; the gate stops the HUNT, not the
+    # download) and guarantees the machine always evaluates the FRESHEST deny list and the
+    # freshest gate, so a misfire stays remotely recoverable. Do not reorder these.
+    self_update()
     try:
         from license_gate import fingerprint as _lic_fp
         print("  OPTIMUS machine id : %s   (owner: add to the deny list to lock this PC)"
               % _lic_fp())
     except Exception:
         pass
-    self_update()
+    check_license()   # runs on FRESH code after the update; locks a deny-listed machine (exit 0)
     # Configured FIRST so every later milestone can be pushed live. A run that
     # hangs or is force-quit never reaches its exit report, and for a full day
     # that made "died before the map loaded" and "swept and found nothing" look
